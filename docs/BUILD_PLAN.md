@@ -222,7 +222,12 @@ schelling knowledge search "commitment problem"
 - [ ] Transcript index searchable from the CLI
 - [ ] Every solve emits a complete ForecastRecord
 - [ ] CI green: ruff, mypy --strict (solver), pytest
-- [ ] Repo public, AGPL-3.0, README states the guiding principle verbatim
+- [ ] Private personal-analysis edition, AGPL-3.0, README states the guiding principle verbatim
+
+> **Distribution update (Session 5):** this is now a **private, personal-analysis edition**.
+> The "open, public repo from day one / open core" framing above and in §1 is superseded:
+> public release and the public scoreboard are **deferred** to a later phase. The AGPL-3.0
+> license and the guiding principle are unchanged.
 
 ## 10. Claude Code session plan
 
