@@ -49,6 +49,12 @@ structures; it never predicts and never auto-solves. A concepts-library firewall
 that every real-world claim traces to the supplied text/sources (CLAUDE.md rule 6). Tests
 use a record/replay client so CI never calls the live API.
 
+**Session 6 (done) — report renderer:** `schelling report` renders a `DraftGameSpec`
+(review sheet) or a `ForecastRecord` (full analysis) to a single self-contained HTML file —
+inline CSS, charts as inline SVG (actor map, outcome histogram, sensitivity tornado, median
+trajectory), no JavaScript and no network. Deterministic: same artifact → byte-identical
+HTML (D6.x).
+
 ## CLI
 
 ```sh
@@ -62,6 +68,9 @@ schelling knowledge search "war of attrition" -k 5
 # Formalize a described situation into a reviewable draft (needs the `formalize` extra +
 # ANTHROPIC_API_KEY). Prints a stakeholder table; NEVER auto-solves — review, then solve.
 schelling formalize situation.txt --sources ./sources -o game.draft.json
+
+# Render any artifact (a draft or a ForecastRecord) to a self-contained HTML report
+schelling report runs/Q-1994-EMISSIONS-mc10000-s42-*.json -o report.html --open
 ```
 
 Optional extras: `uv sync --extra knowledge` (bge-m3 embeddings, ~2 GB model) and
