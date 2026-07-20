@@ -66,5 +66,7 @@ venv.bak/
 # --- schelling-specific ---
 # Raw Jiang transcripts are not redistributable; index is rebuilt locally.
 data/transcripts/
+# The sqlite-vec knowledge index is a build artifact rebuilt from the transcripts.
+data/*.db
 # Every solve writes a ForecastRecord here; these are run artifacts, not source.
 runs/

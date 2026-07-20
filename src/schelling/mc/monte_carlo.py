@@ -19,7 +19,7 @@ import numpy.typing as npt
 
 from schelling.mc.sampling import derive_rng, sample_game
 from schelling.mc.sensitivity import tornado
-from schelling.schemas.forecast import ForecastRecord, SensitivityEntry, StoppingRule
+from schelling.schemas.forecast import Ensemble, ForecastRecord, SensitivityEntry, StoppingRule
 from schelling.schemas.question import GameSpec
 from schelling.solver.config import SolverConfig
 from schelling.solver.model import run
@@ -131,28 +131,31 @@ def build_forecast_record(
 ) -> ForecastRecord:
     """Assemble the complete :class:`ForecastRecord` from a Monte Carlo run.
 
-    The headline statistics summarize the *median* forecast distribution: ``forecast_median``
-    is its median, ``forecast_mean`` / ``settlement_point`` its expected value (see D3.3).
-    ``run_id`` is derived from the inputs hash and seed, so identical inputs address the same
-    record file deterministically.
+    The headline statistics live in the ``ensemble`` block and summarize the per-draw
+    converged **median**: ``ensemble.median`` (central estimate), ``ensemble.mean`` (expected
+    outcome), ``ensemble.p10``/``p90`` (CI80). See D4.2. ``run_id`` is derived from the inputs
+    hash and seed, so identical inputs address the same record file deterministically.
     """
     dist = np.sort(mc.median_distribution)
     hashed = inputs_hash(game, config)
     run_id = f"{game.question_id}-mc{mc.n_draws}-s{mc.seed}-{hashed[:12]}"
+    p10, p90 = ci80(mc.median_distribution)
     return ForecastRecord(
         question_id=game.question_id,
         run_id=run_id,
         engine_version=engine_version(),
         inputs_hash=hashed,
         seed=mc.seed,
-        n_draws=mc.n_draws,
         solver_config=config.model_dump(mode="json"),
         created_at=created_at,
-        forecast_median=float(np.median(dist)),
-        forecast_mean=float(np.mean(dist)),
+        ensemble=Ensemble(
+            median=float(np.median(dist)),
+            mean=float(np.mean(dist)),
+            p10=p10,
+            p90=p90,
+            n_draws=mc.n_draws,
+        ),
         outcome_distribution=[float(v) for v in dist],
-        ci80=ci80(mc.median_distribution),
-        settlement_point=float(np.mean(dist)),
         convergence_stats=convergence_stats(mc),
         sensitivity=sensitivity,
     )
