@@ -77,8 +77,9 @@ def test_zero_variance_on_point_fixture(replication_game: GameSpec) -> None:
     assert np.all(mc.median_distribution == deterministic)
 
     record = build_forecast_record(replication_game, cfg, mc, sensitivity=[])
-    assert record.forecast_median == pytest.approx(deterministic)
-    assert record.ci80 == (deterministic, deterministic)
+    assert record.ensemble.median == pytest.approx(deterministic)
+    assert (record.ensemble.p10, record.ensemble.p90) == (deterministic, deterministic)
+    assert record.ensemble.n_draws == 200
     assert set(record.outcome_distribution) == {deterministic}
 
 
@@ -88,9 +89,7 @@ def test_widened_fixture_is_non_degenerate(widened_game: GameSpec) -> None:
     record = forecast(widened_game, cfg, n_draws=1000, seed=11, write=False)
     dist = record.outcome_distribution
     assert len(set(dist)) > 50  # a real spread, not a spike
-    assert record.ci80 is not None
-    low, high = record.ci80
-    assert low < record.forecast_median < high
+    assert record.ensemble.p10 < record.ensemble.median < record.ensemble.p90
     # a sensible tornado is attached
     assert {e.parameter for e in record.sensitivity} == {"france.position", "germany.position"}
     assert abs(record.sensitivity[0].swing) > 0.0

@@ -68,8 +68,30 @@ class SensitivityEntry(BaseModel):
     swing: float  # forecast_at_high - forecast_at_low
 
 
+class Ensemble(BaseModel):
+    """Ensemble statistics over the per-draw converged **median** (the headline forecast).
+
+    A dedicated block so that no field called ``median``/``mean`` changes meaning by layer
+    (D4.2): ``SolverResult.forecast_median``/``forecast_mean`` describe one deterministic run;
+    ``Ensemble.median``/``mean`` describe the distribution across Monte Carlo draws.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    median: float  # median of the outcome distribution (central estimate)
+    mean: float  # mean of the outcome distribution (expected outcome / settlement point)
+    p10: float  # 10th percentile (CI80 lower bound)
+    p90: float  # 90th percentile (CI80 upper bound)
+    n_draws: int
+
+
 class ForecastRecord(BaseModel):
-    """The audit artifact — one for every solve, deterministic under ``seed``."""
+    """The audit artifact — one per Monte Carlo run, deterministic under ``seed``.
+
+    The record is fully recomputable from ``(inputs_hash, solver_config, seed,
+    engine_version)``; ``outcome_distribution`` embeds the raw draws as a convenience cache,
+    not the source of truth (D4.1).
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -78,15 +100,11 @@ class ForecastRecord(BaseModel):
     engine_version: str  # git SHA of the engine that produced this record
     inputs_hash: str  # SHA-256 of the canonical (GameSpec + SolverConfig) JSON
     seed: int  # Monte Carlo master seed
-    n_draws: int = 1
     solver_config: dict[str, str | float | int | bool] = Field(default_factory=dict)
     created_at: str | None = None  # ISO-8601; outside hashed content; None keeps runs identical
 
-    forecast_median: float
-    forecast_mean: float
+    ensemble: Ensemble
 
-    outcome_distribution: list[float] = Field(default_factory=list)
-    ci80: tuple[float, float] | None = None
-    settlement_point: float | None = None
+    outcome_distribution: list[float] = Field(default_factory=list)  # raw draws (cache, D4.1)
     convergence_stats: dict[str, float] = Field(default_factory=dict)
     sensitivity: list[SensitivityEntry] = Field(default_factory=list)
