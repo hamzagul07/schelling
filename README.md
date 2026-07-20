@@ -21,6 +21,13 @@ papers in [`docs/papers/`](docs/papers/).
 vote layer — effective weights, pairwise (Condorcet) contests, weighted mean, and the
 weighted-median forecast.
 
+**Session 2 (done):** the full solver — expected utility, risk propensity, octant
+classification, offer exchange, and the convergence stopping rule — and the BDM-1994
+emission-standards replication gate (`tests/test_replication.py`). The converged median
+forecast lands within ±1.0 of the outcome Scholz et al. reproduce; every interpretive
+choice against the paper is logged in [`DECISIONS.md`](DECISIONS.md) (D2.x) and the
+equation extract is in [`docs/papers/scholz_extract.md`](docs/papers/scholz_extract.md).
+
 ## Development
 
 This project is managed with [`uv`](https://docs.astral.sh/uv/) and targets Python 3.12.
