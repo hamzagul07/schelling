@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Q-COAL-PHASEOUT</title><style>
+:root { --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --panel:#f9fafb; --accent:#b45309; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#fff;
+  font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.wrap { max-width:760px; margin:0 auto; padding:40px 28px 72px; }
+h1 { font-size:22px; font-weight:650; margin:0 0 2px; letter-spacing:-.01em; }
+h2 { font-size:13px; font-weight:650; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--muted); margin:38px 0 12px; }
+.sub { color:var(--muted); font-size:13px; margin:0 0 4px; }
+.kicker { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
+figure { margin:0; }
+.metrics { display:flex; flex-wrap:wrap; gap:12px; margin:6px 0 4px; }
+.metric { flex:1 1 130px; border:1px solid var(--line); border-radius:8px; padding:12px 14px;
+  background:var(--panel); }
+.metric .m-val { font-size:20px; font-weight:650; letter-spacing:-.01em; }
+.metric .m-lab { color:var(--muted); font-size:11px; text-transform:uppercase;
+  letter-spacing:.05em; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line);
+  vertical-align:top; }
+th { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase;
+  letter-spacing:.04em; }
+td.num { font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ev { color:var(--muted); font-size:12px; }
+.ev q { color:var(--ink); }
+ul.checklist { list-style:none; margin:0; padding:0; }
+ul.checklist li { border:1px solid var(--line); border-radius:8px; padding:10px 12px 10px 34px;
+  position:relative; margin-bottom:8px; background:var(--panel); }
+ul.checklist .box { position:absolute; left:11px; top:11px; width:14px; height:14px;
+  border:1.5px solid #9ca3af; border-radius:3px; }
+ul.checklist .why { color:var(--muted); font-size:12px; margin-top:3px; }
+.prov { border-top:1px solid var(--line); margin-top:40px; padding-top:14px; color:var(--muted);
+  font-size:12px; }
+.prov dl { display:grid; grid-template-columns:150px 1fr; gap:3px 14px; margin:0; }
+.prov dt { color:#9ca3af; }
+.prov dd { margin:0; word-break:break-all; font-variant-numeric:tabular-nums; }
+/* SVG chart classes */
+.axis, .whisker, .baseline, .settle-line, .median-line { stroke:#9ca3af; fill:none; }
+.axis { stroke:var(--line); } .whisker { stroke:#94a3b8; stroke-width:1.4; }
+.dot { fill:#334155; } .bar { fill:#cbd5e1; } .tbar { fill:#94a3b8; }
+.ci-band { fill:#eef2f7; } .traj-line { stroke:#334155; stroke-width:1.6; fill:none; }
+.baseline { stroke-dasharray:3 3; } .settle-line, .median-line { stroke:var(--accent);
+  stroke-width:1.4; stroke-dasharray:4 3; }
+.tick, .actor-label, .swing, .settle-label { font:11px sans-serif; fill:var(--muted); }
+.actor-label { fill:var(--ink); } .swing { fill:#374151; font-variant-numeric:tabular-nums; }
+.settle-label { fill:var(--accent); font-weight:600; }
+@media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .wrap { max-width:none; padding:0 12px; } h2 { margin-top:24px; } }
+</style></head><body><div class="wrap"><div class="kicker">Draft game specification — for review</div><h1>Q-COAL-PHASEOUT</h1><p class="sub">frozen 2026-07-21 · template: multilateral_bargaining · horizon: one_shot</p><p class="sub"><strong>Year of coal-power phase-out</strong><br>0 = earliest phase-out (2030) &nbsp;·&nbsp; 100 = latest phase-out (2040)</p><h2>Actor map</h2><figure><svg viewBox="0 0 680.00 144.00" width="100%" preserveAspectRatio="xMidYMid meet" role="img"><text x="172.00" y="35.00" text-anchor="end" class="actor-label">Aland</text><line x1="201.82" y1="31.00" x2="245.45" y2="31.00" class="whisker"/><line x1="201.82" y1="28.00" x2="201.82" y2="34.00" class="whisker"/><line x1="245.45" y1="28.00" x2="245.45" y2="34.00" class="whisker"/><circle cx="201.82" cy="31.00" r="13.00" class="dot"/><text x="172.00" y="65.00" text-anchor="end" class="actor-label">Belland</text><line x1="594.55" y1="61.00" x2="638.18" y2="61.00" class="whisker"/><line x1="594.55" y1="58.00" x2="594.55" y2="64.00" class="whisker"/><line x1="638.18" y1="58.00" x2="638.18" y2="64.00" class="whisker"/><circle cx="638.18" cy="61.00" r="9.61" class="dot"/><text x="172.00" y="95.00" text-anchor="end" class="actor-label">Cesta</text><line x1="398.18" y1="91.00" x2="441.82" y2="91.00" class="whisker"/><line x1="398.18" y1="88.00" x2="398.18" y2="94.00" class="whisker"/><line x1="441.82" y1="88.00" x2="441.82" y2="94.00" class="whisker"/><circle cx="420.00" cy="91.00" r="8.45" class="dot"/><line x1="180.00" y1="116.00" x2="660.00" y2="116.00" class="axis"/><line x1="180.00" y1="116.00" x2="180.00" y2="120.00" class="axis"/><text x="180.00" y="132.00" text-anchor="start" class="tick">-5</text><line x1="420.00" y1="116.00" x2="420.00" y2="120.00" class="axis"/><text x="420.00" y="132.00" text-anchor="middle" class="tick">50</text><line x1="660.00" y1="116.00" x2="660.00" y2="120.00" class="axis"/><text x="660.00" y="132.00" text-anchor="end" class="tick">105</text></svg></figure><h2>Stakeholders</h2><table><thead><tr><th>actor</th><th>position</th><th>salience</th><th>capability</th><th>evidence</th></tr><tr><th></th><th>low / mode / high</th><th>low / mode / high</th><th>low / mode / high</th><th></th></tr></thead><tbody><tr><td>Aland<br><span class='ev'>aland</span></td><td class='num'>0 / 0 / 10</td><td class='num'>80 / 90 / 95</td><td class='num'>90 / 100 / 100</td><td><div class="ev"><q>Aland wants 2030 and is the most economically powerful.</q> — situation, 2026-07-21</div></td></tr><tr><td>Belland<br><span class='ev'>belland</span></td><td class='num'>90 / 100 / 100</td><td class='num'>60 / 70 / 80</td><td class='num'>40 / 50 / 60</td><td><div class="ev"><q>Belland wants 2040.</q> — situation, 2026-07-21</div></td></tr><tr><td>Cesta<br><span class='ev'>cesta</span></td><td class='num'>45 / 50 / 55</td><td class='num'>50 / 55 / 60</td><td class='num'>30 / 40 / 50</td><td><div class="ev"><q>Cesta wants 2035, the midpoint.</q> — situation, 2026-07-21</div></td></tr></tbody></table><h2>Open assumptions — review before solving</h2><ul class="checklist"><li><span class="box"></span>Capabilities are scaled with Aland at 100 as the strongest.<div class="why">The situation states only that Aland is the most economically powerful, not exact capability ratios.</div></li><li><span class="box"></span>Saliences reflect each power&#x27;s stated insistence on its date.<div class="why">The situation gives positions but no explicit salience figures.</div></li></ul><div class="prov">Provenance<dl><dt>model</dt><dd>claude-opus-4-8</dd><dt>tokens</dt><dd>in 1200 · out 800</dd><dt>cost</dt><dd>$0.0260</dd><dt>retries</dt><dd>0</dd></dl></div></div></body></html>
