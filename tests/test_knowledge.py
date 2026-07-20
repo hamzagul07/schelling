@@ -1,0 +1,60 @@
+"""Tests for the KnowledgeIndex: round-trip + seeded relevance (BUILD_PLAN §7)."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from schelling.knowledge.chunker import Chunk, chunk_directory
+from schelling.knowledge.embed import HashingEmbedder
+from schelling.knowledge.index import KnowledgeIndex
+
+TRANSCRIPTS = Path(__file__).parent.parent / "data" / "transcripts"
+
+
+@pytest.fixture(scope="module")
+def chunks() -> list[Chunk]:
+    return chunk_directory(TRANSCRIPTS)
+
+
+def test_index_round_trips_every_chunk(chunks: list[Chunk], tmp_path: Path) -> None:
+    db = tmp_path / "k.db"
+    index = KnowledgeIndex.build(chunks, HashingEmbedder(), db_path=db)
+    assert index.count() == len(chunks)
+    index.close()
+    # reopen from disk and confirm it still searches (embedder auto-selected from meta)
+    reopened = KnowledgeIndex.open(db)
+    assert reopened.count() == len(chunks)
+
+
+def test_search_returns_chunks_with_refs(chunks: list[Chunk], tmp_path: Path) -> None:
+    index = KnowledgeIndex.build(chunks, HashingEmbedder(), db_path=tmp_path / "k.db")
+    results = index.search("game theory", k=5)
+    assert 1 <= len(results) <= 5
+    assert all(r.ref.endswith(".txt)") for r in results)
+    # scores are sorted descending (best first)
+    assert [r.score for r in results] == sorted((r.score for r in results), reverse=True)
+
+
+def test_seeded_relevance_dating_game(chunks: list[Chunk], tmp_path: Path) -> None:
+    # A query whose expected passage is known in advance: the distinctive vocabulary of the
+    # opening "Dating Game" lecture (5 men, 5 women, marriage, incels) must surface lecture #1.
+    index = KnowledgeIndex.build(chunks, HashingEmbedder(), db_path=tmp_path / "k.db")
+    top = index.search("the dating game five men five women marriage incels", k=1)[0]
+    assert top.chunk.lecture == "Game Theory #1: The Dating Game"
+
+
+def test_open_rejects_dimension_mismatch(chunks: list[Chunk], tmp_path: Path) -> None:
+    db = tmp_path / "k.db"
+    KnowledgeIndex.build(chunks, HashingEmbedder(dim=512), db_path=db).close()
+    with pytest.raises(ValueError, match="dim"):
+        KnowledgeIndex.open(db, HashingEmbedder(dim=256))
+
+
+def test_build_is_deterministic(chunks: list[Chunk], tmp_path: Path) -> None:
+    a = KnowledgeIndex.build(chunks, HashingEmbedder(), db_path=tmp_path / "a.db")
+    b = KnowledgeIndex.build(chunks, HashingEmbedder(), db_path=tmp_path / "b.db")
+    qa = [(r.chunk.lecture, round(r.score, 6)) for r in a.search("game theory power", 5)]
+    qb = [(r.chunk.lecture, round(r.score, 6)) for r in b.search("game theory power", 5)]
+    assert qa == qb

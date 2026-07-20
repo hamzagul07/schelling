@@ -1,0 +1,213 @@
+# Game-template cards (BUILD_PLAN §7).
+#
+# Each card is a reusable game-theoretic pattern the formalizer (Phase 1) will classify a
+# live question into. Fields: name, conditions (when it applies), solution_concept (the
+# predicted logic of play), transcript_refs (lectures grounding it, from the bge-m3 index),
+# notes.
+#
+# PROVENANCE: transcript_refs point at the "Predictive History" game-theory *summaries*
+# (docs D4.x) — geopolitical lectures that *apply* these templates to real cases, not
+# textbook derivations. Refs were selected by semantic (bge-m3) search over the index.
+#
+# STATUS: DRAFT — not final until hand-reviewed by Hassan. Conditions/solution_concepts are
+# standard game theory; the transcript_refs are the best-matching lectures, to be confirmed.
+
+templates:
+  - name: Prisoner's Dilemma
+    conditions: >
+      Two (or more) actors each choose cooperate or defect; defection strictly dominates for
+      each individually, yet mutual cooperation Pareto-dominates mutual defection. One-shot,
+      no binding agreements.
+    solution_concept: >
+      Unique Nash equilibrium is mutual defection despite a jointly worse payoff. Cooperation
+      requires changing the game (repetition, enforcement, or side-payments).
+    transcript_refs:
+      - "Game Theory #12: The Law of Eschatological Convergence"
+      - "Game Theory #5: The World Game"
+    notes: >
+      The recurring "everyone races to the worst collective outcome" motif (arms races,
+      trade wars). Watch for framing that treats defection as individually rational.
+
+  - name: Chicken / Brinkmanship
+    conditions: >
+      Two actors on a collision course; each prefers to yield rather than crash, but most
+      prefers the other yields. Costly, visible escalation with a shared catastrophe if
+      neither backs down.
+    solution_concept: >
+      Two asymmetric pure equilibria (one side yields); mixed equilibrium with positive crash
+      probability. Advantage goes to whoever credibly commits to not yielding (burns bridges,
+      removes the steering wheel).
+    transcript_refs:
+      - "Game Theory #11: The Law of Escalation"
+      - "Game Theory #9: The US-Iran War"
+    notes: >
+      The escalation-ladder analysis maps here directly: manufactured irreversibility as a
+      bargaining tactic.
+
+  - name: War of Attrition
+    conditions: >
+      Two actors compete for a prize by paying a continuous cost over time; the one who
+      outlasts the other wins, but both pay the accumulated cost. Value of the prize and
+      cost-tolerance are the key parameters.
+    solution_concept: >
+      No pure-strategy equilibrium in the symmetric case; mixed equilibrium in stopping times.
+      Expected payoff is dissipated by the contest; deeper pockets / higher pain tolerance win.
+    transcript_refs:
+      - "Game Theory #23: The WWIII Chessboard"
+      - "Game Theory #10: The Law of Asymmetry"
+      - "Game Theory #27: Putin Enters the Chat"
+    notes: >
+      Sanctions wars and prolonged stalemates; the "who can bleed longer" framing. Asymmetry
+      of cost tolerance is decisive.
+
+  - name: Bargaining with Incomplete Information
+    conditions: >
+      Actors negotiate over a divisible surplus while holding private information (resolve,
+      costs, valuations). No party can verify the other's type.
+    solution_concept: >
+      Perfect Bayesian equilibrium: offers screen types and signal resolve; positive
+      probability of bargaining failure / delay is efficient given the information asymmetry.
+    transcript_refs:
+      - "Game Theory #10: The Law of Asymmetry"
+      - "Game Theory #19: The Hollywood-Pentagon Complex"
+      - "Game Theory #24: The AI Apocalypse"
+    notes: >
+      Explains breakdowns that look "irrational" from the outside — delay and bluffing are
+      equilibrium behaviour under private information.
+
+  - name: Signaling
+    conditions: >
+      An informed sender takes a costly, observable action before an uninformed receiver
+      responds; the signal's cost differs by sender type.
+    solution_concept: >
+      Separating equilibrium when the signal is too costly for the weak type to mimic
+      (single-crossing); otherwise pooling. Credibility rests on the cost differential, not
+      the message.
+    transcript_refs:
+      - "Game Theory #25: Trump Visits China"
+      - "Game Theory #16: Pax Judaica Rising (Re-Upload)"
+      - "Game Theory #7: America's Game"
+    notes: >
+      Military posturing, state visits, and reserve-currency moves read as costly signals of
+      resolve or alignment.
+
+  - name: Repeated Games
+    conditions: >
+      A stage game is played repeatedly by the same actors with a sufficiently high discount
+      factor (long shadow of the future) and observable histories.
+    solution_concept: >
+      Folk theorem: cooperation is sustainable as a subgame-perfect equilibrium via
+      trigger/tit-for-tat strategies when the future is valued enough to deter one-shot
+      defection.
+    transcript_refs:
+      - "Game Theory #5: The World Game"
+      - "Game Theory #26: The Holy Empire of AI"
+      - "Game Theory #20: Mid-Term Examination"
+    notes: >
+      The basis for durable alliances and norms; erodes when actors' time horizons shorten
+      (regime instability, succession).
+
+  - name: Commitment Problems
+    conditions: >
+      A mutually beneficial deal exists, but at least one party cannot credibly promise to
+      honour it later (power shifts, no external enforcer, incentive to renege ex post).
+    solution_concept: >
+      Bargaining fails or conflict occurs even with common knowledge of preferences; solved
+      only by credible commitment devices (hostages, institutions, tying hands, third-party
+      enforcement).
+    transcript_refs:
+      - "Game Theory #28: Predictive History"
+      - "Game Theory #3: Rich Dad, Poor Dad"
+    notes: >
+      Central to preventive-war logic: a rising power cannot commit not to exploit future
+      strength, so the declining power strikes early.
+
+  - name: Multilateral / Coalition Bargaining
+    conditions: >
+      Three or more actors with divergent positions and unequal capabilities bargain over a
+      one-dimensional (or low-dimensional) outcome; coalitions can form.
+    solution_concept: >
+      Median-voter / Condorcet logic on a single issue dimension; coalition value split by
+      power (this is exactly the BDM/Scholz engine this project implements). Pivotal actors
+      capture disproportionate influence.
+    transcript_refs:
+      - "Game Theory #16: Pax Judaica Rising (Re-Upload)"
+      - "Game Theory #23: The WWIII Chessboard"
+      - "Game Theory #21: World War Trump"
+    notes: >
+      The template the solver itself instantiates; use it to sanity-check formalized cases
+      against the lectures' balance-of-power narratives.
+
+  - name: Coordination / Nash Equilibrium
+    conditions: >
+      Actors prefer to match choices (or match to complementary roles); multiple equilibria
+      exist and no party gains by unilateral deviation once an equilibrium is reached.
+    solution_concept: >
+      Multiple pure Nash equilibria; selection turns on focal points, conventions, or
+      first-mover cues rather than payoffs alone.
+    transcript_refs:
+      - "Game Theory #1: The Dating Game"
+      - "Game Theory #3: Rich Dad, Poor Dad"
+    notes: >
+      The opening "equals marry equals" equilibrium is the canonical coordination story in
+      the corpus.
+
+  - name: Deterrence (Mutual Assured Destruction)
+    conditions: >
+      Each actor can impose unacceptable costs on the other in retaliation; second-strike
+      capability is secure and credible.
+    solution_concept: >
+      A stable no-attack equilibrium sustained by the credible threat of retaliation; stability
+      degrades if second-strike survivability or credibility is doubted.
+    transcript_refs:
+      - "Game Theory #23: The WWIII Chessboard"
+      - "Game Theory #16: Pax Judaica Rising (Re-Upload)"
+      - "Game Theory #10: The Law of Asymmetry"
+    notes: >
+      A special stabilized case of Chicken; the lectures probe when the deterrence equilibrium
+      is undermined by asymmetry or missile-defence shifts.
+
+  - name: Hegemonic Stability
+    conditions: >
+      One dominant actor supplies global public goods (security, a reserve currency, open
+      trade) it is powerful enough to underwrite; others free-ride or defer.
+    solution_concept: >
+      A stable order while the hegemon's benefits exceed its provision costs; transitions to
+      contested multipolarity (bargaining/attrition) as relative power equalizes.
+    transcript_refs:
+      - "Game Theory #25: Trump Visits China"
+      - "Game Theory #7: America's Game"
+      - "Game Theory #27: Putin Enters the Chat"
+    notes: >
+      The dollar-reserve-currency thread is the corpus's core running example of hegemonic
+      provision and its unwinding.
+
+  - name: Collective Action / Free-Rider
+    conditions: >
+      A group shares a non-excludable benefit that requires costly individual contribution;
+      each actor prefers others bear the cost.
+    solution_concept: >
+      Under-provision of the public good in equilibrium; mitigated by selective incentives,
+      a privileged large actor who provisions unilaterally, or binding institutions.
+    transcript_refs:
+      - "Game Theory #27: Putin Enters the Chat"
+      - "Game Theory #24: The AI Apocalypse"
+      - "Game Theory #25: Trump Visits China"
+    notes: >
+      Alliance burden-sharing and coordinated de-dollarization both hinge on who is willing to
+      pay first.
+
+  - name: Zero-Sum vs Positive-Sum
+    conditions: >
+      Actors must classify the interaction: fixed pie to be divided (pure conflict) versus a
+      surplus creatable through cooperation (mixed motive).
+    solution_concept: >
+      Zero-sum interactions admit no cooperative gains (minimax play); mis-framing a
+      positive-sum game as zero-sum destroys attainable surplus and can manufacture conflict.
+    transcript_refs:
+      - "Game Theory #27: Putin Enters the Chat"
+      - "Game Theory #25: Trump Visits China"
+      - "Game Theory #2: Why Schools Suck"
+    notes: >
+      The lectures repeatedly argue that treating trade as zero-sum is a strategic error;
+      useful as a framing check on any formalized question.
