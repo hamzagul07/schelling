@@ -1,0 +1,123 @@
+{
+  "game": {
+    "question_id": "Q-COAL-PHASEOUT",
+    "frozen_at": "2026-07-21",
+    "continuum": {
+      "label": "Year of coal-power phase-out",
+      "anchor_0": "earliest phase-out (2030)",
+      "anchor_100": "latest phase-out (2040)"
+    },
+    "actors": [
+      {
+        "id": "aland",
+        "name": "Aland",
+        "position": {
+          "low": 0.0,
+          "mode": 0.0,
+          "high": 10.0
+        },
+        "salience": {
+          "low": 80.0,
+          "mode": 90.0,
+          "high": 95.0
+        },
+        "capability": {
+          "low": 90.0,
+          "mode": 100.0,
+          "high": 100.0
+        },
+        "evidence": [
+          {
+            "source": "situation",
+            "date": "2026-07-21",
+            "note": "Aland wants 2030 and is the most economically powerful."
+          }
+        ]
+      },
+      {
+        "id": "belland",
+        "name": "Belland",
+        "position": {
+          "low": 90.0,
+          "mode": 100.0,
+          "high": 100.0
+        },
+        "salience": {
+          "low": 60.0,
+          "mode": 70.0,
+          "high": 80.0
+        },
+        "capability": {
+          "low": 40.0,
+          "mode": 50.0,
+          "high": 60.0
+        },
+        "evidence": [
+          {
+            "source": "situation",
+            "date": "2026-07-21",
+            "note": "Belland wants 2040."
+          }
+        ]
+      },
+      {
+        "id": "cesta",
+        "name": "Cesta",
+        "position": {
+          "low": 45.0,
+          "mode": 50.0,
+          "high": 55.0
+        },
+        "salience": {
+          "low": 50.0,
+          "mode": 55.0,
+          "high": 60.0
+        },
+        "capability": {
+          "low": 30.0,
+          "mode": 40.0,
+          "high": 50.0
+        },
+        "evidence": [
+          {
+            "source": "situation",
+            "date": "2026-07-21",
+            "note": "Cesta wants 2035, the midpoint."
+          }
+        ]
+      }
+    ],
+    "template": "multilateral_bargaining",
+    "horizon": "one_shot",
+    "notes": "Synthetic three-power negotiation, all inputs traceable to the situation text."
+  },
+  "assumptions": [
+    {
+      "statement": "Capabilities are scaled with Aland at 100 as the strongest.",
+      "why": "The situation states only that Aland is the most economically powerful, not exact capability ratios."
+    },
+    {
+      "statement": "Saliences reflect each power's stated insistence on its date.",
+      "why": "The situation gives positions but no explicit salience figures."
+    }
+  ],
+  "template_classification": {
+    "template": "multilateral_bargaining",
+    "rationale": "Three actors with divergent positions on a one-dimensional issue and unequal power bargain toward a single outcome — the median-voter / coalition bargaining pattern.",
+    "template_cards": [
+      "Multilateral / Coalition Bargaining",
+      "Coordination / Nash Equilibrium"
+    ],
+    "index_chunks": [
+      "Game Theory #16: Pax Judaica Rising (Re-Upload)"
+    ]
+  },
+  "metadata": {
+    "model": "claude-opus-4-8",
+    "input_tokens": 1200,
+    "output_tokens": 800,
+    "cost_usd": 0.026,
+    "retries": 0,
+    "created_at": null
+  }
+}

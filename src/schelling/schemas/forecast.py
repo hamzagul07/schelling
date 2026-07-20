@@ -15,6 +15,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from schelling.schemas.question import GameSpec
+
 
 class StoppingRule(StrEnum):
     """Which convergence rule ended a run (BUILD_PLAN §4 step 8, our upgrade)."""
@@ -104,6 +106,12 @@ class ForecastRecord(BaseModel):
     created_at: str | None = None  # ISO-8601; outside hashed content; None keeps runs identical
 
     ensemble: Ensemble
+
+    # The input game (ranges intact) and the deterministic mode-game median trajectory, embedded
+    # so a ForecastRecord report is fully self-describing — actor map, inputs table, and per-round
+    # trajectory need no re-solve (D6.1). ``game`` is None on legacy records.
+    game: GameSpec | None = None
+    median_trajectory: list[float] = Field(default_factory=list)
 
     outcome_distribution: list[float] = Field(default_factory=list)  # raw draws (cache, D4.1)
     convergence_stats: dict[str, float] = Field(default_factory=dict)
