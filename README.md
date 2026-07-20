@@ -28,6 +28,12 @@ forecast lands within ±1.0 of the outcome Scholz et al. reproduce; every interp
 choice against the paper is logged in [`DECISIONS.md`](DECISIONS.md) (D2.x) and the
 equation extract is in [`docs/papers/scholz_extract.md`](docs/papers/scholz_extract.md).
 
+**Session 3 (done):** the Monte Carlo + sensitivity layer — triangular sampling, a
+seed-derived deterministic MC runner (10,000 draws in ~4 s, vectorized contests), the
+one-at-a-time tornado, and full `ForecastRecord` emission to `runs/` (distribution, CI80,
+convergence stats, sensitivity, seed, config, inputs hash, engine git SHA). Same master
+seed → byte-identical record (D3.x).
+
 ## Development
 
 This project is managed with [`uv`](https://docs.astral.sh/uv/) and targets Python 3.12.

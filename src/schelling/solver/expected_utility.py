@@ -116,17 +116,44 @@ def eu_matrix(
     r: FloatArray,
     q: float,
 ) -> FloatArray:
-    """Matrix ``M[c, r]`` = expected utility to challenger ``c`` of challenging responder ``r``.
+    """Matrix ``EU[i, j]`` = expected utility to challenger ``i`` of challenging responder ``j``.
 
-    Diagonal is 0 (no self-challenge). Uses each challenger's own risk exponent ``r[c]``.
+    Fully vectorized (numpy broadcasting) — equivalent to calling :func:`expected_utility` for
+    every off-diagonal cell, but ~orders of magnitude faster for Monte Carlo (BUILD_PLAN §6:
+    "vectorize contests with numpy"). Uses each challenger's own risk exponent ``r[i]`` (per
+    row). Diagonal is 0 (no self-challenge). A parity test pins it to the scalar version.
     """
-    n = positions.size
-    m = np.zeros((n, n), dtype=np.float64)
-    for c in range(n):
-        for resp in range(n):
-            if c == resp:
-                continue
-            m[c, resp] = expected_utility(
-                c, resp, positions, saliences, cs_weights, mu, cont_range, float(r[c]), q
-            )
-    return m
+    if cont_range <= 0.0:
+        raise ValueError(f"cont_range must be positive, got {cont_range}")
+    x = positions
+    dist = np.abs(x[:, None] - x[None, :])  # dist[i, j] = |x_i - x_j|
+
+    # Prevail probability P[i, j] (Scholz eq. 31): arg[i, j, k] = |x_k - x_j| - |x_k - x_i|.
+    dt = dist.T  # dt[m, k] = |x_k - x_m|
+    arg = dt[None, :, :] - dt[:, None, :]  # (i, j, k)
+    cs = cs_weights[None, None, :]
+    numer = np.where(arg > 0.0, arg, 0.0) * cs
+    denom = np.abs(arg) * cs
+    num_sum = numer.sum(axis=2)
+    den_sum = denom.sum(axis=2)
+    p = np.where(den_sum > 0.0, num_sum / np.where(den_sum > 0.0, den_sum, 1.0), 0.5)
+
+    # Basic utilities (Scholz eqs. 15-24), each challenger i's risk exponent on its row.
+    d_ij = dist / cont_range
+    d_mu = np.abs(x - mu) / cont_range  # per challenger i
+    d_bw = d_mu[:, None] + d_ij
+    r_col = r[:, None]
+    u_s = 2.0 - 4.0 * np.maximum(0.5 - 0.5 * d_ij, 0.0) ** r_col
+    u_f = 2.0 - 4.0 * np.maximum(0.5 + 0.5 * d_ij, 0.0) ** r_col
+    u_b = 2.0 - 4.0 * np.maximum(0.5 - 0.25 * d_bw, 0.0) ** r_col
+    u_w = 2.0 - 4.0 * np.maximum(0.5 + 0.25 * d_bw, 0.0) ** r_col
+    u_sq = (2.0 - 4.0 * (0.5) ** r)[:, None]  # per challenger i
+
+    t = (np.abs(x[:, None] - mu) < dist).astype(np.float64)  # T[i, j]
+    s_resp = saliences[None, :] / 100.0  # responder j's salience, normalized
+
+    e_challenge = s_resp * (p * u_s + (1.0 - p) * u_f) + (1.0 - s_resp) * u_s
+    e_no_challenge = q * u_sq + (1.0 - q) * (t * u_b + (1.0 - t) * u_w)
+    eu = e_challenge - e_no_challenge
+    np.fill_diagonal(eu, 0.0)
+    return eu.astype(np.float64)

@@ -160,3 +160,56 @@ which any common factor cancels. No formula uses a raw vote magnitude, so foldin
 Scholz's Compromise text prints the j-upper-hand clause as `E^j(U_ji) < 0`, contradicting
 figure 6 (Compromise− sits at `E^j(U_ji) > 0`). We follow the figure and symmetry: i has the
 upper hand at `(a>0, b<0, |a|>|b|)`, j at `(a<0, b>0, |b|>|a|)`. *Confidence: high.*
+
+---
+
+## Session 3 — Monte Carlo + sensitivity (BUILD_PLAN §6)
+
+### D3.1 — Triangular draws; point estimates pass through with zero variance
+`sample_triangular` draws from `numpy`'s triangular `(low, mode, high)`. numpy requires
+`left < right`, so a degenerate point estimate (`low == high`) short-circuits to the mode
+unchanged. Consequently the replication fixture (all point estimates) is a valid MC input:
+every draw is identical, giving an exact zero-variance distribution equal to the Session-2
+forecast — the basis of the zero-variance test.
+
+### D3.2 — Per-draw RNG derived via `SeedSequence(master, spawn_key=(draw,))`
+Each draw's generator is `np.random.default_rng(SeedSequence(entropy=master_seed,
+spawn_key=(draw_index,)))`. `SeedSequence` gives well-separated, independent streams per draw
+while keeping the whole ensemble reproducible from the master seed alone — same master seed →
+byte-identical `ForecastRecord` (CLAUDE.md rule 2). Preferred over `default_rng(master + i)`,
+whose adjacent seeds can correlate.
+
+### D3.3 — MC record aggregation semantics (repurposing the two scalar forecast fields)
+`ForecastRecord.outcome_distribution` is the sorted distribution of each draw's converged
+headline **median**. From it: `forecast_median` = its median (central estimate),
+`forecast_mean` = `settlement_point` = its mean (expected outcome), `ci80` = (p10, p90). The
+Session-2 `SolverResult` used `forecast_median`/`forecast_mean` for two statistics of one
+deterministic run; at the MC layer they become two summaries (median, mean) of the *median*
+distribution. `MonteCarloResult` also retains the per-draw weighted-mean distribution for
+future use, but the record's headline is the median distribution — the model's stated
+forecast quantity.
+
+### D3.4 — `inputs_hash` covers game **and** config; `run_id` and timestamps are deterministic
+Per the Session-3 brief, the solver config (R mode, Q, security mode, conflict rule, …) is
+part of the run inputs, so `inputs_hash` = SHA-256 of canonical
+`{game, config}` JSON (sorted keys). `run_id` is derived as
+`{question_id}-mc{n}-s{seed}-{hash[:12]}`, so identical inputs address the same record file.
+`engine_version` is the git commit SHA (deterministic within a commit; `"unknown"` outside a
+repo). `created_at` defaults to `None` and is the only non-deterministic field a caller may
+set — kept out of `inputs_hash` and defaulted off so two runs are byte-identical, honoring
+CLAUDE.md rule 2 ("no wall-clock timestamps inside hashed content").
+
+### D3.5 — Vectorized `eu_matrix`, bit-exact with the scalar version
+The per-dyad Python loop made 10k draws ~79 s (over the §6 60 s budget). `eu_matrix` is now
+fully numpy-broadcast (an `n×n×n` `arg` tensor for the prevail probability, `n×n` utility
+arrays). It is **bit-exact** against the scalar `expected_utility` (parity test, `abs=1e-12`,
+observed error 0.0), so no solver result changed — the Session-2 replication median is still
+9.53. 10k draws now run in ~4 s. A defensive `np.maximum(base, 0.0)` guards the fractional
+powers against float-noise negatives (a no-op where distances are ≤ R, as they always are).
+
+### D3.6 — Schema refinement of the Session-1 placeholder fields (names preserved)
+Implementing §6 enriched the deliberately-loose §3 placeholders (D1.5): `sensitivity` is now
+`list[SensitivityEntry]` (structured rows) rather than `list[dict[str, float]]`, and
+`ForecastRecord` gains `n_draws` and `solver_config`; `created_at` became `str | None`. Field
+*names* are unchanged and the replication stays green, so the "freeze once replication passes"
+rule is respected — only the provisional shapes were filled in at the point of implementation.
