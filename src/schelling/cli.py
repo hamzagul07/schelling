@@ -14,11 +14,15 @@ from pathlib import Path
 
 import typer
 
+from schelling.formalizer.client import AnthropicClient
+from schelling.formalizer.formalize import formalize as run_formalize
+from schelling.formalizer.schemas import DraftGameSpec
 from schelling.knowledge.embed import make_embedder
 from schelling.knowledge.index import DEFAULT_DB_PATH, DEFAULT_TRANSCRIPTS, KnowledgeIndex
 from schelling.mc.monte_carlo import forecast
 from schelling.mc.sensitivity import format_tornado
 from schelling.schemas.question import GameSpec
+from schelling.schemas.stakeholders import TriangularEstimate
 from schelling.solver.config import RangeMode, SolverConfig
 
 app = typer.Typer(
@@ -71,6 +75,92 @@ def solve(
     typer.echo(format_tornado(record.sensitivity))
     typer.echo("")
     typer.echo(f"Record written: {out_dir / (record.run_id + '.json')}")
+
+
+def _rng(est: TriangularEstimate) -> str:
+    return f"{est.low:g}-{est.mode:g}-{est.high:g}"
+
+
+def _render_draft(draft: DraftGameSpec) -> str:
+    """Human-readable stakeholder table + open assumptions for review."""
+    g = draft.game
+    lines = [
+        f"Question:   {g.question_id}   (frozen {g.frozen_at})",
+        f"Continuum:  {g.continuum.label}",
+        f"            0 = {g.continuum.anchor_0}   100 = {g.continuum.anchor_100}",
+        f"Template:   {draft.template_classification.template}   horizon: {g.horizon}",
+        "",
+        "Stakeholders (position / salience / capability as low-mode-high, 0-100):",
+    ]
+    for a in g.actors:
+        lines.append(
+            f"  {a.name} [{a.id}]  pos {_rng(a.position)}  sal {_rng(a.salience)}  "
+            f"cap {_rng(a.capability)}"
+        )
+        for ev in a.evidence:
+            lines.append(f"      evidence: {ev.note}  ({ev.source}, {ev.date})")
+        if not a.evidence:
+            lines.append("      evidence: (none supplied)")
+    lines.append("")
+    lines.append("Open assumptions (asserted WITHOUT supplied evidence — review before solving):")
+    if draft.assumptions:
+        for i, asm in enumerate(draft.assumptions, 1):
+            lines.append(f"  {i}. {asm.statement}")
+            lines.append(f"     why: {asm.why}")
+    else:
+        lines.append("  (none)")
+    lines.append("")
+    m = draft.metadata
+    lines.append(
+        f"Provenance: {m.model}  in={m.input_tokens} out={m.output_tokens} "
+        f"tok  ${m.cost_usd:.4f}  retries={m.retries}"
+    )
+    return "\n".join(lines)
+
+
+@app.command()
+def formalize(
+    situation: Path = typer.Argument(..., help="Path to a situation .txt file."),
+    sources: Path | None = typer.Option(None, "--sources", help="Directory of source files."),
+    output: Path | None = typer.Option(None, "-o", "--output", help="Where to write the draft."),
+    model: str = typer.Option("claude-opus-4-8", "--model"),
+    max_retries: int = typer.Option(2, "--max-retries", min=0),
+    db_path: Path = typer.Option(DEFAULT_DB_PATH, "--db", help="Concept index (for grounding)."),
+) -> None:
+    """Formalize a situation into a DraftGameSpec. NEVER auto-solves — review, then `solve`."""
+    if not situation.exists():
+        typer.echo(f"situation file not found: {situation}", err=True)
+        raise typer.Exit(code=2)
+    situation_text = situation.read_text()
+
+    source_texts: dict[str, str] = {}
+    if sources is not None:
+        if not sources.is_dir():
+            typer.echo(f"--sources is not a directory: {sources}", err=True)
+            raise typer.Exit(code=2)
+        for path in sorted(sources.iterdir()):
+            if path.is_file():
+                source_texts[path.name] = path.read_text(errors="replace")
+
+    index = KnowledgeIndex.open(db_path) if db_path.exists() else None
+    if index is None:
+        typer.echo(f"(no concept index at {db_path}; formalizing without grounding)", err=True)
+
+    draft = run_formalize(
+        situation_text,
+        source_texts,
+        client=AnthropicClient(model=model),
+        index=index,
+        model=model,
+        max_retries=max_retries,
+    )
+
+    out_path = output or situation.with_suffix(".draft.json")
+    out_path.write_text(draft.model_dump_json(indent=2) + "\n")
+    typer.echo(_render_draft(draft))
+    typer.echo("")
+    typer.echo(f"Draft written: {out_path}")
+    typer.echo("This is a DRAFT — edit the JSON, then run `schelling solve` to forecast.")
 
 
 @knowledge_app.command("search")

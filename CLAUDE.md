@@ -37,3 +37,10 @@ the next plan section unasked. Commit at the end of each milestone.
 
 Run `ruff`, `mypy`, and `pytest` — all green — before every commit. `mypy` is `--strict` on
 `src/schelling/solver`. CI enforces the same three on every push; do not push red.
+
+## 6. The knowledge index is a concepts library ONLY
+
+The knowledge index is a concepts library ONLY. Retrieval may inform which game template
+applies and how to reason about structure; it is NEVER a source of facts, actors, payoffs,
+capabilities, or evidence about the real world. Every real-world claim in a GameSpec must
+trace to user-supplied situation text or sources.

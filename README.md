@@ -1,9 +1,12 @@
 # Schelling
 
-An open, continuously-audited strategic forecasting engine: bounded geopolitical
+A continuously-audited strategic forecasting engine: bounded geopolitical
 questions → formal bargaining games → deterministic solutions → probability forecasts
-with complete audit trails. The open-source successor to Policon / the Bueno de Mesquita
-(BDM) expected-utility model.
+with complete audit trails. A successor to Policon / the Bueno de Mesquita (BDM)
+expected-utility model.
+
+> **This is a private, personal-analysis edition.** Public release and the public
+> scoreboard are deferred to a later phase; the AGPL-3.0 license still applies.
 
 ## Guiding principle (never violate)
 
@@ -39,6 +42,13 @@ pluggable embedder (bge-m3 in production, a deterministic hashing embedder for t
 sqlite-vec storage behind `KnowledgeIndex.search`, and 13 hand-reviewable game-template
 cards — plus the `schelling` CLI (§8). **This closes Phase 0.**
 
+**Session 5 (done) — Phase 1 formalizer:** `schelling formalize` turns a described
+situation into a reviewable `DraftGameSpec` (ranged actors, sourced evidence, template
+classification, an explicit assumptions list, and token/cost provenance). The LLM
+structures; it never predicts and never auto-solves. A concepts-library firewall enforces
+that every real-world claim traces to the supplied text/sources (CLAUDE.md rule 6). Tests
+use a record/replay client so CI never calls the live API.
+
 ## CLI
 
 ```sh
@@ -48,7 +58,14 @@ schelling solve tests/fixtures/emission_standards.json --draws 10000 --seed 42
 # Build the transcript index (bge-m3; downloads the model on first run), then search it
 schelling knowledge build --embedder bge-m3
 schelling knowledge search "war of attrition" -k 5
+
+# Formalize a described situation into a reviewable draft (needs the `formalize` extra +
+# ANTHROPIC_API_KEY). Prints a stakeholder table; NEVER auto-solves — review, then solve.
+schelling formalize situation.txt --sources ./sources -o game.draft.json
 ```
+
+Optional extras: `uv sync --extra knowledge` (bge-m3 embeddings, ~2 GB model) and
+`uv sync --extra formalize` (the Claude client). Neither is needed to run the tests.
 
 ## Development
 

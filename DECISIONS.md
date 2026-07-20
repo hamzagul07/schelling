@@ -267,3 +267,54 @@ committed-workflow index (real semantic search, cosine scores ~0.45-0.59 on topi
 tests and offline/CI use, so nothing in the test suite needs torch or a network. Both return
 L2-normalized rows; sqlite-vec stores them in a `vec0(... distance_metric=cosine)` table behind
 `KnowledgeIndex.search`, so Phase 2 can swap in pgvector without touching callers.
+
+---
+
+## Session 5 — the formalizer (Phase 1)
+
+### D5.0 — Distribution reframed to a private, personal-analysis edition
+Per the Session-5 brief, the project is now a **private, personal-analysis edition**; public
+release and the public scoreboard are deferred. BUILD_PLAN §9 and the README are updated; the
+AGPL-3.0 license and the guiding principle are unchanged. (The GitHub repository's technical
+*visibility* is a separate question — the account cannot host a private repo without the repo
+being disabled, per the Session-4 finding — so the framing lives in the docs; see the session
+summary's open question.)
+
+### D5.1 — Normalizer strips AI-summary boilerplate; offsets rebase to normalized text
+The transcripts are AI-generated *summaries* (D4.3), each opening with a generic scaffolding
+line ("Here is a comprehensive summary of the video…", "Based on the transcript…"). These
+carry no game-theory content and dilute the embeddings, so `normalize_document` strips them
+(28 lines across the 3 files, ~1 per lecture) before chunking. Consequence: chunk character
+offsets are now relative to the **normalized** text (round-trip verified against
+`normalize_document(source)`), not the raw bytes — an accepted trade for cleaner retrieval.
+Re-indexed with bge-m3: 71 → 70 chunks. Lecture headings are never matched by the stripper.
+
+### D5.2 — Concepts-library firewall: shingle + code detection over the factual surface
+Behind the prompt-level rule (f), a deterministic post-check (`firewall.py`) verifies no
+retrieved-concept content reached a *factual* field. The "factual surface" is actor ids/names,
+evidence source+note, and assumptions — **not** the template rationale, where citing the
+concept library is the whole point. A leak is (a) a **3-word shingle** present in the concepts
+text and the factual surface but absent from the supplied facts, or (b) a distinctive
+**alphanumeric code** (letter *and* digit, e.g. `b52`). Bare numbers (`20`, `2035`) are
+deliberately excluded — they are ubiquitous and caused a false positive on the first live run
+(the firewall flagged `20/40/80` from lecture timestamps). Multi-word factual leaks are the
+real risk and the shingle check catches them robustly; single distinctive proper nouns leaked
+in isolation are left to rule (f) in the prompt (documented limitation). Fail-closed: any leak
+raises `IndexLeakageError` and no draft is emitted.
+
+### D5.3 — Formalizer architecture: injectable client, retry loop, adaptive thinking, cost log
+- **Injectable `LLMClient`.** `AnthropicClient` (production; lazy-imports the SDK, adaptive
+  thinking, default `claude-opus-4-8`) and `ReplayClient` (deterministic, for tests) sit behind
+  one protocol, so **CI never calls the live API** (rule 2) — tests replay a recorded draft
+  from `tests/fixtures/formalize_replay.json`.
+- **Strict JSON + bounded retry.** The model is asked for a bare JSON object; the formalizer
+  extracts it, validates against the pydantic `DraftExtraction`, and on `JSONDecodeError` /
+  `ValidationError` re-prompts with the error, up to `max_retries` (default 2) extra attempts,
+  before raising `FormalizeError`. Token usage accumulates across attempts.
+- **Cost logged into the draft.** `DraftMetadata` records model, input/output tokens, USD cost
+  (Opus 4.8 $5/$25 per 1M), retries, and an optional timestamp (left `None` for reproducible
+  test drafts). The sample EU-ICE-ban run cost **$0.097** (3917 in / 3095 out, 0 retries).
+- **Index = concepts only.** The knowledge index supplies template cards + top-k chunks as
+  *conceptual grounding* in a clearly-delimited prompt section; facts come only from the
+  situation text and sources. `formalize` **never auto-solves** — editing the JSON and running
+  `schelling solve` is the sole path to a forecast (human in the loop by construction).
