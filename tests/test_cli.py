@@ -125,3 +125,35 @@ def test_formalize_missing_situation_errors(tmp_path: Path) -> None:
     result = runner.invoke(app, ["formalize", str(tmp_path / "nope.txt")])
     assert result.exit_code == 2
     assert "not found" in result.output
+
+
+def test_report_on_replication_fixture_record(tmp_path: Path) -> None:
+    # Solve the replication fixture, then render its ForecastRecord to HTML.
+    fixture = str(FIXTURES / "emission_standards.json")
+    solve = runner.invoke(app, ["solve", fixture, "--draws", "40", "--out-dir", str(tmp_path)])
+    assert solve.exit_code == 0, solve.output
+    record_path = next(tmp_path.glob("*.json"))
+
+    out = tmp_path / "report.html"
+    result = runner.invoke(app, ["report", str(record_path), "-o", str(out)])
+    assert result.exit_code == 0, result.output
+    assert "Report written" in result.output
+    html = out.read_text()
+    assert html.startswith("<!doctype html>")
+    assert "Q-1994-EMISSIONS" in html
+    for token in ("http://", "https://", "<script", "src="):
+        assert token not in html.lower()
+
+
+def test_report_missing_artifact_errors(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["report", str(tmp_path / "nope.json")])
+    assert result.exit_code == 2
+    assert "not found" in result.output
+
+
+def test_report_bad_artifact_errors(tmp_path: Path) -> None:
+    bad = tmp_path / "bad.json"
+    bad.write_text('{"not": "an artifact"}')
+    result = runner.invoke(app, ["report", str(bad)])
+    assert result.exit_code == 2
+    assert "could not render" in result.output
