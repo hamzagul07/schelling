@@ -4,7 +4,12 @@ These are the spine of the product. Field names freeze once the replication test
 change them only with a matching entry in DECISIONS.md.
 """
 
-from schelling.schemas.forecast import ForecastRecord, RoundLog, SolverResult
+from schelling.schemas.forecast import (
+    ForecastRecord,
+    RoundLog,
+    SensitivityEntry,
+    SolverResult,
+)
 from schelling.schemas.question import Continuum, GameSpec
 from schelling.schemas.stakeholders import Actor, Evidence, TriangularEstimate
 
@@ -15,6 +20,7 @@ __all__ = [
     "ForecastRecord",
     "GameSpec",
     "RoundLog",
+    "SensitivityEntry",
     "SolverResult",
     "TriangularEstimate",
 ]
