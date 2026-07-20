@@ -7,6 +7,7 @@ from schelling.knowledge.chunker import (
     chunk_file,
     chunk_text,
     lecture_names,
+    normalize_document,
     split_lectures,
 )
 from schelling.knowledge.embed import BgeM3Embedder, Embedder, HashingEmbedder
@@ -31,5 +32,6 @@ __all__ = [
     "chunk_file",
     "chunk_text",
     "lecture_names",
+    "normalize_document",
     "split_lectures",
 ]
