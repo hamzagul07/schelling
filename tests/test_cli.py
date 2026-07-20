@@ -2,17 +2,29 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from schelling.cli import app
+from schelling.formalizer.client import LLMResult, ReplayClient
 from schelling.schemas.forecast import ForecastRecord
+from schelling.schemas.question import GameSpec
 
 runner = CliRunner()
 FIXTURES = Path(__file__).parent / "fixtures"
 TRANSCRIPTS = Path(__file__).parent.parent / "data" / "transcripts"
+
+
+def _fake_anthropic_factory(text: str) -> Callable[..., ReplayClient]:
+    """A drop-in for cli.AnthropicClient that replays a canned completion (no live API)."""
+
+    def make(model: str = "replay-model") -> ReplayClient:
+        return ReplayClient([LLMResult(text, 100, 100)], model_name=model)
+
+    return make
 
 
 def test_solve_reproduces_replication_forecast(tmp_path: Path) -> None:
@@ -75,3 +87,41 @@ def test_knowledge_search_without_index_errors(tmp_path: Path) -> None:
     result = runner.invoke(app, ["knowledge", "search", "x", "--db", str(tmp_path / "none.db")])
     assert result.exit_code == 2
     assert "no index" in result.output
+
+
+def test_formalize_writes_draft_and_never_solves(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    situation = tmp_path / "situation.txt"
+    situation.write_text("Aland, Belland and Cesta negotiate a coal phase-out year.")
+    draft_text = (FIXTURES / "formalize_replay.json").read_text()
+    monkeypatch.setattr("schelling.cli.AnthropicClient", _fake_anthropic_factory(draft_text))
+
+    out = tmp_path / "draft.json"
+    result = runner.invoke(
+        app,
+        ["formalize", str(situation), "-o", str(out), "--db", str(tmp_path / "none.db")],
+    )
+    assert result.exit_code == 0, result.output
+    # human-readable review output
+    assert "Stakeholders" in result.output
+    assert "Aland" in result.output
+    assert "Open assumptions" in result.output
+    assert "DRAFT" in result.output
+    # NEVER auto-solves: none of the `solve` command's forecast output appears
+    assert "CI80" not in result.output
+    assert "Converge:" not in result.output
+    assert not list(tmp_path.glob("*mc*.json"))  # no ForecastRecord was written
+    # a valid DraftGameSpec was written; its game is solver-ready
+    written = out.read_text()
+    assert '"question_id": "Q-COAL-PHASEOUT"' in written
+    import json
+
+    game = GameSpec.model_validate(json.loads(written)["game"])
+    assert len(game.actors) == 3
+
+
+def test_formalize_missing_situation_errors(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["formalize", str(tmp_path / "nope.txt")])
+    assert result.exit_code == 2
+    assert "not found" in result.output

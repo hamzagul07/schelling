@@ -26,6 +26,11 @@ dev = [
 knowledge = [
     "sentence-transformers>=3.0",
 ]
+# The Claude client for the formalizer (§ Phase 1). Not required for tests, which inject a
+# record/replay client so CI never calls the live API.
+formalize = [
+    "anthropic>=0.40",
+]
 
 [project.scripts]
 schelling = "schelling.cli:app"
@@ -91,8 +96,8 @@ module = "tests.*"
 disallow_untyped_decorators = false
 
 [[tool.mypy.overrides]]
-# Third-party knowledge-layer deps without type stubs.
-module = ["sqlite_vec", "sentence_transformers", "sentence_transformers.*"]
+# Third-party deps without type stubs / optional extras that may be absent in CI.
+module = ["sqlite_vec", "sentence_transformers", "sentence_transformers.*", "anthropic", "anthropic.*"]
 ignore_missing_imports = true
 
 [tool.pydantic-mypy]

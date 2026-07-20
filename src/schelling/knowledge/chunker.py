@@ -18,6 +18,32 @@ from pathlib import Path
 _HEADING = re.compile(r"^Game Theory #(\d+):[ \t]*(.+?)[ \t]*$", re.MULTILINE)
 _WORD = re.compile(r"\S+")
 
+# AI-summary boilerplate preamble lines to strip before indexing (D5.1) — generic
+# "Here is a summary of the video…" scaffolding that carries no game-theory content and only
+# dilutes the embeddings. Lecture headings are never matched.
+_BOILERPLATE = re.compile(
+    r"^\s*(?:"
+    r"(?:here(?:'s| is) (?:a|an) .*(?:summary|breakdown|analysis).*)"  # "Here is a … summary …"
+    r"|[bB]?ased on the .*"  # "Based on the …" (and the OCR "ased on the …")
+    r"|[tT]?his (?:video|lecture)\b.*"  # "This video…", "This lecture—titled…"
+    r"|the video [\"“].*"  # 'The video "Game Theory #17…"'
+    r")\s*$",
+    re.IGNORECASE,
+)
+
+
+def normalize_document(text: str) -> str:
+    """Strip AI-summary boilerplate lines from a transcript before chunking (D5.1).
+
+    Removes generic preamble sentences ("Here is a comprehensive summary of the video…",
+    "Based on the transcript…") that carry no game-theory content. Lecture headings and all
+    substantive lines are preserved. Character offsets on chunks are relative to this
+    normalized text (round-trip verified in the tests).
+    """
+    kept = [line for line in text.split("\n") if not _BOILERPLATE.match(line)]
+    return "\n".join(kept)
+
+
 # ~800 tokens with 15% overlap. We estimate tokens as words * 1.3 (typical English ratio),
 # so a chunk targets ~615 words and overlaps ~92 (D4.x).
 TOKENS_PER_WORD = 1.3
@@ -113,17 +139,23 @@ def chunk_lecture(lecture: Lecture) -> list[Chunk]:
     return chunks
 
 
-def chunk_text(text: str, source_file: str) -> list[Chunk]:
-    """Split file text into lectures and window each into chunks."""
+def chunk_text(text: str, source_file: str, *, normalize: bool = True) -> list[Chunk]:
+    """Split file text into lectures and window each into chunks.
+
+    By default the text is normalized (AI-summary boilerplate stripped, D5.1) first; chunk
+    offsets are then relative to the normalized text.
+    """
+    if normalize:
+        text = normalize_document(text)
     chunks: list[Chunk] = []
     for lecture in split_lectures(text, source_file):
         chunks.extend(chunk_lecture(lecture))
     return chunks
 
 
-def chunk_file(path: Path) -> list[Chunk]:
+def chunk_file(path: Path, *, normalize: bool = True) -> list[Chunk]:
     """Chunk one transcript file (UTF-8, BOM-tolerant)."""
-    return chunk_text(path.read_text(encoding="utf-8-sig"), path.name)
+    return chunk_text(path.read_text(encoding="utf-8-sig"), path.name, normalize=normalize)
 
 
 def chunk_directory(directory: Path) -> list[Chunk]:
