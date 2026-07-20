@@ -10,6 +10,7 @@ Two workflows:
 from __future__ import annotations
 
 import json
+import webbrowser
 from pathlib import Path
 
 import typer
@@ -21,6 +22,7 @@ from schelling.knowledge.embed import make_embedder
 from schelling.knowledge.index import DEFAULT_DB_PATH, DEFAULT_TRANSCRIPTS, KnowledgeIndex
 from schelling.mc.monte_carlo import forecast
 from schelling.mc.sensitivity import format_tornado
+from schelling.report.render import render as render_report
 from schelling.schemas.question import GameSpec
 from schelling.schemas.stakeholders import TriangularEstimate
 from schelling.solver.config import RangeMode, SolverConfig
@@ -161,6 +163,30 @@ def formalize(
     typer.echo("")
     typer.echo(f"Draft written: {out_path}")
     typer.echo("This is a DRAFT — edit the JSON, then run `schelling solve` to forecast.")
+
+
+@app.command()
+def report(
+    artifact: Path = typer.Argument(..., help="A DraftGameSpec or ForecastRecord JSON."),
+    output: Path | None = typer.Option(None, "-o", "--output", help="Where to write the HTML."),
+    open_browser: bool = typer.Option(False, "--open", help="Open the report in a browser."),
+) -> None:
+    """Render an artifact to a single self-contained HTML report (offline, deterministic)."""
+    if not artifact.exists():
+        typer.echo(f"artifact not found: {artifact}", err=True)
+        raise typer.Exit(code=2)
+    try:
+        data = json.loads(artifact.read_text())
+        html = render_report(data)
+    except (json.JSONDecodeError, ValueError) as exc:
+        typer.echo(f"could not render {artifact}: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    out_path = output or artifact.with_suffix(".report.html")
+    out_path.write_text(html)
+    typer.echo(f"Report written: {out_path}")
+    if open_browser:
+        webbrowser.open(out_path.resolve().as_uri())
 
 
 @knowledge_app.command("search")
