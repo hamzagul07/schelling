@@ -213,3 +213,57 @@ Implementing §6 enriched the deliberately-loose §3 placeholders (D1.5): `sensi
 `ForecastRecord` gains `n_draws` and `solver_config`; `created_at` became `str | None`. Field
 *names* are unchanged and the replication stays green, so the "freeze once replication passes"
 rule is respected — only the provisional shapes were filled in at the point of implementation.
+
+---
+
+## Session 4 — knowledge index + CLI (BUILD_PLAN §7-9)
+
+### D4.1 — Raw draws stay embedded in the record (a cache, not the source of truth)
+Per the Session-3 ruling, `ForecastRecord.outcome_distribution` keeps every raw draw. The
+record is fully **recomputable** from `(inputs_hash, solver_config, seed, engine_version)` —
+the solver and MC layer are deterministic — so the embedded draws are a convenience cache for
+readers/plotting, not the authoritative artifact. If size ever bites, they can be dropped
+without information loss and regenerated from the four keys.
+
+### D4.2 — Ensemble statistics moved into a named `ensemble` block (one name, one meaning)
+Per the Session-3 ruling, no field name may change meaning by layer. Previously
+`ForecastRecord.forecast_median`/`forecast_mean` held *ensemble* statistics while
+`SolverResult.forecast_median`/`forecast_mean` held *single-run* statistics — the same names,
+two meanings. `ForecastRecord` now carries an explicit `Ensemble` block
+`{median, mean, p10, p90, n_draws}` and no longer has `forecast_*`, `ci80`, `settlement_point`,
+or top-level `n_draws`. `SolverResult.forecast_*` (one deterministic run) is now the only
+thing called `forecast_*`. Minimal change; replication and all prior tests stayed green.
+
+### D4.3 — Source material is detailed lecture *summaries*, not verbatim transcripts
+`data/transcripts/` holds three files of structured, AI-generated *summaries* of the
+"Predictive History" YouTube game-theory series (Professor J), ~10 lectures each, 29 total.
+They apply game-theory framing to geopolitics; they are not verbatim classroom transcripts and
+not academic derivations. Consequences: (a) classic terms ("war of attrition", "prisoner's
+dilemma") rarely appear verbatim, so lexical search is weak and semantic (bge-m3) search is
+what makes retrieval useful; (b) `templates.yaml` cards state standard game theory in the
+`solution_concept`/`conditions` and cite the best-matching *application* lectures as
+`transcript_refs` — flagged DRAFT pending Hassan's hand-review.
+
+### D4.4 — Lecture heading detection (unambiguous) and chunk provenance
+Every lecture is a standalone line `Game Theory #N: <Title>`; we split on
+`^Game Theory #(\d+): (.+)$` (anchored at line start, which excludes body sentences that quote
+a title). The pattern is consistent across all 29 lectures, so we indexed without pausing for
+confirmation (the full list is in the session summary). Each chunk stores its source file, its
+lecture name (the citation ref, so results cite lectures not filenames), and exact character
+offsets into the source file (verified by a round-trip test).
+
+### D4.5 — Token budget approximated as words × 1.3 (no tokenizer dependency in the chunker)
+Chunks target ~800 tokens with 15% overlap. To keep the chunker independent of the heavy
+bge-m3 tokenizer, tokens are estimated as `words × 1.3` (typical English ratio) → ~615
+words/chunk, ~92 overlap. Windows are word-boundary aligned so offsets stay exact. The 29
+lectures produced 71 chunks.
+
+### D4.6 — Pluggable embedder: bge-m3 in production, deterministic hashing for tests/offline
+`Embedder` is a small protocol; the index records which embedder built it (in `meta`) so
+`search` auto-selects the match. `BgeM3Embedder` (local, lazy-imports `sentence_transformers`,
+downloads ~2GB on first use — the `knowledge` extra) is the production default and built the
+committed-workflow index (real semantic search, cosine scores ~0.45-0.59 on topical queries).
+`HashingEmbedder` — a deterministic, dependency-free bag-of-token-hashes embedder — backs the
+tests and offline/CI use, so nothing in the test suite needs torch or a network. Both return
+L2-normalized rows; sqlite-vec stores them in a `vec0(... distance_metric=cosine)` table behind
+`KnowledgeIndex.search`, so Phase 2 can swap in pgvector without touching callers.

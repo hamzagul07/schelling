@@ -34,6 +34,22 @@ one-at-a-time tornado, and full `ForecastRecord` emission to `runs/` (distributi
 convergence stats, sensitivity, seed, config, inputs hash, engine git SHA). Same master
 seed → byte-identical record (D3.x).
 
+**Session 4 (done):** the transcript concept index (§7) — lecture-aware chunking, a
+pluggable embedder (bge-m3 in production, a deterministic hashing embedder for tests),
+sqlite-vec storage behind `KnowledgeIndex.search`, and 13 hand-reviewable game-template
+cards — plus the `schelling` CLI (§8). **This closes Phase 0.**
+
+## CLI
+
+```sh
+# Solve a game: Monte Carlo forecast + tornado, writes the ForecastRecord to runs/
+schelling solve tests/fixtures/emission_standards.json --draws 10000 --seed 42
+
+# Build the transcript index (bge-m3; downloads the model on first run), then search it
+schelling knowledge build --embedder bge-m3
+schelling knowledge search "war of attrition" -k 5
+```
+
 ## Development
 
 This project is managed with [`uv`](https://docs.astral.sh/uv/) and targets Python 3.12.
