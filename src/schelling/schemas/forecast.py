@@ -49,6 +49,25 @@ class SolverResult(BaseModel):
     forecast_mean: float
 
 
+class SensitivityEntry(BaseModel):
+    """One row of the one-at-a-time tornado (BUILD_PLAN §6).
+
+    A single actor-field is moved to its ``low`` and then its ``high`` (all else at ``mode``);
+    ``swing`` is the signed change in the forecast median. Rows are ranked by ``|swing|``.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    parameter: str  # human label, e.g. "france.position"
+    actor_id: str
+    field: str  # "position" | "salience" | "capability"
+    low_value: float
+    high_value: float
+    forecast_at_low: float
+    forecast_at_high: float
+    swing: float  # forecast_at_high - forecast_at_low
+
+
 class ForecastRecord(BaseModel):
     """The audit artifact — one for every solve, deterministic under ``seed``."""
 
@@ -57,16 +76,17 @@ class ForecastRecord(BaseModel):
     question_id: str
     run_id: str
     engine_version: str  # git SHA of the engine that produced this record
-    inputs_hash: str  # SHA-256 of the canonical GameSpec JSON
-    seed: int
-    created_at: str  # ISO-8601; lives outside the hashed content by design
+    inputs_hash: str  # SHA-256 of the canonical (GameSpec + SolverConfig) JSON
+    seed: int  # Monte Carlo master seed
+    n_draws: int = 1
+    solver_config: dict[str, str | float | int | bool] = Field(default_factory=dict)
+    created_at: str | None = None  # ISO-8601; outside hashed content; None keeps runs identical
 
     forecast_median: float
     forecast_mean: float
 
-    # Filled by the Monte Carlo + sensitivity milestones (§6). Shapes fixed now.
     outcome_distribution: list[float] = Field(default_factory=list)
     ci80: tuple[float, float] | None = None
     settlement_point: float | None = None
     convergence_stats: dict[str, float] = Field(default_factory=dict)
-    sensitivity: list[dict[str, float]] = Field(default_factory=list)
+    sensitivity: list[SensitivityEntry] = Field(default_factory=list)
