@@ -8,6 +8,7 @@ from schelling.knowledge.chunker import (
     chunk_directory,
     chunk_text,
     lecture_names,
+    normalize_document,
     split_lectures,
 )
 
@@ -48,11 +49,26 @@ def test_real_transcripts_yield_29_lectures() -> None:
     assert names[-1] == "Game Theory #29: Final Examination"
 
 
-def test_chunk_offsets_map_back_to_source_bytes() -> None:
+def test_chunk_offsets_map_back_to_normalized_source() -> None:
+    # Offsets are relative to the normalized text (boilerplate stripped, D5.1).
     for path in sorted(TRANSCRIPTS.glob("*.txt")):
-        source = path.read_text(encoding="utf-8-sig")
-        for chunk in chunk_text(source, path.name):
-            assert source[chunk.char_start : chunk.char_end] == chunk.text
+        normalized = normalize_document(path.read_text(encoding="utf-8-sig"))
+        for chunk in chunk_text(normalized, path.name, normalize=False):
+            assert normalized[chunk.char_start : chunk.char_end] == chunk.text
+
+
+def test_normalizer_strips_ai_summary_boilerplate() -> None:
+    raw = (
+        "Game Theory #1: The Alpha\n"
+        "Here is a comprehensive and detailed summary of the video.\n"
+        "Based on the transcript, the professor argues X.\n"
+        "The actual game-theory content about war of attrition.\n"
+    )
+    out = normalize_document(raw)
+    assert "Here is a comprehensive" not in out
+    assert "Based on the transcript" not in out
+    assert "Game Theory #1: The Alpha" in out  # heading preserved
+    assert "war of attrition" in out  # substantive content preserved
 
 
 def test_chunks_carry_lecture_provenance() -> None:
