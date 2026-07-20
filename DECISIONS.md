@@ -62,3 +62,101 @@ now (`RoundLog.octant_matrix`, `offers`; `ForecastRecord.outcome_distribution`, 
 `sensitivity`, `convergence_stats`) but leave them defaulted/empty in Session 1, since they
 are produced by the round loop (§4 steps 4-8, Session 2) and the Monte Carlo layer (§6,
 Session 3). Names freeze once `test_replication.py` is green, per §3.
+
+---
+
+## Session 2 — the model + the replication gate (BUILD_PLAN §4 steps 4-8, §5)
+
+Equation numbers refer to `docs/papers/scholz_extract.md`. Ambiguity labels (A1-A4) are
+defined there. The BDM-1994 emission-standards replication is the arbiter of every choice
+below (BUILD_PLAN §4: "implement the interpretation that reproduces their replication").
+
+### D2.1 — Leading salience in the challenge EU is the *responder's* (A1)
+Scholz eq. 6 writes `E^i(U_ij)_c = s_j(...) + (1 - s_j) U_si`, so the salience weighting the
+active-response branch is the *responder's* (`s_j` when i challenges j). By the i↔j swap,
+`E^j(U_ji)` uses `s_i`. `expected_utility()` normalizes the responder's 0-100 salience to
+[0,1] (`s_resp = salience[responder]/100`) — the term `(1 - s_resp)` requires a probability,
+which the raw 0-100 value is not. Capability never enters the EU directly (only via `P`, a
+ratio), so its scale is irrelevant. *Confidence: high.*
+
+### D2.2 — Continuum range `R`: dynamic is the replication default (resolves D1.2)
+Per the Session-1 review, `R` is now a `SolverConfig` option (`RangeMode`): `DYNAMIC`
+(`max - min` of the current round's positions, Scholz's literal reading) or `FIXED` (a set
+value, default 100). The BDM-1994 table uses positions in **years (4-10)**, so `FIXED=100`
+is meaningless there; the paper's normalized distances `|x_i - x_j|/(x_max - x_min)` imply
+`DYNAMIC`. **`DYNAMIC` is therefore the default and the replication uses it.** `FIXED` remains
+our documented upgrade for inputs already on a 0-100 continuum (the toy fixture, future live
+cases). `R` divides every utility term uniformly, so it never changes a contest winner or the
+median — only the curvature of the utility surface.
+
+### D2.3 — Security level = adversaries' challenge EU (column sum) (A2)
+Scholz §5 (p. 24) defines security as "the utility i believes its adversaries expect to
+derive from challenging i" = `Sec_i = Σ_{j≠i} E^j(U_ji)` = column `i` of the EU matrix
+(`security_mode="adversary"`, the default). The Appendix step-8 formula prints `E^i(U_ji)`
+(a responder-EU reading), which we expose as `security_mode="own"` (row sum) but do not use —
+the prose definition is unambiguous and reproduces the replication. *Confidence: medium.*
+
+### D2.4 — `T` operationalized as "median closer to i than j is"
+The no-challenge better/worse selector `T` (eqs. 20-23, figs. 1-4) is set to `1` iff
+`|x_i - μ| < |x_i - x_j|`, which reproduces all four of Scholz's cases (1 & 3A → T=1; 2 & 3B
+→ T=0). Moot for the replication: with `Q = 1.0` the entire `(1-Q)(T U_b + (1-T) U_w)` term
+vanishes, so `U_b`, `U_w` and `T` do not affect the BDM-1994 result. *Confidence: high (and
+untested by the replication — flagged for Session 3+ when `Q < 1` cases appear).*
+
+### D2.5 — Offer selection: most-enforceable first, least-move as tie-break (A4)
+Scholz §6.2 (p. 251): "those better able to enforce their wishes… make their proposals stick;
+given equally enforceable proposals, players move the least." We implement exactly that
+order: each mover accepts the offer from the proposer with the highest expected utility
+(`Offer.enforceability` = the winning actor's EU); ties in enforceability break to the
+smallest `|Δx|`, then to the smaller target position for determinism. An earlier
+least-movement-first reading pulled mid-actors *downward* (tie-broken to the smaller
+position) and made the median fall — clearly wrong, and corrected by reading enforceability
+as primary. *Confidence: medium — the primary replication lever.*
+
+### D2.6 — Conflict is an "uncertain outcome" → no deterministic move (A4, key choice)
+BDM (1997, p. 244): when both actors expect to gain (`E^i(U_ij) > 0` **and** `E^j(U_ji) > 0`)
+"conflict is likely and that conflict has an uncertain outcome." We read this literally:
+conflict produces **no deterministic position change** (`conflict_resolves=False`, the
+default). Only compromise (partial move, eqs. 35-36) and compel (full move) shift positions.
+This is decisive: treating conflict as a full move (the BDM-1984 confrontation-octant reading)
+makes *every* actor stampede to position 10 (mean → 10), whereas the no-move reading preserves
+the spread Scholz report (mean stays ≈ 7.5) and lands the median in the right band. Both
+readings are available via the config flag. *Confidence: medium-high — validated by the
+replication's mean/spread, not just its median.*
+
+### D2.7 — Replication result and residual deviation (BUILD_PLAN §5)
+With the paper-faithful config (`DYNAMIC` R, `Q=1.0`, risk on, adversary security, conflict =
+no move) the solver converges (stopping rule fired, 3 rounds) to:
+
+| statistic        | ours   | Scholz Table 2 (steady) | BDM stabilised | within ±1.0? |
+|------------------|--------|-------------------------|----------------|--------------|
+| median forecast  | 9.53   | 9.9 (rounds 2-5)        | 9.05           | yes (0.37 / 0.48) |
+| mean, round 1    | 7.61   | 7.4                     | —              | yes (0.21)   |
+| mean, round 2    | 7.72   | 7.5                     | —              | yes (0.22)   |
+
+**The gate passes**: the converged median forecast is within ±1.0 of both the Scholz-reproduced
+steady-state (9.9) and BDM's own stabilised prediction (9.05), and the early-round means match
+Scholz's ≈7.4-7.6 band with the position spread preserved.
+
+**Residual deviation (quantified, not hidden):** we do *not* bit-reproduce Scholz's exact
+per-round median trajectory `8.4, 9.9, 9.9, 9.9, 9.9`. Our median jumps from the initial 7.0
+to ~9.5 in round 1 and holds, rather than stepping through 8.4 then 9.9. Hypothesis: the
+round-1 value 8.4 depends on the precise figure-6 octant boundaries for
+Compel/Capitulate/Stalemate and the exact offer-selection tie-handling — all figure-only in
+the paper, none given as inequalities — plus Scholz's own note (p. 28) that their trajectory
+"does not stabilise" and continues to wander (their rounds 6-8 read 7.4, 8.8, 9.6). The steady
+value and the mean/spread, which are the substantive forecast, match. Closing the last
+transient would require Scholz's unpublished code; per BUILD_PLAN §5 this analysis is logged
+rather than papered over by loosening the ±1.0 tolerance.
+
+### D2.8 — D1.1 guard verified: no non-ratiometric use of vote magnitude
+Confirmed while implementing EU (Session-1 review action 3a): vote quantities enter the model
+only (i) as the argmax that selects the median `μ` (sign/order — scale-free) and (ii) as the
+prevail probability `P^i` (Scholz eq. 31), which is a *ratio* of `c_k s_k`-weighted sums in
+which any common factor cancels. No formula uses a raw vote magnitude, so folding the constant
+`2` and the `/100` into the weights (D1.1) changes nothing. The Session-1 constants stand.
+
+### D2.9 — Compromise j-upper-hand sign follows the figure, not the text (A3)
+Scholz's Compromise text prints the j-upper-hand clause as `E^j(U_ji) < 0`, contradicting
+figure 6 (Compromise− sits at `E^j(U_ji) > 0`). We follow the figure and symmetry: i has the
+upper hand at `(a>0, b<0, |a|>|b|)`, j at `(a<0, b>0, |b|>|a|)`. *Confidence: high.*
