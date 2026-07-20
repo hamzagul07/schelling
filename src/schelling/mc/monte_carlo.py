@@ -140,6 +140,9 @@ def build_forecast_record(
     hashed = inputs_hash(game, config)
     run_id = f"{game.question_id}-mc{mc.n_draws}-s{mc.seed}-{hashed[:12]}"
     p10, p90 = ci80(mc.median_distribution)
+    # Deterministic mode-game solve -> the per-round median trajectory embedded in the record.
+    mode_result = run(game, config)
+    trajectory = [rl.weighted_median for rl in mode_result.rounds]
     return ForecastRecord(
         question_id=game.question_id,
         run_id=run_id,
@@ -155,6 +158,8 @@ def build_forecast_record(
             p90=p90,
             n_draws=mc.n_draws,
         ),
+        game=game,
+        median_trajectory=trajectory,
         outcome_distribution=[float(v) for v in dist],
         convergence_stats=convergence_stats(mc),
         sensitivity=sensitivity,
