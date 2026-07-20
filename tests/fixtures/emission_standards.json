@@ -1,0 +1,84 @@
+{
+  "question_id": "Q-1994-EMISSIONS",
+  "frozen_at": "1994-01-01",
+  "continuum": {
+    "label": "Year of emission-standard introduction for medium-sized automobiles",
+    "anchor_0": "earliest introduction (position 4)",
+    "anchor_100": "latest introduction (position 10)"
+  },
+  "template": "multilateral_bargaining",
+  "horizon": "one_shot",
+  "notes": "Replication fixture: BDM 1994 Table 1 (p.78) as reproduced in Scholz et al. (2011) Table 1. Positions are years (4-10); capabilities are normalized (sum ~= 1.01); saliences on a 0-100 scale. Q=1.0 for the Scholz replication. Reported by Scholz (Table 2), median voter position by round: 8.4, 9.9, 9.9, 9.9, 9.9, 7.4, 8.8, 9.6.",
+  "actors": [
+    {
+      "id": "netherlands", "name": "Netherlands",
+      "position": {"low": 4, "mode": 4, "high": 4},
+      "salience": {"low": 80, "mode": 80, "high": 80},
+      "capability": {"low": 0.08, "mode": 0.08, "high": 0.08},
+      "evidence": []
+    },
+    {
+      "id": "belgium", "name": "Belgium",
+      "position": {"low": 7, "mode": 7, "high": 7},
+      "salience": {"low": 40, "mode": 40, "high": 40},
+      "capability": {"low": 0.08, "mode": 0.08, "high": 0.08},
+      "evidence": []
+    },
+    {
+      "id": "luxembourg", "name": "Luxembourg",
+      "position": {"low": 4, "mode": 4, "high": 4},
+      "salience": {"low": 20, "mode": 20, "high": 20},
+      "capability": {"low": 0.03, "mode": 0.03, "high": 0.03},
+      "evidence": []
+    },
+    {
+      "id": "germany", "name": "Germany",
+      "position": {"low": 4, "mode": 4, "high": 4},
+      "salience": {"low": 80, "mode": 80, "high": 80},
+      "capability": {"low": 0.16, "mode": 0.16, "high": 0.16},
+      "evidence": []
+    },
+    {
+      "id": "france", "name": "France",
+      "position": {"low": 10, "mode": 10, "high": 10},
+      "salience": {"low": 60, "mode": 60, "high": 60},
+      "capability": {"low": 0.16, "mode": 0.16, "high": 0.16},
+      "evidence": []
+    },
+    {
+      "id": "italy", "name": "Italy",
+      "position": {"low": 10, "mode": 10, "high": 10},
+      "salience": {"low": 60, "mode": 60, "high": 60},
+      "capability": {"low": 0.16, "mode": 0.16, "high": 0.16},
+      "evidence": []
+    },
+    {
+      "id": "uk", "name": "United Kingdom",
+      "position": {"low": 10, "mode": 10, "high": 10},
+      "salience": {"low": 90, "mode": 90, "high": 90},
+      "capability": {"low": 0.16, "mode": 0.16, "high": 0.16},
+      "evidence": []
+    },
+    {
+      "id": "ireland", "name": "Ireland",
+      "position": {"low": 7, "mode": 7, "high": 7},
+      "salience": {"low": 10, "mode": 10, "high": 10},
+      "capability": {"low": 0.05, "mode": 0.05, "high": 0.05},
+      "evidence": []
+    },
+    {
+      "id": "denmark", "name": "Denmark",
+      "position": {"low": 4, "mode": 4, "high": 4},
+      "salience": {"low": 100, "mode": 100, "high": 100},
+      "capability": {"low": 0.05, "mode": 0.05, "high": 0.05},
+      "evidence": []
+    },
+    {
+      "id": "greece", "name": "Greece",
+      "position": {"low": 7, "mode": 7, "high": 7},
+      "salience": {"low": 70, "mode": 70, "high": 70},
+      "capability": {"low": 0.08, "mode": 0.08, "high": 0.08},
+      "evidence": []
+    }
+  ]
+}
