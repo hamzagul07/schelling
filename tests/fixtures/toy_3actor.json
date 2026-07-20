@@ -1,0 +1,38 @@
+{
+  "question_id": "Q-TOY-3ACTOR",
+  "frozen_at": "2026-01-01",
+  "continuum": {
+    "label": "Toy policy continuum (0-100)",
+    "anchor_0": "minimal policy",
+    "anchor_100": "maximal policy"
+  },
+  "template": "multilateral_bargaining",
+  "horizon": "one_shot",
+  "notes": "Synthetic 3-actor fixture with hand-computable weighted mean (3600/130 = 27.6923...) and weighted median (20). Weights: A=20, B=80, C=30.",
+  "actors": [
+    {
+      "id": "a",
+      "name": "Actor A",
+      "position": {"low": 10, "mode": 10, "high": 10},
+      "salience": {"low": 50, "mode": 50, "high": 50},
+      "capability": {"low": 40, "mode": 40, "high": 40},
+      "evidence": []
+    },
+    {
+      "id": "b",
+      "name": "Actor B",
+      "position": {"low": 20, "mode": 20, "high": 20},
+      "salience": {"low": 80, "mode": 80, "high": 80},
+      "capability": {"low": 100, "mode": 100, "high": 100},
+      "evidence": []
+    },
+    {
+      "id": "c",
+      "name": "Actor C",
+      "position": {"low": 60, "mode": 60, "high": 60},
+      "salience": {"low": 60, "mode": 60, "high": 60},
+      "capability": {"low": 50, "mode": 50, "high": 50},
+      "evidence": []
+    }
+  ]
+}
