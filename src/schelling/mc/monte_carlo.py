@@ -142,16 +142,35 @@ def engine_version() -> str:
         return "unknown"
 
 
-def inputs_hash(game: GameSpec, config: SolverConfig) -> str:
+CURRENT_HASH_VERSION = "v2"
+# Canonicalization epochs (D18.1), newest first — verify tries these in order so legacy records
+# reproduce. v2 (Session 10, D10.4) added SolverConfig.reference_point to the hashed config; v1
+# records predate that field, so recomputing v1 drops it. Same inputs + same era -> same hash.
+KNOWN_HASH_VERSIONS = ("v2", "v1")
+_V1_DROPPED_CONFIG_FIELDS = frozenset({"reference_point"})
+
+
+def inputs_hash(
+    game: GameSpec, config: SolverConfig, *, hash_version: str = CURRENT_HASH_VERSION
+) -> str:
     """SHA-256 of the canonical (GameSpec + SolverConfig) JSON — the run's content address.
 
     ``resolution_rubric`` is excluded (D17.1): it is grading metadata, not a solver input, so it
     must not change a forecast or its content-address — and excluding it keeps the hashes of
     records sealed before the rubric existed byte-stable.
+
+    ``hash_version`` selects the canonicalization epoch (D18.1). ``v2`` (current) hashes the full
+    config; ``v1`` drops the reference-point field, which did not exist when the earliest records
+    were sealed, so their stored hashes reproduce under ``v1`` without touching one sealed byte.
     """
+    config_dump = config.model_dump(mode="json")
+    if hash_version == "v1":
+        config_dump = {k: v for k, v in config_dump.items() if k not in _V1_DROPPED_CONFIG_FIELDS}
+    elif hash_version != CURRENT_HASH_VERSION:
+        raise ValueError(f"unknown hash_version {hash_version!r} (known: {KNOWN_HASH_VERSIONS})")
     payload = {
         "game": game.model_dump(mode="json", exclude={"resolution_rubric"}),
-        "config": config.model_dump(mode="json"),
+        "config": config_dump,
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
