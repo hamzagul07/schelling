@@ -21,6 +21,7 @@ from pydantic import ValidationError
 
 from schelling.advise.search import advise as run_advise
 from schelling.analog.icb import ICBAnalogIndex, to_panel
+from schelling.backtest.coercive import DEFAULT_LIBRARY
 from schelling.backtest.deu import load_deu_issues
 from schelling.backtest.harness import run_backtest
 from schelling.backtest.ledger import append_entry, ledger_entry, new_ledger
@@ -561,7 +562,8 @@ def successor(
 @app.command()
 def coercive(
     library: Path = typer.Argument(
-        Path("data/coercive/library.json"), help="Coercive case library JSON (games + outcomes)."
+        DEFAULT_LIBRARY,
+        help="Coercive case library (a directory of *.json case files, or one file).",
     ),
 ) -> None:
     """Run the pre-registered coercive head-to-head (challenge vs compromise vs successors)."""
@@ -571,8 +573,8 @@ def coercive(
     if report.n_cases == 0:
         typer.echo(report.note)
         typer.echo(
-            "Provide expert-coded coercive tables (position/salience/capability/outcome) as "
-            f"{library} to run the head-to-head — see BACKTEST.md / D11.1."
+            "Add expert-coded case files (see data/coercive-cases/README.md for the schema) to "
+            f"{library} to run the head-to-head — the classics are still the quest (D11.1)."
         )
         return
     typer.echo(f"Coercive head-to-head ({report.n_cases} cases):")
