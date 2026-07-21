@@ -10,12 +10,15 @@ Two workflows:
 from __future__ import annotations
 
 import json
+import os
 import webbrowser
 from pathlib import Path
 
 import typer
+from dotenv import find_dotenv, load_dotenv
 
 from schelling.formalizer.client import AnthropicClient
+from schelling.formalizer.firewall import IndexLeakageError
 from schelling.formalizer.formalize import formalize as run_formalize
 from schelling.formalizer.schemas import DraftGameSpec
 from schelling.knowledge.embed import make_embedder
@@ -32,6 +35,16 @@ app = typer.Typer(
 )
 knowledge_app = typer.Typer(help="Transcript concept index (BUILD_PLAN §7).", no_args_is_help=True)
 app.add_typer(knowledge_app, name="knowledge")
+
+
+@app.callback()
+def _startup() -> None:
+    """Load a project ``.env`` at startup so ANTHROPIC_API_KEY is found automatically.
+
+    Searches upward from the working directory (where the user runs ``schelling``), not from the
+    package, so the developer's project ``.env`` is picked up.
+    """
+    load_dotenv(find_dotenv(usecwd=True))
 
 
 @app.command()
@@ -148,16 +161,37 @@ def formalize(
     if index is None:
         typer.echo(f"(no concept index at {db_path}; formalizing without grounding)", err=True)
 
-    draft = run_formalize(
-        situation_text,
-        source_texts,
-        client=AnthropicClient(model=model),
-        index=index,
-        model=model,
-        max_retries=max_retries,
-    )
+    client = AnthropicClient(model=model)
+    # Only the live client needs a key; a test-injected replay client does not.
+    if type(client).__name__ == "AnthropicClient" and not os.environ.get("ANTHROPIC_API_KEY"):
+        typer.echo(
+            "No ANTHROPIC_API_KEY found. Set it in your shell or a .env file at the project "
+            "root (a line like ANTHROPIC_API_KEY=sk-...), then re-run `schelling formalize`.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
 
     out_path = output or situation.with_suffix(".draft.json")
+    try:
+        draft = run_formalize(
+            situation_text,
+            source_texts,
+            client=client,
+            index=index,
+            model=model,
+            max_retries=max_retries,
+        )
+    except IndexLeakageError as exc:
+        quarantine = out_path.with_suffix(".quarantine.json")
+        if exc.draft is not None:
+            quarantine.write_text(exc.draft.model_dump_json(indent=2) + "\n")
+        locs = "; ".join(f"{leak.phrase!r} in {leak.location}" for leak in exc.leaks[:6])
+        typer.echo(
+            f"Blocked: concept-library phrases leaked into factual fields — {locs}", err=True
+        )
+        typer.echo(f"Rejected draft quarantined at {quarantine} for inspection.", err=True)
+        raise typer.Exit(code=2) from exc
+
     out_path.write_text(draft.model_dump_json(indent=2) + "\n")
     typer.echo(_render_draft(draft))
     typer.echo("")
