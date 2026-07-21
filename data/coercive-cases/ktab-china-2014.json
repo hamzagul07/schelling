@@ -1,0 +1,117 @@
+{
+  "library_version": "draft-1",
+  "transcription": {
+    "status": "UNVERIFIED — first entry by Claude from PDF text extraction; Hassan must verify every number against the PDF (Tables 2-3, pp. 125-131) and flip verified to true",
+    "verified": false,
+    "source_pdf": "https://www.cambridge.org/core/services/aop-cambridge-core/content/view/02CBC45E77B24847E06A3631ADA20771/S1598240815000041a.pdf/analyzing_coalitions_in_chinas_policy_formulation_reforming_the_role_of_stateowned_enterprises_in_chinas_energy_sector.pdf"
+  },
+  "cases": [
+    {
+      "case_id": "KTAB-CHINA-2014-POLICY",
+      "title": "Private-sector space in China's upstream oil & gas (policy dimension)",
+      "domain": "domestic_elite_bargaining",
+      "ex_ante": true,
+      "data_collected": "2014-Q3",
+      "source": "Efird, Lester & Wise (2016), 'Analyzing Coalitions in China's Policy Formulation', Journal of East Asian Studies 16, 117-145, doi:10.1017/jea.2015.4, Table 2",
+      "continuum": {
+        "label": "Openness of upstream oil & gas to private participation",
+        "anchor_0": "Extreme limits on private participation",
+        "anchor_100": "Policy environment open and conducive to private participation",
+        "markers": {"15": "private allowed only in JV with an SOE (approx. status quo 2014)", "30": "ad hoc participation by government approval", "70": "limited participation without government approval"}
+      },
+      "actors": [
+        {"id": "xi_jinping", "name": "Xi Jinping (PBSC)", "position": 30, "capability": 100, "salience": 30},
+        {"id": "li_keqiang", "name": "Li Keqiang (PBSC)", "position": 45, "capability": 65, "salience": 65},
+        {"id": "zhang_gaoli", "name": "Zhang Gaoli (PBSC)", "position": 30, "capability": 35, "salience": 40},
+        {"id": "ma_kai", "name": "Ma Kai (Central govt)", "position": 45, "capability": 35, "salience": 25},
+        {"id": "liu_he", "name": "Liu He (Deputy Director DRC)", "position": 50, "capability": 40, "salience": 70},
+        {"id": "xu_shaoshi", "name": "Xu Shaoshi (Director NDRC)", "position": 15, "capability": 20, "salience": 40},
+        {"id": "nea", "name": "National Energy Administration", "position": 20, "capability": 15, "salience": 40},
+        {"id": "mlr", "name": "Ministry of Land and Resources", "position": 60, "capability": 25, "salience": 70},
+        {"id": "mep", "name": "Ministry of Environmental Protection", "position": 30, "capability": 20, "salience": 30},
+        {"id": "mof", "name": "Ministry of Finance", "position": 45, "capability": 35, "salience": 50},
+        {"id": "shanxi", "name": "Shanxi provincial govt", "position": 50, "capability": 20, "salience": 70},
+        {"id": "heilongjiang", "name": "Heilongjiang provincial govt", "position": 20, "capability": 20, "salience": 70},
+        {"id": "cnpc_petrochina", "name": "CNPC and PetroChina", "position": 15, "capability": 15, "salience": 75},
+        {"id": "cnpc_old_guard", "name": "CNPC old guard", "position": 10, "capability": 50, "salience": 80},
+        {"id": "cnooc_wang_yilin", "name": "CNOOC (Wang Yilin)", "position": 15, "capability": 40, "salience": 80},
+        {"id": "sinopec", "name": "Sinopec", "position": 15, "capability": 45, "salience": 80},
+        {"id": "shanxi_yanchang", "name": "Shanxi Yanchang (provincial SOE)", "position": 60, "capability": 15, "salience": 60},
+        {"id": "cpcia", "name": "China Petroleum & Chemical Industry Federation", "position": 40, "capability": 20, "salience": 80},
+        {"id": "cucbm", "name": "CUCBM Company", "position": 45, "capability": 10, "salience": 60},
+        {"id": "us_gov", "name": "US Government", "position": 100, "capability": 8, "salience": 50},
+        {"id": "us_chamber", "name": "US Chamber of Commerce", "position": 90, "capability": 8, "salience": 50},
+        {"id": "eu_coc", "name": "EU Chamber of Commerce", "position": 90, "capability": 5, "salience": 50},
+        {"id": "iocs", "name": "International oil companies", "position": 90, "capability": 10, "salience": 75},
+        {"id": "mao_yushi", "name": "Mao Yushi (Unirule Institute)", "position": 75, "capability": 10, "salience": 75},
+        {"id": "zhou_dadi", "name": "Zhou Dadi (adviser)", "position": 30, "capability": 15, "salience": 50},
+        {"id": "zhang_guobao", "name": "Zhang Guobao (adviser)", "position": 20, "capability": 15, "salience": 50}
+      ],
+      "published_model_forecast": {"model": "KTAB SMP", "value_note": "convergence around the Xi-led cluster at ~30; little prospect of opening (paper text)"},
+      "outcomes": {
+        "near_term_by_2017": {"proposed_value": 25, "range": [15, 30], "basis": "PROPOSED by Claude — verify: little near-term opening; participation remained JV/approval-based; matches paper's own near-term claim", "verified": false},
+        "long_run_by_2020": {"proposed_value": 55, "range": [45, 70], "basis": "PROPOSED by Claude — verify: May 2020 Ministry of Natural Resources opened oil & gas exploration/production licensing to qualified domestic private and foreign firms — a structural opening, though practical penetration stayed limited", "verified": false}
+      }
+    },
+    {
+      "case_id": "KTAB-CHINA-2014-CNPC",
+      "title": "Reforming CNPC's dominance (competitive dimension)",
+      "domain": "domestic_elite_bargaining",
+      "ex_ante": true,
+      "data_collected": "2014-Q3",
+      "source": "Efird, Lester & Wise (2016), doi:10.1017/jea.2015.4, Table 3",
+      "continuum": {
+        "label": "Degree of reform reducing CNPC's dominance",
+        "anchor_0": "Status quo, no change",
+        "anchor_100": "CNPC broken into smaller pieces",
+        "markers": {"10": "symbolic gestures (reduce patronage practices)", "30": "transparent tendering of service contracts", "60": "required divestiture of major assets, e.g. pipelines run on open access"}
+      },
+      "actors": [
+        {"id": "xi_jinping", "name": "Xi Jinping (PBSC)", "position": 20, "capability": 100, "salience": 60},
+        {"id": "li_keqiang", "name": "Li Keqiang (PBSC)", "position": 65, "capability": 55, "salience": 60},
+        {"id": "wang_qishan", "name": "Wang Qishan (PBSC)", "position": 20, "capability": 80, "salience": 40},
+        {"id": "zhang_gaoli", "name": "Zhang Gaoli (PBSC)", "position": 15, "capability": 35, "salience": 90},
+        {"id": "ma_kai", "name": "Ma Kai (Central govt)", "position": 45, "capability": 35, "salience": 60},
+        {"id": "liu_he", "name": "Liu He (Deputy Director NDRC)", "position": 65, "capability": 40, "salience": 75},
+        {"id": "xu_shaoshi", "name": "Xu Shaoshi (Director NDRC)", "position": 10, "capability": 20, "salience": 40},
+        {"id": "nea", "name": "National Energy Administration", "position": 15, "capability": 15, "salience": 40},
+        {"id": "ndrc_pricing", "name": "NDRC Pricing Department", "position": 20, "capability": 25, "salience": 40},
+        {"id": "sasac_zhang_yi", "name": "SASAC (Zhang Yi)", "position": 60, "capability": 25, "salience": 95},
+        {"id": "nao", "name": "National Audit Office", "position": 20, "capability": 30, "salience": 70},
+        {"id": "mlr", "name": "Ministry of Land and Resources", "position": 50, "capability": 25, "salience": 80},
+        {"id": "mep", "name": "Ministry of Environmental Protection", "position": 15, "capability": 20, "salience": 20},
+        {"id": "mof", "name": "Ministry of Finance", "position": 40, "capability": 35, "salience": 65},
+        {"id": "shanxi", "name": "Shanxi provincial govt", "position": 50, "capability": 20, "salience": 75},
+        {"id": "heilongjiang", "name": "Heilongjiang provincial govt", "position": 30, "capability": 20, "salience": 60},
+        {"id": "cnpc_leadership", "name": "CNPC senior leadership", "position": 20, "capability": 50, "salience": 90},
+        {"id": "cnpc_middle", "name": "CNPC middle managers", "position": 30, "capability": 30, "salience": 60},
+        {"id": "cnpc_employees", "name": "CNPC employees", "position": 45, "capability": 10, "salience": 75},
+        {"id": "cnpc_overseas", "name": "CNPC PetroChina/overseas branches", "position": 50, "capability": 15, "salience": 80},
+        {"id": "cnpc_service", "name": "CNPC service providers", "position": 0, "capability": 5, "salience": 70},
+        {"id": "sinopec_fu", "name": "Sinopec chairman Fu Chengyu", "position": 65, "capability": 45, "salience": 80},
+        {"id": "sinopec", "name": "Sinopec", "position": 45, "capability": 10, "salience": 45},
+        {"id": "cnooc_wang", "name": "CNOOC chairman Wang Yilin", "position": 60, "capability": 40, "salience": 75},
+        {"id": "cnooc", "name": "CNOOC", "position": 60, "capability": 7, "salience": 55},
+        {"id": "shanxi_yanchang", "name": "Shanxi Yanchang (provincial SOE)", "position": 65, "capability": 15, "salience": 20},
+        {"id": "offtake_psoes", "name": "Offtake companies (provincial SOEs)", "position": 30, "capability": 2, "salience": 20},
+        {"id": "cpcia", "name": "CPCIA", "position": 55, "capability": 10, "salience": 70},
+        {"id": "cucbm", "name": "CUCBM Company", "position": 55, "capability": 10, "salience": 70},
+        {"id": "private_good_access", "name": "Private domestic competitors (good access)", "position": 0, "capability": 5, "salience": 60},
+        {"id": "private_poor_access", "name": "Private domestic competitors (poor access)", "position": 60, "capability": 2, "salience": 80},
+        {"id": "iocs", "name": "Foreign supermajors", "position": 75, "capability": 15, "salience": 50},
+        {"id": "shell", "name": "Shell", "position": 90, "capability": 10, "salience": 50},
+        {"id": "foreign_sme", "name": "Foreign small-medium competitors", "position": 70, "capability": 5, "salience": 60}
+      ],
+      "published_model_forecast": {"model": "KTAB SMP", "value_note": "reform reflecting a Position between 20 and 40; breakup implausible; scenario sweep bounds outcome ~30-50 even under extreme leader positions (paper text)"},
+      "outcomes": {
+        "near_term_by_2017": {"proposed_value": 25, "range": [15, 35], "basis": "PROPOSED by Claude — verify: anti-corruption purges of CNPC leadership, tendering/mixed-ownership pilots, no structural divestiture", "verified": false},
+        "long_run_by_2020": {"proposed_value": 60, "range": [50, 65], "basis": "PROPOSED by Claude — verify: Dec 2019 creation of PipeChina; CNPC (with Sinopec/CNOOC) pipeline assets divested into a national open-access pipeline company, operational Oct 2020 — matching this continuum's explicit Position-60 marker; CNPC core not broken up", "verified": false}
+      }
+    }
+  ],
+  "notes": [
+    "DOMAIN CAVEAT: these are domestic-elite bargaining cases (cooperative regime), NOT coercive interstate crises — they extend out-of-domain validation beyond the EU but do NOT settle the coercive verdict. The coercive classics (Red Flag over Hong Kong, Iran 1984, Feder cases) remain the quest.",
+    "HORIZON RULE (proposed): each case carries two outcome readings — the paper's own stated horizon (primary, used for the gate) and a 5-year reading (secondary, reported not gated).",
+    "BONUS COLUMN: the published KTAB forecast enables three-way scoring on these cases: Schelling challenge vs compromise mean vs the incumbent KTAB SMP."
+  ]
+}
