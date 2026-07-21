@@ -900,3 +900,39 @@ out-of-domain (domestic bargaining) and N is tiny.
 (`drafts/ktab-japan-2017-scaffold.json`) records the differing column order (Influence | Position |
 Salience) and the Exercised-Power checksum to apply. The same blind protocol runs when Hassan supplies
 the PDF. Its 5 known rows are internally checksum-consistent but remain unverified against the source.
+
+## Session 14 — Japan (blocked) + the paper scaffold
+
+### D14.0 — Japan case stays BLOCKED; the paper scaffold runs regardless
+Part A (the Japan KTAB case) is precondition-gated on the KAPSARC KS-2018-DP47 PDF being present in
+`docs/papers/`. It is not (Hassan still owes the 2-minute KAPSARC "download without subscribing"
+form), so Part A is **BLOCKED** and no Japan transcription/ratification happened this session. The
+blind dual-entry protocol is staged in `data/coercive-cases/drafts/ktab-japan-2017-scaffold.json`
+(differing column order Influence | Position | Salience; Exercised Power = Influence × Salience / 100
+checksum) and runs the moment the PDF lands. Part B (the paper scaffold) proceeded unconditionally.
+
+### D14.1 — `schelling paper-evidence`: numbers regenerated from artifacts, never hand-typed
+The paper's evidence base is a generated artifact, not a hand-written one. `schelling paper-evidence`
+(new command; `src/schelling/paper/evidence.py`) writes `paper/EVIDENCE.md` where **every number is
+computed from the repo's own artifacts**, each row carrying its source path + provenance stamp (git
+short hash of the source file, or the dataset SHA-256 prefix for data-derived numbers):
+- replication median (9.530) — re-solved from the committed emission fixture;
+- DEU MAE/RMSE per method, split-sample, oracle gap (−0.84), worst issues — a fresh `run_backtest`
+  over the DEU data (pinned by SHA-256), byte-identical to BACKTEST.md by determinism;
+- successor leaderboard + bootstrap CIs + the 140/105/106 split — a fresh `run_successor_search`;
+- published-context table and the China blind-verification facts — read from BACKTEST.md / the case
+  JSON; the four sealed US-Iran ledger medians — read from FORECASTS.md (records gitignored, so the
+  SHA-256 commitments *are* the artifact); the test count — collected live.
+No wall-clock timestamps are written, so the file regenerates byte-for-byte from the same repo state
+and can be diffed forever. Numbers no artifact can source are emitted as **open questions**, never
+guessed (with DEU data present there are none). Determinism verified: re-runs are byte-identical.
+
+### D14.2 — Deterministic paper figures + the outline (stubs only, no prose)
+The same command renders four byte-stable SVGs to `paper/figures/` from the computed records (integer
+coordinates, no random, no timestamps): the DEU abs-error histogram, the challenge-vs-compromise
+error comparison, the R1 leaderboard table, and the pre-registered 40/30/30 split diagram.
+`paper/OUTLINE.md` is a bullet-level skeleton (title candidates + section stubs, **no flowing
+prose**) whose every empirical claim points to an `EVIDENCE.md` E-tag or a figure. Guardrails hold
+(item 6): the coercive verdict stays **PENDING**, the noise-floor ceiling claim stays **scoped** to
+cooperative EU-legislative bargaining on the classic input set, and no number appears in the outline
+that is not sourced in EVIDENCE.md.

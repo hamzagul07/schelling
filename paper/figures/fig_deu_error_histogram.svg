@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" font-family="Helvetica,Arial,sans-serif">
+<text x="320" y="26" text-anchor="middle" font-size="17" font-weight="bold" fill="#1a1a2e">DEU abs-error distribution — challenge (primary)</text>
+<line x1="60" y1="300" x2="600" y2="300" stroke="#888"/>
+<rect x="62" y="60" width="50" height="240" fill="#c0392b"/>
+<text x="87" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">0-10</text>
+<text x="87" y="56" text-anchor="middle" font-size="10" fill="#1a1a2e">116</text>
+<rect x="116" y="197" width="50" height="103" fill="#c0392b"/>
+<text x="141" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">10-20</text>
+<text x="141" y="193" text-anchor="middle" font-size="10" fill="#1a1a2e">50</text>
+<rect x="170" y="197" width="50" height="103" fill="#c0392b"/>
+<text x="195" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">20-30</text>
+<text x="195" y="193" text-anchor="middle" font-size="10" fill="#1a1a2e">50</text>
+<rect x="224" y="238" width="50" height="62" fill="#c0392b"/>
+<text x="249" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">30-40</text>
+<text x="249" y="234" text-anchor="middle" font-size="10" fill="#1a1a2e">30</text>
+<rect x="278" y="248" width="50" height="52" fill="#c0392b"/>
+<text x="303" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">40-50</text>
+<text x="303" y="244" text-anchor="middle" font-size="10" fill="#1a1a2e">25</text>
+<rect x="332" y="228" width="50" height="72" fill="#c0392b"/>
+<text x="357" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">50-60</text>
+<text x="357" y="224" text-anchor="middle" font-size="10" fill="#1a1a2e">35</text>
+<rect x="386" y="273" width="50" height="27" fill="#c0392b"/>
+<text x="411" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">60-70</text>
+<text x="411" y="269" text-anchor="middle" font-size="10" fill="#1a1a2e">13</text>
+<rect x="440" y="286" width="50" height="14" fill="#c0392b"/>
+<text x="465" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">70-80</text>
+<text x="465" y="282" text-anchor="middle" font-size="10" fill="#1a1a2e">7</text>
+<rect x="494" y="288" width="50" height="12" fill="#c0392b"/>
+<text x="519" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">80-90</text>
+<text x="519" y="284" text-anchor="middle" font-size="10" fill="#1a1a2e">6</text>
+<rect x="548" y="261" width="50" height="39" fill="#c0392b"/>
+<text x="573" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">90-100</text>
+<text x="573" y="257" text-anchor="middle" font-size="10" fill="#1a1a2e">19</text>
+<text x="320" y="354" text-anchor="middle" font-size="11" fill="#1a1a2e">absolute error (0-100 continuum), n=351</text>
+</svg>
