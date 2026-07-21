@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 from schelling.schemas.forecast import ForecastRecord
@@ -132,3 +133,40 @@ def insert_seal_row(existing: str, row: str, sha: str) -> tuple[str, bool]:
 def empty_seal_ledger(header: str) -> str:
     """A fresh SHA-256 ledger: ``header`` prose + an empty marker-bounded table for ``seal``."""
     return f"{header.rstrip()}\n\n{LEDGER_START}\n{_TABLE_HEAD}\n{LEDGER_END}\n"
+
+
+# ------------------------------------------------------------------------------------------------
+# External anchoring via OpenTimestamps (Session 17, D17.2). On every seal we timestamp the ledger
+# file with the `ots` client, proving the commitment existed at a Bitcoin-anchored time — anchoring
+# that no one, including us, can backdate. Graceful no-op (a warning) when `ots` is not installed.
+def stamp_ledger(ledger_path: Path, proofs_dir: Path) -> tuple[str | None, str]:
+    """Timestamp ``ledger_path`` with OpenTimestamps; store the proof in ``proofs_dir``.
+
+    Returns ``(proof_path | None, message)``. The proof is content-addressed by the ledger's
+    SHA-256, so each distinct ledger state gets exactly one proof and re-stamping is idempotent.
+    Missing `ots` tool or any failure is a soft no-op — never blocks a seal.
+    """
+    if not ledger_path.exists():
+        return None, f"no ledger at {ledger_path} to timestamp"
+    fsha = hashlib.sha256(ledger_path.read_bytes()).hexdigest()
+    proof_dest = proofs_dir / f"{ledger_path.name}-{fsha[:12]}.ots"
+    if proof_dest.exists():
+        return str(proof_dest), f"already timestamped (proof {proof_dest})"
+    try:
+        result = subprocess.run(
+            ["ots", "stamp", str(ledger_path)], capture_output=True, text=True, timeout=120
+        )
+    except FileNotFoundError:
+        return None, (
+            "OpenTimestamps client not found — external anchoring skipped. "
+            "Install it (`pip install opentimestamps-client`) and re-run `schelling seal`."
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return None, f"ots stamp failed ({exc}); external anchoring skipped"
+    created = Path(str(ledger_path) + ".ots")
+    if result.returncode != 0 or not created.exists():
+        detail = (result.stderr or result.stdout or "").strip().splitlines()
+        return None, f"ots stamp produced no proof ({detail[-1] if detail else 'unknown'}); skipped"
+    proofs_dir.mkdir(parents=True, exist_ok=True)
+    created.replace(proof_dest)
+    return str(proof_dest), f"timestamped {ledger_path.name} → {proof_dest} (verify with `ots verify`)"
