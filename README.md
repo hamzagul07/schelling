@@ -179,6 +179,10 @@ schelling solve game.json --analog "gravity=6,violence=3,actors=8"
 
 # Coercive head-to-head (PENDING real tables; runs when data/coercive/library.json is supplied)
 schelling coercive
+
+# Regenerate the paper's evidence base + figures deterministically from repo artifacts (never
+# hand-typed; each number carries its source path + provenance). Writes paper/EVIDENCE.md + figures/.
+schelling paper-evidence
 ```
 
 The DEU dataset is not redistributed here; download the four open-access DEU III files
