@@ -167,8 +167,14 @@ schelling solve game.json --solver both --draws 10000
 schelling backtest data/deu/ --draws 2000 --seed 42 --html backtest.html
 schelling backtest data/deu/ --capability-mode equal --no-reference-point   # Session-9 baseline
 
-# Seal a forecast record into FORECASTS.md by the SHA-256 of its runs/ file (idempotent; graded later)
+# Seal a forecast record into FORECASTS.md by the SHA-256 of its runs/ file (idempotent; graded
+# later). Refuses a forecast whose question has no pre-registered resolution_rubric; on each seal it
+# anchors the ledger with OpenTimestamps (soft no-op if the `ots` client is absent).
 schelling seal runs/Q-2026-USIRAN-STAGE2-mc10000-s42-45d931c6cd91.json --vintage v1
+
+# Audit a sealed forecast (the one command an outsider runs): hash-in-ledger, inputs-hash, and
+# re-solve determinism — PASS/FAIL per check, non-zero exit on any failure.
+schelling verify runs/Q-2026-USIRAN-STAGE2-mc10000-s42-45d931c6cd91.json
 
 # Successor search: fit train / tune dev / score TEST once; update the BACKTEST.md leaderboard
 schelling successor data/deu/
