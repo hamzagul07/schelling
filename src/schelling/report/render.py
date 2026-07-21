@@ -396,6 +396,7 @@ def _targets_table(targets: list[PersuasionTarget]) -> str:
 
 def render_advise(record: AdviseRecord) -> str:
     """Render an AdviseRecord: baseline map, own-moves benefit/cost, persuasion ranking, caveat."""
+    lens = "exact weighted-mean (closed-form)" if record.exact else "simulated challenge (MC)"
     parts = [
         '<div class="kicker">Strategic advice — one-sided lever search</div>',
         f"<h1>{_esc(record.question_id)}</h1>",
@@ -403,6 +404,8 @@ def render_advise(record: AdviseRecord) -> str:
         f"ideal {record.ideal:g} · baseline settlement {record.baseline_median:.3f}</p>",
         f'<div class="caveat"><strong>Caveat.</strong> {_esc(ADVISE_CAVEAT)}</div>',
     ]
+    if record.exact or record.second_lens is not None:
+        parts.append(f'<p class="sub">Primary lever lens: <strong>{lens}</strong>.</p>')
     if record.game is not None:
         amap = svg.actor_map(_actor_points(record.game), settlement=record.baseline_median)
         parts += ["<h2>Baseline actor map &amp; settlement</h2>", f"<figure>{amap}</figure>"]
@@ -421,8 +424,18 @@ def render_advise(record: AdviseRecord) -> str:
         "<h2>Who to work on — persuasion targets</h2>",
         f"<figure>{svg.hbars(bars)}</figure>",
         _targets_table(record.persuasion_targets),
-        _advise_provenance(record),
     ]
+    if record.second_lens is not None:
+        s = record.second_lens
+        label = "exact (closed-form)" if s.exact else "simulated"
+        parts += [
+            f"<h2>Second lens — {_esc(s.model)} model, {label}</h2>",
+            f'<p class="sub">Baseline settlement {s.baseline_median:.3f}. Shown side by side so '
+            "the two models' levers can be compared.</p>",
+            _own_moves_table(s.top_moves),
+            _targets_table(s.persuasion_targets),
+        ]
+    parts.append(_advise_provenance(record))
     return _page(record.question_id, "".join(parts))
 
 

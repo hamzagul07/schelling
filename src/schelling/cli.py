@@ -134,6 +134,152 @@ def _analog_panel(spec: str) -> AnalogPanel:
     return panel
 
 
+def _formalize_or_exit(
+    situation_text: str,
+    source_texts: dict[str, str],
+    *,
+    model: str,
+    max_retries: int,
+    search: bool,
+    max_searches: int,
+    db_path: Path,
+    no_knowledge: bool,
+    quarantine_path: Path,
+) -> DraftGameSpec:
+    """Shared formalize path (client + key + index + leak/search handling); exits 2 on failure."""
+    index = None if no_knowledge else (KnowledgeIndex.open(db_path) if db_path.exists() else None)
+    if index is None and not no_knowledge:
+        typer.echo(f"(no concept index at {db_path}; formalizing without grounding)", err=True)
+    client = AnthropicClient(model=model)
+    if type(client).__name__ == "AnthropicClient" and not os.environ.get("ANTHROPIC_API_KEY"):
+        typer.echo(
+            "No ANTHROPIC_API_KEY found. Set it in your shell or a .env file at the project "
+            "root (a line like ANTHROPIC_API_KEY=sk-...), then re-run.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    try:
+        return run_formalize(
+            situation_text,
+            source_texts,
+            client=client,
+            index=index,
+            model=model,
+            max_retries=max_retries,
+            search=search,
+            max_searches=max_searches,
+            today=date.today().isoformat() if search else None,
+        )
+    except WebSearchUnavailableError as exc:
+        typer.echo(f"Web search unavailable: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    except IndexLeakageError as exc:
+        if exc.draft is not None:
+            quarantine_path.write_text(exc.draft.model_dump_json(indent=2) + "\n")
+        locs = "; ".join(f"{leak.phrase!r} in {leak.location}" for leak in exc.leaks[:6])
+        typer.echo(
+            f"Blocked: concept-library phrases leaked into factual fields — {locs}", err=True
+        )
+        typer.echo(f"Rejected draft quarantined at {quarantine_path}.", err=True)
+        raise typer.Exit(code=2) from exc
+    except ImportError as exc:
+        typer.echo(f"{_KNOWLEDGE_HINT} Or pass --no-knowledge to formalize ungrounded.", err=True)
+        raise typer.Exit(code=2) from exc
+
+
+@app.command()
+def analyze(
+    question: str = typer.Argument(..., help="The question / situation text to formalize."),
+    sources: Path | None = typer.Option(None, "--sources", help="Directory of source files."),
+    search: bool = typer.Option(
+        False, "--search/--no-search", help="Let the model search the web."
+    ),
+    solver: str = typer.Option("both", "--solver", help="challenge|compromise|both."),
+    seed: int = typer.Option(42, "--seed"),
+    review: bool = typer.Option(
+        True, "--review/--no-review", help="Pause for human review between draft and solve."
+    ),
+    draws: int = typer.Option(10_000, "--draws"),
+    llm_model: str = typer.Option("claude-opus-4-8", "--model"),
+    max_retries: int = typer.Option(2, "--max-retries", min=0),
+    max_searches: int = typer.Option(5, "--max-searches", min=1),
+    db_path: Path = typer.Option(DEFAULT_DB_PATH, "--db"),
+    no_knowledge: bool = typer.Option(False, "--no-knowledge"),
+    out_dir: Path = typer.Option(Path("runs"), "--out-dir"),
+    draft_out: Path = typer.Option(Path("draft.json"), "-o", "--draft-out"),
+    report_out: Path | None = typer.Option(
+        None, "--report", help="Where to write the HTML report."
+    ),
+) -> None:
+    """One command: formalize -> draft -> (human review) -> solve -> report -> summary."""
+    if solver not in ("challenge", "compromise", "both"):
+        typer.echo("--solver must be 'challenge', 'compromise', or 'both'.", err=True)
+        raise typer.Exit(code=2)
+    source_texts: dict[str, str] = {}
+    if sources is not None:
+        if not sources.is_dir():
+            typer.echo(f"--sources is not a directory: {sources}", err=True)
+            raise typer.Exit(code=2)
+        for p in sorted(sources.iterdir()):
+            if p.is_file():
+                source_texts[p.name] = p.read_text(errors="replace")
+
+    # 1-2. Formalize the question into a reviewable draft and write it.
+    draft = _formalize_or_exit(
+        question, source_texts, model=llm_model, max_retries=max_retries, search=search,
+        max_searches=max_searches, db_path=db_path, no_knowledge=no_knowledge,
+        quarantine_path=draft_out.with_suffix(".quarantine.json"),
+    )
+    draft_out.write_text(draft.model_dump_json(indent=2) + "\n")
+    typer.echo(_render_draft(draft))
+    typer.echo("")
+    typer.echo(f"Draft written: {draft_out}")
+
+    # 3-4. The human gate (default on): pause between draft and solve.
+    if review and not typer.confirm(
+        "Review the draft above (edit the JSON if needed). Solve now?", default=False
+    ):
+        typer.echo("Stopped before solving. Edit the draft JSON, then run `schelling solve`.")
+        return
+
+    # 5. Solve the selected model(s), carrying the draft's provenance.
+    models = ["challenge", "compromise"] if solver == "both" else [solver]
+    records = [
+        forecast(
+            draft.game, SolverConfig(seed=seed), n_draws=draws, seed=seed, out_dir=out_dir,
+            assumptions=draft.assumptions, formalizer_metadata=draft.metadata,
+            live_searched=draft.live_searched, model=m,
+        )
+        for m in models
+    ]
+
+    # 6. Render the primary report.
+    report_path = report_out or (draft_out.with_suffix(".report.html"))
+    report_path.write_text(render_report(json.loads(records[0].model_dump_json())))
+
+    # 7. Five-line summary.
+    by_model = {r.model: r for r in records}
+    ch = by_model.get("challenge")
+    typer.echo("")
+    typer.echo(f"Report: {report_path}")
+    med = "  ".join(f"{r.model} median {r.ensemble.median:.3f}" for r in records)
+    typer.echo(f"1. medians:   {med}")
+    ci = "  ".join(f"{r.model} [{r.ensemble.p10:.2f}, {r.ensemble.p90:.2f}]" for r in records)
+    typer.echo(f"2. CI80:      {ci}")
+    if ch is not None and ch.median_trajectory:
+        gap = ch.ensemble.median - ch.median_trajectory[-1]
+        mm = ch.median_trajectory[-1]
+        typer.echo(f"3. mode gap:  challenge mode-game {mm:.3f} (gap {gap:+.2f})")
+    else:
+        typer.echo("3. mode gap:  n/a (no challenge trajectory)")
+    sens = ch.sensitivity if ch is not None else (records[0].sensitivity)
+    if sens:
+        typer.echo(f"4. top lever: {sens[0].parameter} (swing {sens[0].swing:+.2f})")
+    else:
+        typer.echo("4. top lever: none (point estimates — zero sensitivity)")
+    typer.echo(f"5. assumptions flagged: {len(draft.assumptions)} — review before trusting")
+
+
 @app.command()
 def solve(
     fixture: Path = typer.Argument(..., help="A GameSpec or DraftGameSpec JSON."),
@@ -400,17 +546,24 @@ def advise(
         None, "--grid-step", min=0.1, help="Position sweep step (default: adaptive, span/20)."
     ),
     salience_floor: float = typer.Option(20.0, "--salience-floor", min=0.0, max=100.0),
+    solver: str = typer.Option(
+        "challenge", "--solver", help="challenge (simulated), compromise (exact), or both."
+    ),
     out_dir: Path = typer.Option(Path("runs"), "--out-dir"),
 ) -> None:
     """Find levers for one actor: own moves + who to persuade. Writes an AdviseRecord to runs/."""
     if not fixture.exists():
         typer.echo(f"input not found: {fixture}", err=True)
         raise typer.Exit(code=2)
+    if solver not in ("challenge", "compromise", "both"):
+        typer.echo("--solver must be 'challenge', 'compromise', or 'both'.", err=True)
+        raise typer.Exit(code=2)
     try:
         game, _assumptions, _fm, _ls = _load_solve_input(fixture)
         record, baseline = run_advise(
             game,
             actor,
+            model=solver,
             draws_per_candidate=draws_per_candidate,
             target_draws=target_draws,
             seed=seed,
@@ -426,9 +579,10 @@ def advise(
     out = out_dir / f"{record.run_id}.json"
     out.write_text(record.model_dump_json(indent=2) + "\n")
 
+    lens_label = "exact weighted-mean" if record.exact else "simulated challenge"
     typer.echo(
         f"Advising:  {record.advising_actor}  (ideal {record.ideal:g}, "
-        f"baseline settlement {record.baseline_median:.3f})"
+        f"baseline settlement {record.baseline_median:.3f})  [{lens_label} lens]"
     )
     typer.echo("")
     typer.echo("Top own moves (benefit toward ideal / cost conceded):")
@@ -445,6 +599,15 @@ def advise(
             f"  [{t.kind}] {t.actor_id}.{t.dimension} {t.from_value:g}->{t.to_value:g}: "
             f"settle {t.settlement_median:.3f}  benefit {t.benefit:+.3f}"
         )
+    if record.second_lens is not None:
+        s = record.second_lens
+        typer.echo("")
+        typer.echo(f"Exact (compromise) lens — closed-form (baseline {s.baseline_median:.3f}):")
+        for mv in s.top_moves:
+            typer.echo(
+                f"  {mv.dimension} -> {mv.value:g}: settle {mv.settlement_median:.3f}  "
+                f"benefit {mv.benefit:+.3f}  (exact)"
+            )
     typer.echo("")
     typer.echo(f"AdviseRecord written: {out}")
     typer.echo(ADVISE_CAVEAT)
