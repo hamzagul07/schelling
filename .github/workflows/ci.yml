@@ -29,8 +29,14 @@ jobs:
           uv run ruff check .
           uv run ruff format --check .
 
-      - name: Mypy (strict on the solver)
+      - name: Mypy (strict, whole package)
         run: uv run mypy
 
       - name: Pytest
         run: uv run pytest
+
+      - name: Evidence drift (paper-evidence --check)
+        # Fails the build only if a SCIENCE number in paper/EVIDENCE.md drifts from HEAD; warns on
+        # provenance/test-count drift (D18.3). DEU-derived tags are skipped here because the DEU
+        # dataset is gitignored on CI — those numbers are guarded by the (data-gated) local tests.
+        run: uv run schelling paper-evidence --check

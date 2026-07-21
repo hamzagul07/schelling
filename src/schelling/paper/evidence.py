@@ -245,20 +245,35 @@ def _round1_items(repo_root: Path, csv_path: Path) -> list[EvidenceItem]:
 
     issues = load_deu_issues(csv_path, capability=100.0, sourced_capability=False, min_actors=3)
     rec = run_backtest(
-        issues, csv_path=csv_path, dataset_label=_DEU_LABEL, seed=42, draws=2000,
-        capability=100.0, capability_mode="equal", reference_point=False, oracle=None,
+        issues,
+        csv_path=csv_path,
+        dataset_label=_DEU_LABEL,
+        seed=42,
+        draws=2000,
+        capability=100.0,
+        capability_mode="equal",
+        reference_point=False,
+        oracle=None,
     )
     prov = f"sha256:{rec.dataset_sha256[:12]}"
     src = f"data/deu/{_DEU_CSV_NAME}"
     return [
         EvidenceItem(
-            "E-DEU-MAE-r1", "3. Fair fight", "Round-1 challenge MAE (equal capability)",
-            _f2(_mae(rec, "solver_paper")), src, prov,
+            "E-DEU-MAE-r1",
+            "3. Fair fight",
+            "Round-1 challenge MAE (equal capability)",
+            _f2(_mae(rec, "solver_paper")),
+            src,
+            prov,
             "handicapped run: equal capability, no reference point (Session 9, D9.2)",
         ),
         EvidenceItem(
-            "E-BASE-WMEAN-r1", "3. Fair fight", "Round-1 weighted-mean MAE (equal capability)",
-            _f2(_mae(rec, "baseline_wmean")), src, prov,
+            "E-BASE-WMEAN-r1",
+            "3. Fair fight",
+            "Round-1 weighted-mean MAE (equal capability)",
+            _f2(_mae(rec, "baseline_wmean")),
+            src,
+            prov,
             "= salience-weighted mean under equal capability; the baseline round 1 loses to",
         ),
     ]
@@ -331,8 +346,10 @@ def _ledger_items(repo_root: Path) -> tuple[list[EvidenceItem], list[str]]:
 
 
 # --------------------------------------------------------------------------- test count
-_CTX_ROW = re.compile(r"^\|\s*(?P<model>[^|]+?)\s*\|\s*(?P<mae>\d+\.\d+)\s*\|\s*(?P<subset>[^|]+?)"
-                      r"\s*\|\s*(?P<src>[^|]+?)\s*\|\s*$")
+_CTX_ROW = re.compile(
+    r"^\|\s*(?P<model>[^|]+?)\s*\|\s*(?P<mae>\d+\.\d+)\s*\|\s*(?P<subset>[^|]+?)"
+    r"\s*\|\s*(?P<src>[^|]+?)\s*\|\s*$"
+)
 
 
 def _context_items(repo_root: Path) -> list[EvidenceItem]:
@@ -352,30 +369,46 @@ def _context_items(repo_root: Path) -> list[EvidenceItem]:
         if "BdM" not in m["src"] and "Table" not in m["src"]:
             continue
         model = m["model"].strip()
-        items.append(EvidenceItem(
-            f"E-CTX-{len(items) + 1}", "3. Fair fight (context)",
-            f"Published: {model}", m["mae"], "BACKTEST.md", prov,
-            f"{m['subset'].strip()} — {m['src'].strip()} (regime/ordering only, NOT like-for-like)",
-        ))
+        items.append(
+            EvidenceItem(
+                f"E-CTX-{len(items) + 1}",
+                "3. Fair fight (context)",
+                f"Published: {model}",
+                m["mae"],
+                "BACKTEST.md",
+                prov,
+                f"{m['subset'].strip()} — {m['src'].strip()} (regime/ordering only, NOT like-for-like)",
+            )
+        )
         if "Old Model" in model:
             old_model.append(m["mae"])
         elif "Weighted mean" in model:
             wmean.append(m["mae"])
     # named summaries the draft cites directly
     if old_model and wmean:
-        items.append(EvidenceItem(
-            "E-CTX-bdm2011", "3. Fair fight (context)",
-            "BdM (2011): Old Model vs weighted mean MAE",
-            f"Old Model {'/'.join(old_model)} vs weighted mean {'/'.join(wmean)}",
-            "BACKTEST.md", prov,
-            "BdM 2011 Tables 1 & 3 — same regime & ordering, NOT like-for-like (diff DEU version)",
-        ))
+        items.append(
+            EvidenceItem(
+                "E-CTX-bdm2011",
+                "3. Fair fight (context)",
+                "BdM (2011): Old Model vs weighted mean MAE",
+                f"Old Model {'/'.join(old_model)} vs weighted mean {'/'.join(wmean)}",
+                "BACKTEST.md",
+                prov,
+                "BdM 2011 Tables 1 & 3 — same regime & ordering, NOT like-for-like (diff DEU version)",
+            )
+        )
     if "Achen" in text and "as well or better" in text:
-        items.append(EvidenceItem(
-            "E-CTX-achen2006", "3. Fair fight (context)",
-            "Achen (2006) finding", "weighted mean does as well or better than complex models",
-            "BACKTEST.md", prov, "canonical DEU finding cited in BACKTEST.md (qualitative)",
-        ))
+        items.append(
+            EvidenceItem(
+                "E-CTX-achen2006",
+                "3. Fair fight (context)",
+                "Achen (2006) finding",
+                "weighted mean does as well or better than complex models",
+                "BACKTEST.md",
+                prov,
+                "canonical DEU finding cited in BACKTEST.md (qualitative)",
+            )
+        )
     return items
 
 
@@ -394,13 +427,22 @@ def _china_items(repo_root: Path) -> tuple[list[EvidenceItem], list[str]]:
     total = sum(counts)
     return [
         EvidenceItem(
-            "E-CHINA-ROWS", "7. Case library", "China Tables 2+3 rows verified (blind dual entry)",
-            f"{total}/{total} ({' + '.join(str(c) for c in counts)})", src, prov,
+            "E-CHINA-ROWS",
+            "7. Case library",
+            "China Tables 2+3 rows verified (blind dual entry)",
+            f"{total}/{total} ({' + '.join(str(c) for c in counts)})",
+            src,
+            prov,
             "two independent blind transcriptions agree; every Exercised-Power checksum reproduces",
         ),
         EvidenceItem(
-            "E-CHINA-VERIFIED", "7. Case library", "China transcription.verified",
-            str(verified), src, prov, "flipped true only on human ratification (D13.0)",
+            "E-CHINA-VERIFIED",
+            "7. Case library",
+            "China transcription.verified",
+            str(verified),
+            src,
+            prov,
+            "flipped true only on human ratification (D13.0)",
         ),
     ], []
 
@@ -414,8 +456,11 @@ def _domain_verdict_item(repo_root: Path) -> tuple[EvidenceItem | None, list[str
     if "PENDING" not in text or "Cooperative" not in text:
         return None, ["domain verdict: BACKTEST.md missing the domain-verdicts table"]
     return EvidenceItem(
-        "E-DOMAIN-VERDICT", "7. Case library", "Domain verdicts",
-        "cooperative: compromise mean wins; coercive: PENDING", "BACKTEST.md",
+        "E-DOMAIN-VERDICT",
+        "7. Case library",
+        "Domain verdicts",
+        "cooperative: compromise mean wins; coercive: PENDING",
+        "BACKTEST.md",
         _git_short(repo_root, "BACKTEST.md"),
         "coercive classics paywalled (D11.1); domestic cases out-of-domain, never counted",
     ), []

@@ -74,7 +74,7 @@ These are **not** directly comparable to our numbers (different DEU version, iss
 
 - **Capability (sourced, D10.1).** DEU records no capability, so each member state takes its Council power in the treaty regime in force at the issue's decision date (pre-Nice / Nice weighted votes; Lisbon-era population), rescaled so the strongest actor = 100; Commission/EP each take the largest member-state power (D10.3). The same table feeds the challenge solver AND the weighted-mean baseline — a fair fight.
 - **Point estimates.** Each issue is point estimates, so Monte Carlo is degenerate (zero variance, D3.1); the harness solves each issue once deterministically. `--draws` (2000) is recorded for interface parity but does not affect the result (D9.3).
-- **Determinism.** Dataset pinned by SHA-256 `0d75f0d2f3a96982…`; engine `0b979564c190`; seed 42. Same inputs → byte-identical record.
+- **Determinism.** Dataset pinned by SHA-256 `0d75f0d2f3a96982…`; engine `c9bc727a783b`; seed 42. Same inputs → byte-identical record.
 
 ## Domain verdicts, side by side
 
