@@ -206,6 +206,81 @@ def tornado(rows: Sequence[TornadoRow], *, baseline: float, width: float = 680.0
     return _svg(width, height, "".join(parts))
 
 
+class ScatterPoint(NamedTuple):
+    x: float
+    y: float
+    label: str
+
+
+def scatter(
+    points: Sequence[ScatterPoint],
+    *,
+    x_label: str = "",
+    y_label: str = "",
+    width: float = 680.0,
+    height: float = 260.0,
+) -> str:
+    """A scatter with a y=0 reference line — for own-move benefit (y) vs cost conceded (x)."""
+    if not points:
+        return _svg(width, 40, _text(width / 2, 24, "(no moves)", "tick", "middle"))
+    x0, x1 = 46.0, width - 20.0
+    y0, y1 = 16.0, height - 34.0
+    xs = [p.x for p in points] + [0.0]
+    ys = [p.y for p in points] + [0.0]
+    xmin, xmax = _nice_bounds(min(xs), max(xs))
+    ymin, ymax = _nice_bounds(min(ys), max(ys))
+
+    def sx(v: float) -> float:
+        return x0 + (x1 - x0) * (v - xmin) / (xmax - xmin)
+
+    def sy(v: float) -> float:
+        return y1 - (y1 - y0) * (v - ymin) / (ymax - ymin)
+
+    parts = [_line(x0, sy(0.0), x1, sy(0.0), "baseline"), _line(x0, y0, x0, y1, "axis")]
+    for p in points:
+        parts.append(f'<circle cx="{_n(sx(p.x))}" cy="{_n(sy(p.y))}" r="3.5" class="dot"/>')
+    parts.append(_text(x0, y1 + 16, f"{x_label} {xmin:g}", "tick", "start"))
+    parts.append(_text(x1, y1 + 16, f"{xmax:g}", "tick", "end"))
+    parts.append(_text(x0 - 6, sy(ymax) + 4, f"{ymax:g}", "tick", "end"))
+    parts.append(_text(x0 - 6, sy(ymin) + 4, f"{ymin:g}", "tick", "end"))
+    parts.append(_text(x0 - 6, y0 - 4, y_label, "tick", "end"))
+    return _svg(width, height, "".join(parts))
+
+
+class BarRow(NamedTuple):
+    label: str
+    value: float
+
+
+def hbars(rows: Sequence[BarRow], *, width: float = 680.0) -> str:
+    """Horizontal bars from a zero baseline (signed) — for the persuasion-target ranking."""
+    if not rows:
+        return _svg(width, 40, _text(width / 2, 24, "(no targets)", "tick", "middle"))
+    label_w = 190.0
+    x0, x1 = label_w + 8.0, width - 54.0
+    row_h = 26.0
+    top = 10.0
+    height = top + len(rows) * row_h + 12.0
+    vals = [r.value for r in rows] + [0.0]
+    dmin, dmax = _nice_bounds(min(vals), max(vals))
+
+    def sx(v: float) -> float:
+        return x0 + (x1 - x0) * (v - dmin) / (dmax - dmin)
+
+    zero = sx(0.0)
+    parts = [_line(zero, top - 2, zero, top + len(rows) * row_h, "baseline")]
+    for i, r in enumerate(rows):
+        y = top + i * row_h + row_h / 2
+        bx = min(zero, sx(r.value))
+        bw = max(abs(sx(r.value) - zero), 1.0)
+        parts.append(_text(label_w, y + 4, r.label, "actor-label", "end"))
+        parts.append(
+            f'<rect x="{_n(bx)}" y="{_n(y - 7)}" width="{_n(bw)}" height="14" class="tbar"/>'
+        )
+        parts.append(_text(x1 + 6, y + 4, f"{r.value:+.2f}", "swing", "start"))
+    return _svg(width, height, "".join(parts))
+
+
 def trajectory(medians: Sequence[float], *, width: float = 680.0, height: float = 190.0) -> str:
     """Per-round median trajectory as a line with round markers."""
     if not medians:
