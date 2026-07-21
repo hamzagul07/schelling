@@ -21,11 +21,29 @@ class Continuum(BaseModel):
     anchor_100: str
 
 
+class ResolutionRubric(BaseModel):
+    """How a sealed forecast will be graded once its real-world event resolves (Session 17, D17.1).
+
+    Written *before* resolution and pinned inside the sealed game so grading cannot be reverse-fit
+    to the outcome. It is grading metadata, not a solver input: it is **excluded** from the
+    ``inputs_hash`` (see ``mc.monte_carlo.inputs_hash``), so it never changes a forecast or the
+    content-address of a run.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    resolution_criteria: str  # the binary yes/no event that counts as the question resolving
+    adjudicating_sources: list[str] = Field(min_length=1)  # authoritative sources consulted
+    outcome_mapping: str  # rule mapping the real-world outcome onto the 0-100 settlement continuum
+    grading_formula: str  # e.g. "score = |forecast_median - actual| on the 0-100 continuum"
+
+
 class GameSpec(BaseModel):
     """One formalized situation — the deterministic solver's input.
 
     The canonical JSON serialization of this object is what gets SHA-256'd into a
-    ``ForecastRecord.inputs_hash``; keep it stable and order-independent.
+    ``ForecastRecord.inputs_hash``; keep it stable and order-independent. ``resolution_rubric`` is
+    the one exception — it is grading metadata and is excluded from the hash (D17.1).
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -37,3 +55,4 @@ class GameSpec(BaseModel):
     template: str
     horizon: str
     notes: str = ""
+    resolution_rubric: ResolutionRubric | None = None

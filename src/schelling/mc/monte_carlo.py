@@ -143,9 +143,14 @@ def engine_version() -> str:
 
 
 def inputs_hash(game: GameSpec, config: SolverConfig) -> str:
-    """SHA-256 of the canonical (GameSpec + SolverConfig) JSON — the run's content address."""
+    """SHA-256 of the canonical (GameSpec + SolverConfig) JSON — the run's content address.
+
+    ``resolution_rubric`` is excluded (D17.1): it is grading metadata, not a solver input, so it
+    must not change a forecast or its content-address — and excluding it keeps the hashes of
+    records sealed before the rubric existed byte-stable.
+    """
     payload = {
-        "game": game.model_dump(mode="json"),
+        "game": game.model_dump(mode="json", exclude={"resolution_rubric"}),
         "config": config.model_dump(mode="json"),
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
