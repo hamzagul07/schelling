@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import json
+import os
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from schelling.cli import app
+from schelling.cli import _startup, app
 from schelling.formalizer.client import LLMResult, ReplayClient
+from schelling.knowledge.chunker import Chunk
+from schelling.knowledge.embed import HashingEmbedder
+from schelling.knowledge.index import KnowledgeIndex
 from schelling.schemas.forecast import ForecastRecord
 from schelling.schemas.question import GameSpec
 
@@ -115,8 +120,6 @@ def test_formalize_writes_draft_and_never_solves(
     # a valid DraftGameSpec was written; its game is solver-ready
     written = out.read_text()
     assert '"question_id": "Q-COAL-PHASEOUT"' in written
-    import json
-
     game = GameSpec.model_validate(json.loads(written)["game"])
     assert len(game.actors) == 3
 
@@ -157,3 +160,58 @@ def test_report_bad_artifact_errors(tmp_path: Path) -> None:
     result = runner.invoke(app, ["report", str(bad)])
     assert result.exit_code == 2
     assert "could not render" in result.output
+
+
+# --------------------------------------------------------------- env loading (D6.5)
+def test_startup_loads_dotenv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SCHELLING_DOTENV_PROBE", raising=False)
+    (tmp_path / ".env").write_text("SCHELLING_DOTENV_PROBE=loaded\n")
+    monkeypatch.chdir(tmp_path)
+    _startup()
+    assert os.environ.get("SCHELLING_DOTENV_PROBE") == "loaded"
+
+
+def test_formalize_missing_key_is_friendly_not_a_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.chdir(tmp_path)  # no .env here, so the startup loader finds no key
+    situation = tmp_path / "s.txt"
+    situation.write_text("Aland, Belland and Cesta negotiate a coal phase-out year.")
+    result = runner.invoke(app, ["formalize", str(situation), "--db", str(tmp_path / "none.db")])
+    assert result.exit_code == 2
+    assert "No ANTHROPIC_API_KEY found" in result.output
+    assert "Traceback" not in result.output
+
+
+def _planted_db(tmp_path: Path, fact: str) -> Path:
+    db = tmp_path / "k.db"
+    chunk = Chunk(fact, "planted.txt", "Game Theory #99: Planted", 99, 0, 0, len(fact))
+    KnowledgeIndex.build([chunk], HashingEmbedder(), db_path=db).close()
+    return db
+
+
+def test_formalize_leak_quarantines_rejected_draft(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fact = "The Zorbian Federation fields nine hundred hypersonic interceptors near its border."
+    db = _planted_db(tmp_path, fact)
+    leak = json.loads((FIXTURES / "formalize_replay.json").read_text())
+    leak["game"]["actors"][0]["evidence"][0]["note"] = (
+        "Zorbian Federation fields nine hundred hypersonic interceptors."
+    )
+    leak_text = json.dumps(leak)
+    monkeypatch.setattr(
+        "schelling.cli.AnthropicClient",
+        lambda model="x": ReplayClient([LLMResult(leak_text, 10, 10)] * 2),
+    )
+    situation = tmp_path / "s.txt"
+    situation.write_text("Aland, Belland and Cesta negotiate a coal phase-out year.")
+    out = tmp_path / "draft.json"
+    result = runner.invoke(app, ["formalize", str(situation), "-o", str(out), "--db", str(db)])
+    assert result.exit_code == 2
+    assert "Blocked" in result.output and "quarantined" in result.output
+    assert "Traceback" not in result.output
+    quarantine = out.with_suffix(".quarantine.json")
+    assert quarantine.exists()
+    assert "game" in json.loads(quarantine.read_text())  # rejected draft saved for inspection
