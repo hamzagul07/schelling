@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import webbrowser
+from datetime import date
 from pathlib import Path
 
 import typer
@@ -19,7 +20,7 @@ from dotenv import find_dotenv, load_dotenv
 from pydantic import ValidationError
 
 from schelling.advise.search import advise as run_advise
-from schelling.formalizer.client import AnthropicClient
+from schelling.formalizer.client import AnthropicClient, WebSearchUnavailableError
 from schelling.formalizer.firewall import IndexLeakageError
 from schelling.formalizer.formalize import formalize as run_formalize
 from schelling.formalizer.schemas import DraftGameSpec
@@ -180,10 +181,18 @@ def _render_draft(draft: DraftGameSpec) -> str:
     else:
         lines.append("  (none)")
     lines.append("")
+    if draft.live_searched:
+        lines.append(
+            f"Live-searched (frozen {g.frozen_at}); {len(draft.sources_fetched)} source(s) fetched:"
+        )
+        for s in draft.sources_fetched:
+            lines.append(f"  - {s.title or s.url}  ({s.url}, retrieved {s.retrieved_at})")
+        lines.append("")
     m = draft.metadata
+    search_note = f"  searches={m.searches_used}" if m.searches_used else ""
     lines.append(
         f"Provenance: {m.model}  in={m.input_tokens} out={m.output_tokens} "
-        f"tok  ${m.cost_usd:.4f}  retries={m.retries}"
+        f"tok  ${m.cost_usd:.4f}  retries={m.retries}{search_note}"
     )
     return "\n".join(lines)
 
@@ -197,6 +206,12 @@ def formalize(
     max_retries: int = typer.Option(2, "--max-retries", min=0),
     db_path: Path = typer.Option(DEFAULT_DB_PATH, "--db", help="Concept index (for grounding)."),
     no_knowledge: bool = typer.Option(False, "--no-knowledge", help="Skip concept grounding."),
+    search: bool = typer.Option(
+        False, "--search/--no-search", help="Let the model search the web for current sources."
+    ),
+    max_searches: int = typer.Option(
+        5, "--max-searches", min=1, help="Search budget for --search."
+    ),
 ) -> None:
     """Formalize a situation into a DraftGameSpec. NEVER auto-solves — review, then `solve`."""
     if not situation.exists():
@@ -236,7 +251,13 @@ def formalize(
             index=index,
             model=model,
             max_retries=max_retries,
+            search=search,
+            max_searches=max_searches,
+            today=date.today().isoformat() if search else None,
         )
+    except WebSearchUnavailableError as exc:
+        typer.echo(f"Web search unavailable: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
     except IndexLeakageError as exc:
         quarantine = out_path.with_suffix(".quarantine.json")
         if exc.draft is not None:
@@ -289,7 +310,9 @@ def advise(
     draws_per_candidate: int = typer.Option(2000, "--draws-per-candidate", min=1),
     seed: int = typer.Option(42, "--seed"),
     target_draws: int = typer.Option(10000, "--target-draws", min=1),
-    grid_step: float = typer.Option(5.0, "--grid-step", min=0.1),
+    grid_step: float | None = typer.Option(
+        None, "--grid-step", min=0.1, help="Position sweep step (default: adaptive, span/20)."
+    ),
     salience_floor: float = typer.Option(20.0, "--salience-floor", min=0.0, max=100.0),
     out_dir: Path = typer.Option(Path("runs"), "--out-dir"),
 ) -> None:
@@ -333,7 +356,7 @@ def advise(
     typer.echo("Top persuasion targets (who to work on):")
     for t in record.persuasion_targets[:5]:
         typer.echo(
-            f"  {t.actor_id}.{t.dimension} {t.from_value:g}->{t.to_value:g}: "
+            f"  [{t.kind}] {t.actor_id}.{t.dimension} {t.from_value:g}->{t.to_value:g}: "
             f"settle {t.settlement_median:.3f}  benefit {t.benefit:+.3f}"
         )
     typer.echo("")

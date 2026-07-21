@@ -12,7 +12,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from schelling.formalizer.schemas import DraftGameSpec
+from schelling.formalizer.schemas import DraftGameSpec, FetchedSource
 from schelling.report import svg
 from schelling.report.svg import ActorPoint, BarRow, ScatterPoint, TornadoRow
 from schelling.schemas.forecast import (
@@ -75,6 +75,14 @@ ul.checklist .why { color:var(--muted); font-size:12px; margin-top:3px; }
 .caveat { border-left:3px solid var(--accent); background:#fff7ed; color:#7c2d12;
   padding:11px 14px; font-size:13px; margin:14px 0; border-radius:0 6px 6px 0; }
 .flag { color:var(--accent); font-size:11px; }
+.badge { display:inline-block; border:1px solid var(--accent); color:var(--accent);
+  border-radius:10px; padding:0 7px; font-size:11px; letter-spacing:.03em; }
+ul.sources { list-style:none; margin:0; padding:0; }
+ul.sources li { border:1px solid var(--line); border-radius:8px; padding:9px 12px;
+  margin-bottom:8px; background:var(--panel); }
+ul.sources a { color:var(--accent); text-decoration:none; word-break:break-all; }
+ul.sources .meta { color:var(--muted); font-size:12px; margin-top:2px; }
+ul.sources .snip { color:var(--ink); font-size:12px; margin-top:4px; }
 @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .wrap { max-width:none; padding:0 12px; } h2 { margin-top:24px; } }
 """
@@ -143,11 +151,14 @@ def render_draft(draft: DraftGameSpec) -> str:
     """Render a DraftGameSpec review sheet."""
     g = draft.game
     tc = draft.template_classification
+    searched = (
+        ' &nbsp;·&nbsp; <span class="badge">live-searched</span>' if draft.live_searched else ""
+    )
     parts = [
         '<div class="kicker">Draft game specification — for review</div>',
         f"<h1>{_esc(g.question_id)}</h1>",
         f'<p class="sub">frozen {_esc(g.frozen_at)} · template: {_esc(tc.template)} · '
-        f"horizon: {_esc(g.horizon)}</p>",
+        f"horizon: {_esc(g.horizon)}{searched}</p>",
         f'<p class="sub"><strong>{_esc(g.continuum.label)}</strong><br>'
         f"0 = {_esc(g.continuum.anchor_0)} &nbsp;·&nbsp; 100 = {_esc(g.continuum.anchor_100)}</p>",
         "<h2>Actor map</h2>",
@@ -157,6 +168,8 @@ def render_draft(draft: DraftGameSpec) -> str:
         "<h2>Open assumptions — review before solving</h2>",
         _assumptions(draft),
     ]
+    if draft.sources_fetched:
+        parts += ["<h2>Sources fetched — live web search</h2>", _sources_list(draft)]
     m = draft.metadata
     prov = _dl(
         {
@@ -182,6 +195,27 @@ def _assumptions_html(items: list[Assumption]) -> str:
 
 def _assumptions(draft: DraftGameSpec) -> str:
     return _assumptions_html(list(draft.assumptions))
+
+
+def _sources_list(draft: DraftGameSpec) -> str:
+    """A linked list of fetched sources with retrieval dates (data about the evidence, D8.2).
+
+    Hyperlinks reference the source pages; the report loads no external resource on open, so it
+    stays self-contained and offline (D8.4).
+    """
+    items: list[str] = []
+    for s in _sorted_sources(draft.sources_fetched):
+        title = _esc(s.title or s.url)
+        link = f'<a href="{_esc(s.url)}" rel="noopener noreferrer">{title}</a>'
+        meta = f'<div class="meta">{_esc(s.url)} · retrieved {_esc(s.retrieved_at)}</div>'
+        snip = f'<div class="snip">{_esc(s.snippet)}</div>' if s.snippet else ""
+        items.append(f"<li>{link}{meta}{snip}</li>")
+    return f'<ul class="sources">{"".join(items)}</ul>'
+
+
+def _sorted_sources(sources: list[FetchedSource]) -> list[FetchedSource]:
+    """Deterministic order for rendering (by url), independent of fetch order (D6.2)."""
+    return sorted(sources, key=lambda s: s.url)
 
 
 def _metric(value: str, label: str) -> str:
@@ -287,13 +321,14 @@ def _own_moves_table(moves: list[OwnMove]) -> str:
 def _targets_table(targets: list[PersuasionTarget]) -> str:
     rows = "".join(
         f"<tr><td>{_esc(t.actor_id)}</td><td>{_esc(t.dimension)}</td>"
+        f"<td>{_esc(t.kind)}</td>"
         f"<td class='num'>{t.from_value:g} &rarr; {t.to_value:g}</td>"
         f"<td class='num'>{t.settlement_median:.3f}</td><td class='num'>{t.benefit:+.3f}</td></tr>"
         for t in targets
     )
     return (
-        "<table><thead><tr><th>actor</th><th>lever</th><th>shift</th><th>settlement</th>"
-        f"<th>benefit</th></tr></thead><tbody>{rows}</tbody></table>"
+        "<table><thead><tr><th>actor</th><th>lever</th><th>play</th><th>shift</th>"
+        f"<th>settlement</th><th>benefit</th></tr></thead><tbody>{rows}</tbody></table>"
     )
 
 
@@ -316,7 +351,10 @@ def render_advise(record: AdviseRecord) -> str:
         "<h2>Top own moves</h2>",
         _own_moves_table(record.top_moves),
     ]
-    bars = [BarRow(f"{t.actor_id}.{t.dimension}", t.benefit) for t in record.persuasion_targets[:8]]
+    bars = [
+        BarRow(f"{t.actor_id}.{t.dimension} ({t.kind})", t.benefit)
+        for t in record.persuasion_targets[:8]
+    ]
     parts += [
         "<h2>Who to work on — persuasion targets</h2>",
         f"<figure>{svg.hbars(bars)}</figure>",
