@@ -936,3 +936,39 @@ prose**) whose every empirical claim points to an `EVIDENCE.md` E-tag or a figur
 (item 6): the coercive verdict stays **PENDING**, the noise-floor ceiling claim stays **scoped** to
 cooperative EU-legislative bargaining on the classic input set, and no number appears in the outline
 that is not sourced in EVIDENCE.md.
+
+## Session 15 — paper assembly
+
+### D15.0 — Draft sections relocated to paper/, treated verbatim, with one sanctioned roadmap fix
+The eleven approved draft sections arrived in `docs/papers/draft/`; they were relocated to
+`paper/draft/` so all of our paper artifacts live under `paper/` (`docs/papers/` holds the *source*
+PDFs we cite, not our manuscript). Relocation is a move, not an editorial change — the prose is
+treated as approved verbatim. The **one** authorized textual change (item 5): the introduction's
+roadmap sentence said "Section 7 the case-library protocol and ledger. Section 8 limitations.
+Section 9 concludes," conflating two sections and leaving the tail off by one against the actual
+files (07 case-library, 08 ledger, 09 limitations, 10 conclusion). Corrected to "Section 7 the
+case-library protocol. Section 8 the commit-reveal ledger. Section 9 limitations. Section 10
+concludes." Flagged here and in the session report.
+
+### D15.1 — `schelling paper-assemble`: deterministic, idempotent draft assembly
+New command (`src/schelling/paper/assemble.py`) concatenates `paper/draft/00…10` in order into
+`paper/DRAFT.md`, resolves every `[E-tag]` citation **inline to its EVIDENCE.md value with a
+provenance footnote** (`(351)[^ev-E-DEU-N]`, footnote → value · source · provenance), places the four
+figures at their section anchors (the two error figures after §3, the two successor figures after
+§4 — the drafts carry no explicit anchors), and appends the `paper/BIBLIOGRAPHY.md` skeleton. A bare
+family tag (e.g. `[E-LEDGER]`) resolves to its `E-LEDGER-*` members joined. Pure function of the
+on-disk inputs (no wall-clock, sorted files, stable dict order) → byte-identical `DRAFT.md` every run.
+Any tag EVIDENCE.md cannot resolve becomes a visible `**TODO(E-tag)**` in the text and is reported —
+never a silent value. On the current repo: 0 TODOs.
+
+### D15.2 — Six new evidence tags, each artifact-sourced
+The drafts cite tags EVIDENCE.md did not yet cover; all six are wired into `schelling paper-evidence`
+and sourced from a repo artifact (never hand-typed): `E-DEU-MAE-r1` (28.31) and `E-BASE-WMEAN-r1`
+(23.64) — the handicapped round-1 evaluation, computed by a **second** `run_backtest` in equal-
+capability / no-reference-point mode (Session 9's configuration); `E-METHOD-capabilities` — the
+sourced treaty-regime capability table (points to `capability.py`); `E-CTX-bdm2011` and
+`E-CTX-achen2006` — the published-context finding, parsed from BACKTEST.md; `E-WORST` — the worst-
+issue aggregate, from the backtest record. The bibliography skeleton (`paper/BIBLIOGRAPHY.md`) adds
+stubs for Feder 1987, Scholz–Calbert–Smith 2011, Thomson et al. 2006, Achen 2006, Bueno de Mesquita
+2011, Meehl 1954, Dawes 1979, Tetlock 2005, Green & Armstrong 2007 (plus Arregui & Perarnaud 2021,
+the DEU III dataset the paper actually evaluates on).

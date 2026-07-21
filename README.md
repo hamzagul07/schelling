@@ -183,6 +183,10 @@ schelling coercive
 # Regenerate the paper's evidence base + figures deterministically from repo artifacts (never
 # hand-typed; each number carries its source path + provenance). Writes paper/EVIDENCE.md + figures/.
 schelling paper-evidence
+
+# Assemble paper/DRAFT.md from paper/draft/*.md + EVIDENCE.md: resolve every [E-tag] inline to its
+# value with a provenance footnote, place the figures, append the bibliography. Deterministic.
+schelling paper-assemble
 ```
 
 The DEU dataset is not redistributed here; download the four open-access DEU III files

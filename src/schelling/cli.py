@@ -841,6 +841,36 @@ def paper_evidence(
         typer.echo("open questions: none — every cited number resolved to an artifact.")
 
 
+@app.command("paper-assemble")
+def paper_assemble(
+    repo_root: Path = typer.Option(Path("."), "--repo-root", help="Repository root."),
+    out: Path = typer.Option(Path("paper/DRAFT.md"), "-o", "--out", help="Assembled draft path."),
+) -> None:
+    """Assemble paper/DRAFT.md from the draft sections + EVIDENCE.md (deterministic, idempotent).
+
+    Concatenates paper/draft/00..10 in order, resolves every [E-tag] inline to its EVIDENCE.md value
+    with a provenance footnote, places the four figures at their section anchors, and appends the
+    bibliography skeleton. Any E-tag EVIDENCE.md cannot resolve is left as a visible TODO.
+    """
+    from schelling.paper.assemble import assemble
+
+    draft, todos, missing = assemble(repo_root)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(draft)
+    words = len(draft.split())
+    typer.echo(f"DRAFT.md: {words} words → {out}")
+    if missing:
+        typer.echo(f"missing inputs: {len(missing)}")
+        for msg in missing:
+            typer.echo(f"  - {msg}")
+    if todos:
+        typer.echo(f"UNRESOLVED E-tag TODOs: {len(todos)}")
+        for t in todos:
+            typer.echo(f"  - {t}")
+    else:
+        typer.echo("unresolved E-tags: none — every citation resolved to an EVIDENCE.md value.")
+
+
 @knowledge_app.command("search")
 def knowledge_search(
     query: str = typer.Argument(..., help="Free-text query."),
