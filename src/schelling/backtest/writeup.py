@@ -189,6 +189,25 @@ def backtest_markdown(record: BacktestRecord) -> str:
         "built and waits on the printed inputs (D11.1). |"
     )
     out.append("")
+    out.append("## Coercive contenders")
+    out.append("")
+    out.append("| Model | Status | Result |")
+    out.append("|---|---|---|")
+    out.append(
+        "| Challenge (BDM), compromise mean, gravity, regime | scored when cases arrive | awaiting "
+        "the coercive library |"
+    )
+    out.append(
+        "| **Model Three — Asabiyyah (MT-1.0)** | **PRE-REGISTERED — awaiting the reading** | "
+        "Specification sealed ([`specs/MT-1.0.md`](specs/MT-1.0.md), D20.0) while the library holds "
+        "two verified cases, none coercive. Scored **once**, at the 8-verified-case reading. **Gate "
+        '(§6, verbatim):** *"Primary: at the pre-registered 8-verified-case coercive reading, MT-1.0 '
+        "must beat the unadjusted compromise mean on MAE, reported with paired bootstrap intervals. "
+        "… Negative results are published with the same prominence as positive ones. If MT-1.0 "
+        "fails, it is retired exactly as R1's candidates were; its committed specification remains as "
+        'the record that the theory stated its claim before the evidence existed."* |'
+    )
+    out.append("")
     out.append("## Scheduled next: the ICB coercive benchmark")
     out.append("")
     out.append(

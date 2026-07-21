@@ -65,3 +65,111 @@ def test_head_to_head_is_deterministic() -> None:
     assert [(m.key, m.mae, m.ci_lo, m.ci_hi) for m in a.methods] == [
         (m.key, m.mae, m.ci_lo, m.ci_hi) for m in b.methods
     ]
+
+
+# --------------------------------------------------------------- model-three integration (Session 20)
+import json  # noqa: E402
+
+import pytest  # noqa: E402
+from typer.testing import CliRunner  # noqa: E402
+
+from schelling.cli import app  # noqa: E402
+
+_runner = CliRunner()
+
+
+def _coded_case_file(tmp_path: Path) -> Path:
+    lib = tmp_path / "syn.json"
+    lib.write_text(
+        json.dumps(
+            {
+                "transcription": {"verified": True},
+                "cases": [
+                    {
+                        "case_id": "SYN-1",
+                        "title": "t",
+                        "domain": "coercive_interstate",
+                        "ex_ante": True,
+                        "source": "synthetic",
+                        "reference_point": 50,
+                        "continuum": {"label": "x", "anchor_0": "a", "anchor_100": "b"},
+                        "actors": [
+                            {
+                                "id": "s",
+                                "name": "S",
+                                "position": 20,
+                                "salience": 60,
+                                "capability": 90,
+                            },
+                            {
+                                "id": "w",
+                                "name": "W",
+                                "position": 80,
+                                "salience": 60,
+                                "capability": 40,
+                            },
+                        ],
+                        "outcomes": {"o": {"proposed_value": 45, "primary": True}},
+                        "coding_flags": {
+                            "case": {
+                                "horizon_months": {"value": 24, "citation": "c"},
+                                "vulnerability": {"value": 1, "citation": "c"},
+                                "guarantor": {"value": 0, "citation": "c"},
+                            },
+                            "actors": {
+                                "s": {
+                                    "cohesion": {"value": "exceptional", "citation": "c"},
+                                    "endurance": {"value": "comfortable", "citation": "c"},
+                                    "loss": {"value": 1, "citation": "c"},
+                                    "perception": {"value": "ledger", "citation": "c"},
+                                },
+                                "w": {
+                                    "cohesion": {"value": "fractured", "citation": "c"},
+                                    "endurance": {"value": "hardened", "citation": "c"},
+                                    "perception": {"value": "lens", "citation": "c"},
+                                },
+                            },
+                        },
+                    }
+                ],
+            }
+        )
+    )
+    return lib
+
+
+def test_coding_flags_loaded_and_model_three_scores_via_harness(tmp_path: Path) -> None:
+    from schelling.backtest.coercive import _METHODS, MODEL_THREE, _forecast, head_to_head
+    from schelling.backtest.model_three import model_three_forecast
+
+    cases = load_library(_coded_case_file(tmp_path))
+    coding = cases[0].coding
+    assert coding is not None and len(coding.mt_actors) == 2 and coding.horizon_months == 24
+    expected = model_three_forecast(
+        coding.mt_actors,
+        reference_point=50.0,
+        horizon_months=24,
+        vulnerability=True,
+        guarantor=False,
+    )
+    assert _forecast(MODEL_THREE, cases[0]) == expected
+    rep = head_to_head(cases, methods=(*_METHODS, MODEL_THREE))
+    assert any(m.key == MODEL_THREE for m in rep.methods)
+
+
+def test_model_three_refuses_a_case_without_coding_flags() -> None:
+    from schelling.backtest.coercive import MODEL_THREE, _forecast
+
+    china = load_library(Path("data/coercive-cases/ktab-china-2014.json"))
+    with pytest.raises(ValueError, match="no coding_flags"):
+        _forecast(MODEL_THREE, china[0])
+
+
+def test_cli_coercive_refuses_model_three_before_the_reading() -> None:
+    # The real library is not the reading: model-three must refuse (never run before 8 verified cases).
+    result = _runner.invoke(app, ["coercive", "--solver", "model-three"])
+    assert result.exit_code == 2
+    assert (
+        "Refusing to run model-three" in result.output
+        and "reading has not arrived" in result.output
+    )
