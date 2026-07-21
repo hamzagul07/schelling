@@ -244,14 +244,24 @@ def advise(
         base_final = base_rec.ensemble.median
         base_lite = _median(game, cfg, draws_per_candidate, seed)
         om, tm, tg = _lens_moves(
-            game, advisor_idx, ideal,
+            game,
+            advisor_idx,
+            ideal,
             lambda g: _median(g, cfg, draws_per_candidate, seed),
             lambda g: _median(g, cfg, target_draws, seed),
-            base_lite, base_final, pos_step, sal_step, salience_floor,
+            base_lite,
+            base_final,
+            pos_step,
+            sal_step,
+            salience_floor,
         )
         lens = AdviseLens(
-            model="challenge", exact=False, baseline_median=base_final,
-            own_moves=om, top_moves=tm, persuasion_targets=tg,
+            model="challenge",
+            exact=False,
+            baseline_median=base_final,
+            own_moves=om,
+            top_moves=tm,
+            persuasion_targets=tg,
         )
         return lens, base_rec
 
@@ -261,12 +271,24 @@ def advise(
         )
         base = _compromise_settlement(game)
         om, tm, tg = _lens_moves(
-            game, advisor_idx, ideal, _compromise_settlement, _compromise_settlement,
-            base, base, pos_step, sal_step, salience_floor,
+            game,
+            advisor_idx,
+            ideal,
+            _compromise_settlement,
+            _compromise_settlement,
+            base,
+            base,
+            pos_step,
+            sal_step,
+            salience_floor,
         )
         lens = AdviseLens(
-            model="compromise", exact=True, baseline_median=base,
-            own_moves=om, top_moves=tm, persuasion_targets=tg,
+            model="compromise",
+            exact=True,
+            baseline_median=base,
+            own_moves=om,
+            top_moves=tm,
+            persuasion_targets=tg,
         )
         return lens, base_rec
 

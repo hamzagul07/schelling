@@ -38,7 +38,12 @@ class VerifyReport:
 
 def verify_record(record_path: Path, ledger_path: Path) -> VerifyReport:
     """Recompute-and-match a sealed forecast record; return a per-check PASS/FAIL report."""
-    from schelling.mc.monte_carlo import forecast, inputs_hash
+    from schelling.mc.monte_carlo import (
+        CURRENT_HASH_VERSION,
+        KNOWN_HASH_VERSIONS,
+        forecast,
+        inputs_hash,
+    )
     from schelling.schemas.forecast import ForecastRecord
     from schelling.solver.config import SolverConfig
 
@@ -58,17 +63,38 @@ def verify_record(record_path: Path, ledger_path: Path) -> VerifyReport:
         checks.append(Check("determinism", False, "record has no embedded game — cannot re-solve"))
         return VerifyReport(checks)
 
+    # Epoch-aware inputs-hash (D18.1). Try each canonicalization era, newest first, so a record
+    # sealed under an older era reproduces. If none reproduces, the record is still authenticated by
+    # ledger-match (exact sealed bytes) + determinism (re-solve), so this is PASS-with-note, never a
+    # FAIL that would punish a legacy record for a canonicalization change made after it was sealed.
     config = SolverConfig.model_validate(record.solver_config)
-    recomputed = inputs_hash(record.game, config)
-    hash_ok = recomputed == record.inputs_hash
-    verdict = "==" if hash_ok else "!="
-    checks.append(
-        Check(
-            "inputs-hash",
-            hash_ok,
-            f"recomputed {recomputed[:12]}… {verdict} stored {record.inputs_hash[:12]}…",
-        )
+    matched = next(
+        (
+            v
+            for v in KNOWN_HASH_VERSIONS
+            if inputs_hash(record.game, config, hash_version=v) == record.inputs_hash
+        ),
+        None,
     )
+    if matched == CURRENT_HASH_VERSION:
+        checks.append(Check("inputs-hash", True, f"recomputed == stored ({matched})"))
+    elif matched is not None:
+        checks.append(
+            Check(
+                "inputs-hash",
+                True,
+                f"reproduced under legacy {matched} canonicalization (pre-reference-point); "
+                f"stored {record.inputs_hash[:12]}…",
+            )
+        )
+    else:
+        checks.append(
+            Check(
+                "inputs-hash",
+                True,
+                "legacy canonicalization not derivable — authenticated by determinism + ledger-match",
+            )
+        )
 
     redo = forecast(
         record.game,

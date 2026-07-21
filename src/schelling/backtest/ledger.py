@@ -169,4 +169,6 @@ def stamp_ledger(ledger_path: Path, proofs_dir: Path) -> tuple[str | None, str]:
         return None, f"ots stamp produced no proof ({detail[-1] if detail else 'unknown'}); skipped"
     proofs_dir.mkdir(parents=True, exist_ok=True)
     created.replace(proof_dest)
-    return str(proof_dest), f"timestamped {ledger_path.name} → {proof_dest} (verify with `ots verify`)"
+    return str(
+        proof_dest
+    ), f"timestamped {ledger_path.name} → {proof_dest} (verify with `ots verify`)"
