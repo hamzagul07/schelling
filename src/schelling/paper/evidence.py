@@ -190,7 +190,32 @@ def _deu_items(repo_root: Path, record: BacktestRecord) -> list[EvidenceItem]:
                 "<= 0 => mean at/near the extractable-signal ceiling (COOPERATIVE domain only)",
             )
         )
-    # worst issues (limitations §9)
+    # sourced-capability method note (§3)
+    items.append(
+        EvidenceItem(
+            "E-METHOD-capabilities",
+            "3. Fair fight",
+            "Actor capability source",
+            "treaty-regime Council power (pre-Nice / Nice / Lisbon), rescaled strongest=100",
+            "src/schelling/backtest/capability.py",
+            _git_short(repo_root, "src/schelling/backtest/capability.py"),
+            "Commission/EP = largest member-state power (D10.1/D10.3); feeds solver AND baseline",
+        )
+    )
+    # worst issues (limitations §9): the aggregate the draft cites, plus the top few
+    if record.worst_issues:
+        top_err = max(w.error for w in record.worst_issues)
+        items.append(
+            EvidenceItem(
+                "E-WORST",
+                "9. Limitations",
+                "Worst-issue errors (primary solver)",
+                f"{len(record.worst_issues)} issues at abs error up to {_f2(top_err)}",
+                src,
+                prov,
+                "0/100-pole coding coarseness — pole-to-pole misses",
+            )
+        )
     for w in record.worst_issues[:3]:
         items.append(
             EvidenceItem(
@@ -204,6 +229,39 @@ def _deu_items(repo_root: Path, record: BacktestRecord) -> list[EvidenceItem]:
             )
         )
     return items
+
+
+def _mae(record: BacktestRecord, key: str) -> float:
+    for m in record.methods:
+        if m.key == key:
+            return m.mae
+    raise KeyError(key)
+
+
+def _round1_items(repo_root: Path, csv_path: Path) -> list[EvidenceItem]:
+    """The first, handicapped evaluation (§3): equal capability, no reference point (Session 9)."""
+    from schelling.backtest.deu import load_deu_issues
+    from schelling.backtest.harness import run_backtest
+
+    issues = load_deu_issues(csv_path, capability=100.0, sourced_capability=False, min_actors=3)
+    rec = run_backtest(
+        issues, csv_path=csv_path, dataset_label=_DEU_LABEL, seed=42, draws=2000,
+        capability=100.0, capability_mode="equal", reference_point=False, oracle=None,
+    )
+    prov = f"sha256:{rec.dataset_sha256[:12]}"
+    src = f"data/deu/{_DEU_CSV_NAME}"
+    return [
+        EvidenceItem(
+            "E-DEU-MAE-r1", "3. Fair fight", "Round-1 challenge MAE (equal capability)",
+            _f2(_mae(rec, "solver_paper")), src, prov,
+            "handicapped run: equal capability, no reference point (Session 9, D9.2)",
+        ),
+        EvidenceItem(
+            "E-BASE-WMEAN-r1", "3. Fair fight", "Round-1 weighted-mean MAE (equal capability)",
+            _f2(_mae(rec, "baseline_wmean")), src, prov,
+            "= salience-weighted mean under equal capability; the baseline round 1 loses to",
+        ),
+    ]
 
 
 # --------------------------------------------------------------------------- successor search (§4)
@@ -283,17 +341,40 @@ def _context_items(repo_root: Path) -> list[EvidenceItem]:
     if not path.exists():
         return []
     prov = _git_short(repo_root, "BACKTEST.md")
+    text = path.read_text()
     items: list[EvidenceItem] = []
-    for i, line in enumerate(path.read_text().splitlines()):
+    old_model: list[str] = []
+    wmean: list[str] = []
+    for line in text.splitlines():
         m = _CTX_ROW.match(line)
         if not m or m["mae"] in ("", None) or "abs. error" in m["model"].lower():
             continue
         if "BdM" not in m["src"] and "Table" not in m["src"]:
             continue
+        model = m["model"].strip()
         items.append(EvidenceItem(
             f"E-CTX-{len(items) + 1}", "3. Fair fight (context)",
-            f"Published: {m['model'].strip()}", m["mae"], "BACKTEST.md", prov,
+            f"Published: {model}", m["mae"], "BACKTEST.md", prov,
             f"{m['subset'].strip()} — {m['src'].strip()} (regime/ordering only, NOT like-for-like)",
+        ))
+        if "Old Model" in model:
+            old_model.append(m["mae"])
+        elif "Weighted mean" in model:
+            wmean.append(m["mae"])
+    # named summaries the draft cites directly
+    if old_model and wmean:
+        items.append(EvidenceItem(
+            "E-CTX-bdm2011", "3. Fair fight (context)",
+            "BdM (2011): Old Model vs weighted mean MAE",
+            f"Old Model {'/'.join(old_model)} vs weighted mean {'/'.join(wmean)}",
+            "BACKTEST.md", prov,
+            "BdM 2011 Tables 1 & 3 — same regime & ordering, NOT like-for-like (diff DEU version)",
+        ))
+    if "Achen" in text and "as well or better" in text:
+        items.append(EvidenceItem(
+            "E-CTX-achen2006", "3. Fair fight (context)",
+            "Achen (2006) finding", "weighted mean does as well or better than complex models",
+            "BACKTEST.md", prov, "canonical DEU finding cited in BACKTEST.md (qualitative)",
         ))
     return items
 
@@ -319,13 +400,13 @@ def _china_items(repo_root: Path) -> tuple[list[EvidenceItem], list[str]]:
         ),
         EvidenceItem(
             "E-CHINA-VERIFIED", "7. Case library", "China transcription.verified",
-            str(verified), src, prov, "flipped true only on human ratification of judgments (D13.0)",
+            str(verified), src, prov, "flipped true only on human ratification (D13.0)",
         ),
     ], []
 
 
 def _domain_verdict_item(repo_root: Path) -> tuple[EvidenceItem | None, list[str]]:
-    """The suppressed-verdict discipline, from BACKTEST.md (cooperative decided; coercive PENDING)."""
+    """Suppressed-verdict discipline, from BACKTEST.md (cooperative decided; coercive PENDING)."""
     path = repo_root / "BACKTEST.md"
     if not path.exists():
         return None, ["domain verdict: BACKTEST.md not found"]
@@ -400,13 +481,14 @@ def build_evidence(repo_root: Path) -> EvidenceBundle:
         )
         bundle.record = record
         bundle.items += _deu_items(repo_root, record)
+        bundle.items += _round1_items(repo_root, csv_path)
         report, _a, _b = run_successor_search(csv_path)
         bundle.report = report
         bundle.items += _successor_items(repo_root, report)
     else:
         bundle.open_questions += [
-            "DEU MAE/RMSE tables, split-sample, oracle gap, worst issues: data/deu absent — "
-            "download DEU III (doi:10.34810/data53) into data/deu/ to regenerate.",
+            "DEU MAE/RMSE tables, split-sample, oracle gap, worst issues, round-1 (E-DEU-MAE-r1 / "
+            "E-BASE-WMEAN-r1): data/deu absent — download DEU III (doi:10.34810/data53) to redo.",
             "Successor leaderboard + bootstrap CIs + R1 split sizes: data/deu absent (see above).",
         ]
 
