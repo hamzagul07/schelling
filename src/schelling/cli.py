@@ -18,16 +18,17 @@ import typer
 from dotenv import find_dotenv, load_dotenv
 from pydantic import ValidationError
 
+from schelling.advise.search import advise as run_advise
 from schelling.formalizer.client import AnthropicClient
 from schelling.formalizer.firewall import IndexLeakageError
 from schelling.formalizer.formalize import formalize as run_formalize
 from schelling.formalizer.schemas import DraftGameSpec
 from schelling.knowledge.embed import make_embedder
 from schelling.knowledge.index import DEFAULT_DB_PATH, DEFAULT_TRANSCRIPTS, KnowledgeIndex
-from schelling.mc.monte_carlo import forecast
+from schelling.mc.monte_carlo import forecast, write_record
 from schelling.mc.sensitivity import format_tornado
 from schelling.report.render import render as render_report
-from schelling.schemas.forecast import Assumption, DraftMetadata
+from schelling.schemas.forecast import ADVISE_CAVEAT, Assumption, DraftMetadata
 from schelling.schemas.question import GameSpec
 from schelling.schemas.stakeholders import TriangularEstimate
 from schelling.solver.config import RangeMode, SolverConfig
@@ -37,6 +38,11 @@ app = typer.Typer(
 )
 knowledge_app = typer.Typer(help="Transcript concept index (BUILD_PLAN §7).", no_args_is_help=True)
 app.add_typer(knowledge_app, name="knowledge")
+
+# Shown when the bge-m3 knowledge extra is needed but not installed (D7.0c).
+_KNOWLEDGE_HINT = (
+    "This needs the 'knowledge' extra (bge-m3 embeddings): run `uv sync --all-extras`."
+)
 
 
 @app.callback()
@@ -190,6 +196,7 @@ def formalize(
     model: str = typer.Option("claude-opus-4-8", "--model"),
     max_retries: int = typer.Option(2, "--max-retries", min=0),
     db_path: Path = typer.Option(DEFAULT_DB_PATH, "--db", help="Concept index (for grounding)."),
+    no_knowledge: bool = typer.Option(False, "--no-knowledge", help="Skip concept grounding."),
 ) -> None:
     """Formalize a situation into a DraftGameSpec. NEVER auto-solves — review, then `solve`."""
     if not situation.exists():
@@ -206,8 +213,8 @@ def formalize(
             if path.is_file():
                 source_texts[path.name] = path.read_text(errors="replace")
 
-    index = KnowledgeIndex.open(db_path) if db_path.exists() else None
-    if index is None:
+    index = None if no_knowledge else (KnowledgeIndex.open(db_path) if db_path.exists() else None)
+    if index is None and not no_knowledge:
         typer.echo(f"(no concept index at {db_path}; formalizing without grounding)", err=True)
 
     client = AnthropicClient(model=model)
@@ -239,6 +246,9 @@ def formalize(
             f"Blocked: concept-library phrases leaked into factual fields — {locs}", err=True
         )
         typer.echo(f"Rejected draft quarantined at {quarantine} for inspection.", err=True)
+        raise typer.Exit(code=2) from exc
+    except ImportError as exc:
+        typer.echo(f"{_KNOWLEDGE_HINT} Or pass --no-knowledge to formalize ungrounded.", err=True)
         raise typer.Exit(code=2) from exc
 
     out_path.write_text(draft.model_dump_json(indent=2) + "\n")
@@ -272,6 +282,65 @@ def report(
         webbrowser.open(out_path.resolve().as_uri())
 
 
+@app.command()
+def advise(
+    fixture: Path = typer.Argument(..., help="A GameSpec or DraftGameSpec JSON."),
+    actor: str = typer.Option(..., "--actor", help="The advising actor's id."),
+    draws_per_candidate: int = typer.Option(2000, "--draws-per-candidate", min=1),
+    seed: int = typer.Option(42, "--seed"),
+    target_draws: int = typer.Option(10000, "--target-draws", min=1),
+    grid_step: float = typer.Option(5.0, "--grid-step", min=0.1),
+    salience_floor: float = typer.Option(20.0, "--salience-floor", min=0.0, max=100.0),
+    out_dir: Path = typer.Option(Path("runs"), "--out-dir"),
+) -> None:
+    """Find levers for one actor: own moves + who to persuade. Writes an AdviseRecord to runs/."""
+    if not fixture.exists():
+        typer.echo(f"input not found: {fixture}", err=True)
+        raise typer.Exit(code=2)
+    try:
+        game, _assumptions, _fm = _load_solve_input(fixture)
+        record, baseline = run_advise(
+            game,
+            actor,
+            draws_per_candidate=draws_per_candidate,
+            target_draws=target_draws,
+            seed=seed,
+            grid_step=grid_step,
+            salience_floor=salience_floor,
+        )
+    except ValueError as exc:  # bad JSON/schema, or unknown actor id
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    write_record(baseline, out_dir)  # the baseline ForecastRecord reference
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"{record.run_id}.json"
+    out.write_text(record.model_dump_json(indent=2) + "\n")
+
+    typer.echo(
+        f"Advising:  {record.advising_actor}  (ideal {record.ideal:g}, "
+        f"baseline settlement {record.baseline_median:.3f})"
+    )
+    typer.echo("")
+    typer.echo("Top own moves (benefit toward ideal / cost conceded):")
+    for mv in record.top_moves:
+        flag = "  [beyond stated range]" if mv.beyond_stated_range else ""
+        typer.echo(
+            f"  {mv.dimension} -> {mv.value:g}: settle {mv.settlement_median:.3f}  "
+            f"benefit {mv.benefit:+.3f}  cost {mv.cost:g}{flag}"
+        )
+    typer.echo("")
+    typer.echo("Top persuasion targets (who to work on):")
+    for t in record.persuasion_targets[:5]:
+        typer.echo(
+            f"  {t.actor_id}.{t.dimension} {t.from_value:g}->{t.to_value:g}: "
+            f"settle {t.settlement_median:.3f}  benefit {t.benefit:+.3f}"
+        )
+    typer.echo("")
+    typer.echo(f"AdviseRecord written: {out}")
+    typer.echo(ADVISE_CAVEAT)
+
+
 @knowledge_app.command("search")
 def knowledge_search(
     query: str = typer.Argument(..., help="Free-text query."),
@@ -282,8 +351,12 @@ def knowledge_search(
     if not db_path.exists():
         typer.echo(f"no index at {db_path}. Build one with: schelling knowledge build", err=True)
         raise typer.Exit(code=2)
-    index = KnowledgeIndex.open(db_path)
-    results = index.search(query, k=k)
+    try:
+        index = KnowledgeIndex.open(db_path)
+        results = index.search(query, k=k)
+    except ImportError as exc:
+        typer.echo(_KNOWLEDGE_HINT, err=True)
+        raise typer.Exit(code=2) from exc
     if not results:
         typer.echo("no results.")
         return
@@ -305,9 +378,13 @@ def knowledge_build(
         typer.echo(f"no transcripts in {transcripts}", err=True)
         raise typer.Exit(code=2)
     typer.echo(f"building index ({embedder}) from {transcripts} ...")
-    index = KnowledgeIndex.build_from_transcripts(
-        transcripts, embedder=make_embedder(embedder), db_path=db_path
-    )
+    try:
+        index = KnowledgeIndex.build_from_transcripts(
+            transcripts, embedder=make_embedder(embedder), db_path=db_path
+        )
+    except ImportError as exc:
+        typer.echo(_KNOWLEDGE_HINT, err=True)
+        raise typer.Exit(code=2) from exc
     typer.echo(f"indexed {index.count()} chunks -> {db_path}")
 
 
