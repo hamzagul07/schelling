@@ -85,3 +85,35 @@ def test_long_lecture_is_split_with_overlap() -> None:
     assert len(chunks) >= 2
     # consecutive chunks overlap in the source (next starts before current ends)
     assert chunks[1].char_start < chunks[0].char_end
+
+
+# --------------------------------------------------------------- concept-card chunking (Session 19)
+CANON = Path(__file__).parent.parent / "data" / "concepts" / "canon.md"
+
+
+def test_chunk_concept_cards_splits_every_canon_card() -> None:
+    from schelling.knowledge.chunker import chunk_concept_cards
+
+    cards = chunk_concept_cards(CANON.read_text(), "canon.md")
+    assert len(cards) == 28  # families A1-A7, B1-B5, C1-C6, D1-D7, E1-E3
+    refs = {c.lecture for c in cards}
+    assert "Canon A3: Loss-domain risk seeking" in refs
+    assert "Canon D2: Indivisibility and sacred stakes" in refs
+    a3 = next(c for c in cards if c.lecture.startswith("Canon A3"))
+    assert "loss-domain risk seeking" in a3.text.lower() and a3.source_file == "canon.md"
+
+
+def test_chunk_concept_cards_handles_multiline_citation_header() -> None:
+    # A5's citation list wraps across a line ("Trachtenberg\n2012)") — DOTALL keeps the card whole.
+    from schelling.knowledge.chunker import chunk_concept_cards
+
+    cards = chunk_concept_cards(CANON.read_text(), "canon.md")
+    assert any(c.lecture == "Canon A5: Audience costs" for c in cards)
+
+
+def test_chunk_concepts_directory_reads_md(tmp_path: Path) -> None:
+    from schelling.knowledge.chunker import chunk_concepts_directory
+
+    (tmp_path / "x.md").write_text("**A1. Foo (Bar 2020).** Body text here.\n")
+    chunks = chunk_concepts_directory(tmp_path)
+    assert len(chunks) == 1 and chunks[0].lecture == "Canon A1: Foo"
