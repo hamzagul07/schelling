@@ -11,8 +11,11 @@ from schelling.formalizer.client import (
     LLMResult,
     Message,
     ReplayClient,
+    WebSearchUnavailableError,
+    WebSource,
     cost_usd,
     replay_from_text,
+    search_cost_usd,
 )
 from schelling.formalizer.firewall import (
     IndexLeakageError,
@@ -27,6 +30,7 @@ from schelling.formalizer.schemas import (
     DraftExtraction,
     DraftGameSpec,
     DraftMetadata,
+    FetchedSource,
     TemplateClassification,
 )
 
@@ -37,6 +41,7 @@ __all__ = [
     "DraftExtraction",
     "DraftGameSpec",
     "DraftMetadata",
+    "FetchedSource",
     "FormalizeError",
     "IndexLeakageError",
     "LLMClient",
@@ -45,6 +50,8 @@ __all__ = [
     "Message",
     "ReplayClient",
     "TemplateClassification",
+    "WebSearchUnavailableError",
+    "WebSource",
     "assert_no_leakage",
     "build_system_prompt",
     "build_user_prompt",
@@ -52,4 +59,5 @@ __all__ = [
     "find_leaks",
     "formalize",
     "replay_from_text",
+    "search_cost_usd",
 ]

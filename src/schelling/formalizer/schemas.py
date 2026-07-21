@@ -24,8 +24,25 @@ __all__ = [
     "DraftExtraction",
     "DraftGameSpec",
     "DraftMetadata",
+    "FetchedSource",
     "TemplateClassification",
 ]
+
+
+class FetchedSource(BaseModel):
+    """One source Claude retrieved via live web search (``formalize --search``).
+
+    Evidence-river material: a fetched source may be cited in an evidence note exactly like a
+    supplied file. ``retrieved_at`` is data *about* the evidence (when it was fetched) — it does
+    not enter any hash and does not affect report determinism (D8.2).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    url: str
+    title: str
+    retrieved_at: str  # ISO-8601 fetch date
+    snippet: str = ""
 
 
 class TemplateClassification(BaseModel):
@@ -62,3 +79,7 @@ class DraftGameSpec(BaseModel):
     assumptions: list[Assumption]
     template_classification: TemplateClassification
     metadata: DraftMetadata
+    # Populated by ``formalize --search`` (D8.1): the live-web sources Claude pulled, and the flag
+    # that this draft was grounded against a search that cannot be frozen in the past.
+    sources_fetched: list[FetchedSource] = Field(default_factory=list)
+    live_searched: bool = False

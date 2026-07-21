@@ -95,9 +95,10 @@ class DraftMetadata(BaseModel):
     model: str
     input_tokens: int
     output_tokens: int
-    cost_usd: float
+    cost_usd: float  # total: token cost + web-search cost (D8.1)
     retries: int  # schema-validation retries
     leak_retries: int = 0  # firewall rephrase retries (D6.5)
+    searches_used: int = 0  # server-side web searches performed (D8.1)
     created_at: str | None = None  # ISO-8601; left None keeps drafts reproducible in tests
 
 
@@ -190,6 +191,8 @@ class PersuasionTarget(BaseModel):
     to_value: float
     settlement_median: float
     benefit: float  # settlement shift toward the advisor's ideal
+    # "energize" (raise salience / pull position toward the advisor) vs "defuse" (lower salience)
+    kind: str = "energize"
 
 
 class AdviseRecord(BaseModel):
