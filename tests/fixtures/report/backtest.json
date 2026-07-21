@@ -4,9 +4,28 @@
   "n_issues": 3,
   "seed": 7,
   "draws": 40,
-  "capability": 100.0,
+  "capability": 0.0,
   "engine_version": "0000000000000000000000000000000000000000",
   "created_at": null,
+  "capability_mode": "sourced",
+  "reference_point_used": true,
+  "split_sample": {
+    "objective": "rp-anchored challenge: status-quo probability Q",
+    "tuned_param": "q",
+    "candidates": [
+      0.3,
+      0.5,
+      0.7,
+      0.9
+    ],
+    "selected": 0.9,
+    "train_n": 2,
+    "test_n": 1,
+    "train_mae": 20.0,
+    "test_mae": 10.0,
+    "test_baseline_mae": 10.0,
+    "passed": false
+  },
   "methods": [
     {
       "key": "solver_paper",
@@ -19,6 +38,7 @@
         "apply_risk": true,
         "conflict_resolves": false,
         "security_mode": "adversary",
+        "reference_point": null,
         "max_rounds": 20,
         "convergence_epsilon": 0.5,
         "convergence_patience": 2,
@@ -45,6 +65,7 @@
         "apply_risk": false,
         "conflict_resolves": false,
         "security_mode": "adversary",
+        "reference_point": null,
         "max_rounds": 20,
         "convergence_epsilon": 0.5,
         "convergence_patience": 2,
@@ -62,7 +83,7 @@
     },
     {
       "key": "baseline_wmean",
-      "label": "Baseline — capability x salience weighted mean",
+      "label": "Compromise — capability x salience weighted mean",
       "kind": "baseline",
       "config": {},
       "mae": 10.714285714285715,
@@ -101,6 +122,7 @@
         "apply_risk": true,
         "conflict_resolves": false,
         "security_mode": "adversary",
+        "reference_point": null,
         "max_rounds": 20,
         "convergence_epsilon": 0.5,
         "convergence_patience": 2,
@@ -127,6 +149,7 @@
         "apply_risk": true,
         "conflict_resolves": false,
         "security_mode": "adversary",
+        "reference_point": null,
         "max_rounds": 20,
         "convergence_epsilon": 0.5,
         "convergence_patience": 2,
@@ -153,6 +176,7 @@
         "apply_risk": true,
         "conflict_resolves": false,
         "security_mode": "adversary",
+        "reference_point": null,
         "max_rounds": 20,
         "convergence_epsilon": 0.5,
         "convergence_patience": 2,
@@ -179,6 +203,7 @@
         "apply_risk": true,
         "conflict_resolves": false,
         "security_mode": "adversary",
+        "reference_point": null,
         "max_rounds": 20,
         "convergence_epsilon": 0.5,
         "convergence_patience": 2,
@@ -193,9 +218,28 @@
         10.0,
         30.0
       ]
+    },
+    {
+      "key": "challenge_rp",
+      "label": "Challenge — rp-anchored, Q=0.9 (tuned split-sample)",
+      "kind": "solver",
+      "config": {
+        "reference_point": "per-issue DEU rp",
+        "q": 0.9,
+        "range_mode": "dynamic"
+      },
+      "mae": 16.666666666666668,
+      "rmse": 19.148542155126762,
+      "median_error": 10.0,
+      "max_error": 30.0,
+      "errors": [
+        10.0,
+        10.0,
+        30.0
+      ]
     }
   ],
-  "primary_method": "solver_paper",
+  "primary_method": "challenge_rp",
   "baseline_methods": [
     "baseline_wmean",
     "baseline_median"
