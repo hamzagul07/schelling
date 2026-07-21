@@ -111,6 +111,17 @@ analog / base-rate layer** ships: `solve --analog "gravity=6,violence=3,actors=8
 most structurally similar historical crises and their outcome distribution as a report panel — off
 by default, clearly separated from the solver line, never blended (D11.2).
 
+**Session 12 (done) — sealing, exact advice, and the one-command flow:** `schelling seal
+<record>` pins a forecast into [`FORECASTS.md`](FORECASTS.md) by the SHA-256 of its `runs/` file
+(idempotent; D12.1), and `solve`/reports now surface the deterministic mode-game median beside the
+MC median with a degenerate-median-lock warning (D12.3). `advise --solver compromise|both` adds the
+compromise model's **closed-form** lever lens — a position shift of *d* moves the weighted-mean
+settlement by exactly `(w_i/Σw)·d`, labeled **exact** and rendered side by side with the simulated
+challenge lens (D12.4). `schelling analyze "<question>"` chains formalize → draft → **human-review
+gate** → solve both models → report + a five-line terminal summary in one command; the gate is
+default-on (`--no-review` to skip), keeping the human between the LLM's structuring and the math's
+prediction (D12.5).
+
 ## CLI
 
 ```sh
@@ -136,6 +147,15 @@ schelling formalize situation.txt --search --max-searches 5 -o game.draft.json
 # Find levers for one actor: own moves (position/salience) + who to persuade. Writes an
 # AdviseRecord to runs/. One-sided search — lever-finding, not a playbook.
 schelling advise game.json --actor germany --draws-per-candidate 2000 --target-draws 10000
+
+# ...under the compromise model the levers are closed-form (exact), not simulated. --solver
+# both renders the simulated (challenge) and exact (compromise) lenses side by side.
+schelling advise game.json --actor germany --solver both
+
+# One command: formalize a question -> draft -> (human-review gate) -> solve both models ->
+# report + a five-line terminal summary. The gate is default-on; --no-review skips it.
+schelling analyze "Germany, France and the Commission negotiate a 2035 emissions target" \
+    --sources ./sources --solver both --seed 42
 
 # Render any artifact (draft, ForecastRecord, AdviseRecord, or BacktestRecord) to a report
 schelling report runs/Q-1994-EMISSIONS-mc10000-s42-*.json -o report.html --open

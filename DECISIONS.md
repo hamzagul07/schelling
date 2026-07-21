@@ -829,3 +829,32 @@ at 22.0 while its Monte-Carlo median is 29.4, and whose tornado is 18/27 zero-sw
   median** in `solve` output and the report headline, with the signed gap, so the reader sees when
   the point-estimate solve and the ensemble diverge sharply (e.g. v1: mode 53.8 vs MC 34.6, gap
   −19.2). The compromise model has no round trajectory, so its mode-game cell reads "—".
+
+### D12.4 — `advise --solver compromise|both`: the exact closed-form lever lens
+The compromise model's settlement is the capability×salience weighted mean of positions, so its
+levers are **closed-form**, not simulated. Shifting actor *i*'s position by *d* moves the settlement
+by exactly `(w_i / Σw)·d`; a salience change re-weights the mean analytically. `advise` now takes a
+`model` argument (CLI `--solver`): `challenge` (the default Monte-Carlo simulated search),
+`compromise` (the exact weighted-mean levers), or `both` — challenge primary with the compromise lens
+attached as `AdviseRecord.second_lens` and rendered **side by side** in the report. Compromise moves
+are labeled **"exact"** to distinguish closed-form shifts from the challenge model's simulated MC
+search. The sweep/benefit/cost logic is shared (`_lens_moves`, parameterized by a settlement
+function), so the challenge lens is byte-identical to Session 7's and its golden is unchanged. The new
+`AdviseRecord` fields (`model`, `exact`, `second_lens`) default to `challenge`/`False`/`None`, so
+existing records validate and render unchanged. `_compromise_settlement` returns the plain mean of
+positions when total weight is zero (degenerate guard). Determinism (rule 2) holds: the exact lens is
+a pure function of the game, byte-identical across runs; `run_id` carries the model tag.
+
+### D12.5 — `schelling analyze`: the one-command formalize→solve→report flow with a human gate
+`schelling analyze "<question>" [--sources dir] [--search] [--solver both] [--seed 42]` chains the
+whole pipeline: formalize the question into a draft, write the draft JSON, print the stakeholder
+table, **pause at a human-review gate**, then (on confirm) solve both models, render the report, and
+print a five-line terminal summary (medians, CI80s, mode-vs-MC gap, top lever, assumptions count).
+The gate is **default-on**: `analyze` stops after the draft and tells the reader to edit the JSON and
+run `solve` unless `--no-review` is passed — the LLM structures, the human approves, the math predicts
+(rules 1, 6). `--solver` selects `challenge`, `compromise`, or `both` (default). The formalize path is
+factored into a shared `_formalize_or_exit` helper (index open, key check, `run_formalize`, and the
+`WebSearchUnavailable`/`IndexLeakage`/missing-extra friendly exits) reused by `analyze`; the existing
+`formalize` command is left untouched so its tests are unaffected. Search follows rule 7: a
+`--search` analyze stamps `frozen_at = today` and marks the draft live-searched; never use it for
+backtests.
