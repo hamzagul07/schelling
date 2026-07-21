@@ -31,6 +31,11 @@ class SolverConfig(BaseModel):
     apply_risk: bool = True  # run the second, risk-adjusted EU pass (Appendix steps 8-10)
     conflict_resolves: bool = False  # conflict (both EU>0) = "uncertain outcome" = no move (A4)
     security_mode: str = "adversary"  # "adversary" (col sum) or "own" (row sum) — A2
+    # Status-quo reference point (Session 10, D10.4). When None, the status quo is "no move" (an
+    # actor keeps its own position, u_sq at distance 0). When set to a continuum point, the
+    # reversion outcome is that point, so an actor's status-quo utility falls with its distance
+    # from it — the "status quo as an actual reference" variant. Only bites when Q < 1.
+    reference_point: float | None = None
     max_rounds: int = Field(default=20, ge=1)  # hard cap (BUILD_PLAN §4 step 8)
     convergence_epsilon: float = 0.5  # median move < this for 2 rounds -> converged
     convergence_patience: int = Field(default=2, ge=1)
