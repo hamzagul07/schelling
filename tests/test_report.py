@@ -76,7 +76,7 @@ def test_forecast_report_has_all_sections() -> None:
         "Inputs",
     ):
         assert heading in html
-    assert "settlement median" in html
+    assert "MC median" in html and "mode-game" in html  # both medians surfaced (D12.3)
     assert "settle-line" in html  # settlement marker on the actor map
     assert "inputs_hash" in html and "engine" in html  # provenance footer
 

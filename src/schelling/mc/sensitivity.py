@@ -7,6 +7,8 @@ The output is the "what to watch" list.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from schelling.schemas.forecast import SensitivityEntry
 from schelling.schemas.question import GameSpec
 from schelling.schemas.stakeholders import Actor, TriangularEstimate
@@ -14,6 +16,7 @@ from schelling.solver.config import SolverConfig
 from schelling.solver.model import run
 
 _FIELDS = ("position", "salience", "capability")
+_ZERO = 1e-9
 
 
 def _vary(game: GameSpec, actor_index: int, field: str, value: float) -> GameSpec:
@@ -65,6 +68,24 @@ def tornado(game: GameSpec, config: SolverConfig | None = None) -> list[Sensitiv
             )
     entries.sort(key=lambda e: (-abs(e.swing), e.parameter))
     return entries
+
+
+def zero_swing_warning(entries: Sequence[SensitivityEntry]) -> str | None:
+    """Warn when a sensitivity table is dominated by zero-swing rows (degenerate lock, D12.3).
+
+    Returns a one-line warning if at least half of (and >= 2) the ranged parameters leave the
+    forecast unchanged — a sign the weighted median is pinned so single-parameter moves don't shift
+    it — else ``None``.
+    """
+    n = len(entries)
+    zero = sum(1 for e in entries if abs(e.swing) < _ZERO)
+    if n >= 2 and zero * 2 >= n:
+        return (
+            f"WARNING — degenerate median lock: {zero} of {n} sensitivity rows have zero swing. "
+            "The weighted median is pinned, so most single-parameter moves do not shift the "
+            "forecast; the Monte-Carlo spread comes only from the few live parameters."
+        )
+    return None
 
 
 def format_tornado(entries: list[SensitivityEntry]) -> str:

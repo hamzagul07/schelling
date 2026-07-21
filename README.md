@@ -147,8 +147,8 @@ schelling solve game.json --solver both --draws 10000
 schelling backtest data/deu/ --draws 2000 --seed 42 --html backtest.html
 schelling backtest data/deu/ --capability-mode equal --no-reference-point   # Session-9 baseline
 
-# Seal both models' forecasts for a real, unresolved question into FORECASTS.md (graded later)
-schelling ledger game.json --grade-date 2026-09-01 --note "what is being forecast"
+# Seal a forecast record into FORECASTS.md by the SHA-256 of its runs/ file (idempotent; graded later)
+schelling seal runs/Q-2026-USIRAN-STAGE2-mc10000-s42-45d931c6cd91.json --vintage v1
 
 # Successor search: fit train / tune dev / score TEST once; update the BACKTEST.md leaderboard
 schelling successor data/deu/

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 
 from schelling.schemas.forecast import ForecastRecord
 
@@ -88,3 +89,46 @@ def new_ledger(entry: str) -> str:
 def append_entry(existing: str, entry: str) -> str:
     """Append an entry to an existing ledger document."""
     return existing.rstrip() + "\n\n" + entry
+
+
+# ------------------------------------------------------------------------------------------------
+# SHA-256-of-record ledger (Session 12, D12.0). Supersedes the partial ``forecast_commitment``:
+# a sealed line pins the EXACT ``runs/`` record file by the SHA-256 of its bytes, so a reader can
+# ``sha256sum runs/<file>`` and verify. ``schelling seal`` appends one line per record, idempotent.
+LEDGER_START = "<!-- LEDGER:START -->"
+LEDGER_END = "<!-- LEDGER:END -->"
+_TABLE_HEAD = (
+    "| model | vintage | question | frozen_at | median | sha256 (of the runs/ record file) |\n"
+    "|---|---|---|---|---:|---|"
+)
+
+
+def record_sha256(path: Path) -> str:
+    """SHA-256 of a forecast record file's bytes — the seal that pins that exact artifact."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def seal_row(
+    *, model: str, vintage: str, question_id: str, frozen_at: str, median: float, sha: str
+) -> str:
+    """One ledger line (markdown table row) for a sealed record."""
+    return f"| {model} | {vintage} | {question_id} | {frozen_at} | {median:.3f} | `{sha}` |"
+
+
+def insert_seal_row(existing: str, row: str, sha: str) -> tuple[str, bool]:
+    """Insert ``row`` into the ledger table before ``LEDGER_END``; idempotent on ``sha``.
+
+    Returns ``(text, changed)``. If ``sha`` already appears anywhere in the document, nothing
+    changes (``changed`` is False). If the marker block is missing, one is created.
+    """
+    if sha in existing:
+        return existing, False
+    if LEDGER_END in existing:
+        return existing.replace(LEDGER_END, f"{row}\n{LEDGER_END}", 1), True
+    block = f"{LEDGER_START}\n{_TABLE_HEAD}\n{row}\n{LEDGER_END}\n"
+    return existing.rstrip() + "\n\n" + block, True
+
+
+def empty_seal_ledger(header: str) -> str:
+    """A fresh SHA-256 ledger: ``header`` prose + an empty marker-bounded table for ``seal``."""
+    return f"{header.rstrip()}\n\n{LEDGER_START}\n{_TABLE_HEAD}\n{LEDGER_END}\n"
