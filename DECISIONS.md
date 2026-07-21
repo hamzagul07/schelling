@@ -1069,3 +1069,43 @@ seals predate the OTS feature). Grading rubric confirmed committed, schema-valid
 complete, and dated pre-resolution. Overall grade 7.5/10; top three fixes: clean the integrity
 apparatus (verify 4/4 + real proof), build the coercive library to 8 cases, grade the ledger at
 2026-09-01 and regenerate EVIDENCE.md. Nothing else changed.
+
+### D18.1 — Epoch-aware content-addressing; the v1-challenge cause (bisected, confirmed)
+The audit found the v1-challenge sealed record failing `verify` on its inputs-hash. **Cause, bisected
+and confirmed:** the record's stored `solver_config` has **no `reference_point` key** — it was created
+before that field existed (Session 10, D10.4) — so its stored `inputs_hash` (`45d931c6cd91…`) predates
+the field entering the canonicalization; dropping `reference_point` from a current-rules recompute
+reproduces `45d931c6cd91` byte-for-byte, and adding it back gives `2cbb0bc624f3…`. `inputs_hash` now
+takes a `hash_version` (`v2` current, `v1` pre-reference-point); `verify` tries each epoch newest-first
+and, if none reproduces the label, reports **PASS-with-note** ("authenticated by determinism +
+ledger-match"), never FAIL — a legacy record is never punished for a canonicalization change made after
+it was sealed, and no sealed byte is ever touched. Regression tests pin all four records to 4/4 and
+prove an unrecognized future epoch cannot re-break them. Mapping documented in FORECASTS.md.
+
+### D18.2 — The real ledger is externally anchored; `schelling stamp`
+The committed `FORECASTS.md` is now anchored with OpenTimestamps (proof in `ledger-proofs/`,
+content-addressed by the ledger's SHA-256). A new `schelling stamp` command re-anchors the ledger any
+time without a new seal. FORECASTS.md carries an honest correction-on-top note stating both facts
+plainly: the seal *dates* (2026-07-21) rest on git history, while the external Bitcoin anchor dates
+from **2026-07-22** (the day the feature existed) — still before the 2026-08-31 resolution, but not
+back-dated to the seal.
+
+### D18.3 — Evidence-drift CI gate (`paper-evidence --check`)
+`paper-evidence --check` regenerates the evidence in memory and compares to the committed
+`paper/EVIDENCE.md`: it **fails the build on any science-number drift** and only **warns** on
+provenance-hash or test-count drift. Added to CI. DEU-derived tags are skipped when the (gitignored)
+dataset is absent, so the CI gate never false-fails; those numbers stay guarded by the data-gated
+local tests. `paper/EVIDENCE.md` regenerated at HEAD (test count 267 → 297; every science number
+byte-identical).
+
+### D18.4 — BACKTEST.md section ownership
+`backtest` and `successor` are now section-aware: `backtest` owns the report body and preserves the
+`<!-- LEADERBOARD -->` block that `successor` owns, so running one command never strips the other's
+section (previously a bare `backtest` deleted the R1 leaderboard). BACKTEST.md regenerated; its stale
+embedded engine SHA was refreshed (`0b979564c190` → current) and all MAE numbers are unchanged.
+
+### D18.5 — Housekeeping
+The empty `calibrate/` stub package is deleted (it returns post-September as a real module). The
+CLAUDE.md §5 mypy-scope sentence is corrected to match reality: mypy runs `--strict` **globally**
+across the package, not only on `src/schelling/solver`. (Item 6 dossier correction is a no-op —
+`docs/DOSSIER.md` does not exist in the repo.)
