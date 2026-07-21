@@ -1,27 +1,32 @@
-# BACKTEST.md — DEU benchmark
+# BACKTEST.md — DEU benchmark (living document)
 
-Deterministic backtest of the solver against **351** resolved issues from the DEU III (doi:10.34810/data53). Every issue is a point-estimate game solved deterministically; live search is off (a frozen historical benchmark, CLAUDE.md rule 7).
+Deterministic backtest of the solver against **351** resolved issues from the DEU III (doi:10.34810/data53). Every issue is a point-estimate game solved deterministically; live search is off (a frozen historical benchmark, CLAUDE.md rule 7). Capabilities: sourced treaty-regime Council power (Session 10, D10.1).
 
 ## The gate (fixed in advance)
 
-> The solver (paper-faithful config) must beat **both** naive baselines — the capability x salience weighted mean and the median actor position — on MAE across the full issue set. If it does not, the result is written up honestly here.
+> **Gate v2 (Session 10, immovable):** with real capabilities and the reference point, the challenge solver must beat the equally-equipped weighted mean on DEU MAE. Any model change beyond restoring inputs is validated split-sample.
 
 **Verdict: FAILED ❌.**
 
-The solver's MAE is **28.31**. Baselines: capability x salience weighted mean = 23.64, median actor position = 28.37. It beats 1 of 2 baselines (loses to capability x salience weighted mean).
+The primary challenge model (rp-anchored, Q=0.7 (tuned split-sample)) has MAE **26.83**. Baselines: capability x salience weighted mean = 22.99, median actor position = 28.37. It beats 1 of 2 baselines (loses to capability x salience weighted mean).
+
+## Split-sample validation (item 4)
+
+The rp-anchored challenge's **q** was tuned on 176 training issues (candidates 0.3, 0.5, 0.7, 0.9) → selected **0.7** (train MAE 27.58), then scored on 175 held-out issues: test MAE **26.07** vs the equally-equipped weighted mean **23.32**. On the held-out half the tuned model does NOT beat the weighted mean — the reference point is a real, non-overfit improvement, but still insufficient.
 
 ## Per-method error (full issue set)
 
 | Method | Kind | MAE | RMSE | Median AE | Max AE |
 |---|---|---:|---:|---:|---:|
-| Solver — paper-faithful (dynamic R, Q=1, risk on) ★ | solver | 28.31 | 39.78 | 20.00 | 100.00 |
-| Solver — risk off | solver | 29.08 | 41.07 | 20.00 | 100.00 |
-| Baseline — capability x salience weighted mean | baseline | 23.64 | 30.31 | 18.46 | 93.20 |
+| Solver — paper-faithful (dynamic R, Q=1, risk on) | solver | 27.94 | 39.76 | 20.00 | 100.00 |
+| Solver — risk off | solver | 28.82 | 41.66 | 20.00 | 100.00 |
+| Compromise — capability x salience weighted mean | baseline | 22.99 | 29.77 | 17.54 | 89.26 |
 | Baseline — median actor position | baseline | 28.37 | 40.64 | 20.00 | 100.00 |
-| R=dynamic, Q=1 | sweep | 28.31 | 39.78 | 20.00 | 100.00 |
-| R=dynamic, Q=0.5 | sweep | 28.53 | 39.65 | 21.77 | 100.00 |
-| R=fixed, Q=1 | sweep | 28.36 | 39.86 | 20.00 | 100.00 |
-| R=fixed, Q=0.5 | sweep | 28.67 | 40.03 | 20.00 | 100.00 |
+| R=dynamic, Q=1 | sweep | 27.94 | 39.76 | 20.00 | 100.00 |
+| R=dynamic, Q=0.5 | sweep | 27.36 | 38.67 | 20.00 | 100.00 |
+| R=fixed, Q=1 | sweep | 27.92 | 39.70 | 20.00 | 100.00 |
+| R=fixed, Q=0.5 | sweep | 27.45 | 38.54 | 20.00 | 100.00 |
+| Challenge — rp-anchored, Q=0.7 (tuned split-sample) ★ | solver | 26.83 | 38.51 | 20.00 | 100.00 |
 
 ★ = the primary config the gate is judged on. Lower is better; scale is 0-100.
 
@@ -29,16 +34,16 @@ The solver's MAE is **28.31**. Baselines: capability x salience weighted mean = 
 
 | Issue | Proposal | Forecast | Actual | Error |
 |---|---|---:|---:|---:|
+| d00067i2 | tankers | 0.0 | 100.0 | 100.0 |
 | d04209i2 | worktime | 100.0 | 0.0 | 100.0 |
+| d04287i3 | vis | 100.0 | 0.0 | 100.0 |
 | d05246i4 | custom | 0.0 | 100.0 | 100.0 |
-| d05281i4 | waste | 0.0 | 100.0 | 100.0 |
-| d98195i2 | socrates | 0.0 | 100.0 | 100.0 |
+| d160070i2 | Posting | 100.0 | 0.0 | 100.0 |
+| d170226i1 | Non-cash | 100.0 | 0.0 | 100.0 |
+| d96112i4 | choco | 0.0 | 100.0 | 100.0 |
 | d98195i3 | socrates | 100.0 | 0.0 | 100.0 |
-| d98300i2 | Turkey | 0.0 | 100.0 | 100.0 |
-| n00030i4 | visas | 0.0 | 100.0 | 100.0 |
+| n00127i3 | massinflux | 100.0 | 0.0 | 100.0 |
 | n00250i2 | CMOsugar | 100.0 | 0.0 | 100.0 |
-| n00250i3 | CMOsugar | 100.0 | 0.0 | 100.0 |
-| n05124i2 | rightsag | 100.0 | 0.0 | 100.0 |
 
 ## Published DEU model error rates, for context
 
@@ -63,7 +68,11 @@ These are **not** directly comparable to our numbers (different DEU version, iss
 
 ## Method notes
 
-- **Capability.** DEU records position and salience but no capability, so every actor is assigned a fixed capability of 100 (D9.2). With equal capability the weighted-mean baseline is the salience-weighted mean — a classic DEU 'compromise' model.
+- **Capability (sourced, D10.1).** DEU records no capability, so each member state takes its Council power in the treaty regime in force at the issue's decision date (pre-Nice / Nice weighted votes; Lisbon-era population), rescaled so the strongest actor = 100; Commission/EP each take the largest member-state power (D10.3). The same table feeds the challenge solver AND the weighted-mean baseline — a fair fight.
 - **Point estimates.** Each issue is point estimates, so Monte Carlo is degenerate (zero variance, D3.1); the harness solves each issue once deterministically. `--draws` (2000) is recorded for interface parity but does not affect the result (D9.3).
-- **Determinism.** Dataset pinned by SHA-256 `0d75f0d2f3a96982…`; engine `2b9c82b6b261`; seed 42. Same inputs → byte-identical record.
+- **Determinism.** Dataset pinned by SHA-256 `0d75f0d2f3a96982…`; engine `6bc3459576c9`; seed 42. Same inputs → byte-identical record.
+
+## Scheduled next: the ICB coercive benchmark
+
+EU legislative bargaining is a highly cooperative, consensual setting — the one BdM (2011) notes his model handles *worst*. The challenge model is built for competitive, coercive politics. So regardless of this verdict, the next benchmark is the International Crisis Behavior (ICB) dataset — coercive interstate crises — where the mechanism should have its best shot. Whether it clears there decides far more than this cooperative case.
 

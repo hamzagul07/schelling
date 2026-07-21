@@ -4,6 +4,11 @@ Every issue is a point-estimate game, so Monte Carlo is degenerate (zero varianc
 harness solves each issue once with the deterministic solver rather than repeating identical draws
 (``--draws`` is recorded for interface parity but does not change a point-estimate result, D9.3).
 Error is ``|forecast - actual outcome|``; the headline is MAE over the full issue set.
+
+Session 10 adds the "fair fight": real (sourced) capabilities feed the solver AND the weighted-mean
+baseline equally (D10.1), and an rp-anchored challenge variant (status quo = the DEU reference
+point, D10.4) whose Q is tuned split-sample — tuned on one half, scored on the other (item 4), so a
+gain can't be an artifact of tuning.
 """
 
 from __future__ import annotations
@@ -15,19 +20,29 @@ from pathlib import Path
 
 from schelling.backtest.deu import dataset_sha256
 from schelling.mc.monte_carlo import engine_version
-from schelling.schemas.backtest import BacktestRecord, DEUIssue, IssueError, MethodResult
+from schelling.schemas.backtest import (
+    BacktestRecord,
+    DEUIssue,
+    IssueError,
+    MethodResult,
+    SplitSample,
+)
 from schelling.schemas.question import GameSpec
 from schelling.solver.config import RangeMode, SolverConfig
 from schelling.solver.model import run
 
-Forecaster = Callable[[GameSpec], float]
+# A forecaster maps a whole issue (so it can read the reference point) to a point forecast.
+Forecaster = Callable[[DEUIssue], float]
+
+_Q_GRID = (0.3, 0.5, 0.7, 0.9)  # candidate status-quo probabilities for the rp variant (Q < 1)
 
 
 def weighted_mean_forecast(game: GameSpec) -> float:
-    """Naive baseline: the capability x salience weighted mean of actor positions.
+    """The compromise model / naive baseline: capability x salience weighted mean of positions.
 
-    With capability fixed constant across actors (D9.2) this is the salience-weighted mean — a
-    classic DEU 'compromise' baseline. Falls back to the plain mean if all weights are zero.
+    With equal capability (D9.2) this is the salience-weighted mean; with sourced capability
+    (D10.1) it is the influence-weighted mean — the classic DEU 'compromise' prediction. Falls
+    back to the plain mean if all weights are zero.
     """
     num = 0.0
     den = 0.0
@@ -52,8 +67,22 @@ def median_position_forecast(game: GameSpec) -> float:
 
 
 def solver_forecast(game: GameSpec, config: SolverConfig) -> float:
-    """The solver's headline forecast for one issue: the converged weighted median."""
+    """The challenge solver's headline forecast for one issue: the converged weighted median."""
     return run(game, config).forecast_median
+
+
+def _challenge(cfg: SolverConfig) -> Forecaster:
+    return lambda iss: solver_forecast(iss.game, cfg)
+
+
+def _rp_challenge(q: float) -> Forecaster:
+    """A challenge forecaster anchoring the status quo to each issue's reference point (D10.4)."""
+
+    def forecast(iss: DEUIssue) -> float:
+        cfg = SolverConfig(q=q, reference_point=iss.reference_point)
+        return solver_forecast(iss.game, cfg)
+
+    return forecast
 
 
 @dataclass(frozen=True)
@@ -62,15 +91,15 @@ class _Method:
     label: str
     kind: str
     forecaster: Forecaster
-    config: dict[str, str | float | int | bool]
+    config: dict[str, str | float | int | bool | None]
 
 
 def _solver_method(key: str, label: str, kind: str, cfg: SolverConfig) -> _Method:
-    return _Method(key, label, kind, lambda g: solver_forecast(g, cfg), cfg.model_dump(mode="json"))
+    return _Method(key, label, kind, _challenge(cfg), cfg.model_dump(mode="json"))
 
 
-def _methods() -> list[_Method]:
-    """The methods reported: two solver configs, two naive baselines, and an R x Q sweep."""
+def _base_methods() -> list[_Method]:
+    """Two solver configs, two naive baselines, and an R x Q sweep."""
     methods = [
         _solver_method(
             "solver_paper",
@@ -83,20 +112,19 @@ def _methods() -> list[_Method]:
         ),
         _Method(
             "baseline_wmean",
-            "Baseline — capability x salience weighted mean",
+            "Compromise — capability x salience weighted mean",
             "baseline",
-            weighted_mean_forecast,
+            lambda iss: weighted_mean_forecast(iss.game),
             {},
         ),
         _Method(
             "baseline_median",
             "Baseline — median actor position",
             "baseline",
-            median_position_forecast,
+            lambda iss: median_position_forecast(iss.game),
             {},
         ),
     ]
-    # Config sweep over R-mode and Q (each solved deterministically).
     for rmode in (RangeMode.DYNAMIC, RangeMode.FIXED):
         for q in (1.0, 0.5):
             cfg = SolverConfig(range_mode=rmode, q=q)
@@ -108,12 +136,18 @@ def _methods() -> list[_Method]:
     return methods
 
 
+def _errors(forecaster: Forecaster, issues: Sequence[DEUIssue]) -> list[float]:
+    return [abs(forecaster(iss) - iss.outcome) for iss in issues]
+
+
+def _mae(forecaster: Forecaster, issues: Sequence[DEUIssue]) -> float:
+    errs = _errors(forecaster, issues)
+    return sum(errs) / len(errs)
+
+
 def _method_result(method: _Method, issues: Sequence[DEUIssue]) -> tuple[MethodResult, list[float]]:
     """Compute one method's per-issue errors and summary statistics (errors in issue order)."""
-    errors: list[float] = []
-    for issue in issues:
-        forecast = method.forecaster(issue.game)
-        errors.append(abs(forecast - issue.outcome))
+    errors = _errors(method.forecaster, issues)
     n = len(errors)
     mae = sum(errors) / n
     rmse = math.sqrt(sum(e * e for e in errors) / n)
@@ -136,7 +170,36 @@ def _method_result(method: _Method, issues: Sequence[DEUIssue]) -> tuple[MethodR
     )
 
 
-_PRIMARY = "solver_paper"
+def _tune_rp_split_sample(
+    issues: Sequence[DEUIssue], q_grid: Sequence[float]
+) -> tuple[float, SplitSample]:
+    """Tune the rp-anchored challenge's Q on a training half and score it on a held-out half.
+
+    Deterministic interleaved split (even issue indices = train, odd = test) keeps both halves
+    balanced across the three treaty periods. Selection minimizes train MAE; the reported test MAE
+    is the honest number (item 4). Ties in train MAE break to the larger Q for determinism.
+    """
+    train = list(issues[0::2])
+    test = list(issues[1::2])
+    train_mae = {q: _mae(_rp_challenge(q), train) for q in q_grid}
+    selected = min(q_grid, key=lambda q: (train_mae[q], -q))
+    test_mae = _mae(_rp_challenge(selected), test)
+    test_baseline = _mae(lambda iss: weighted_mean_forecast(iss.game), test)
+    split = SplitSample(
+        objective="rp-anchored challenge: status-quo probability Q",
+        tuned_param="q",
+        candidates=list(q_grid),
+        selected=selected,
+        train_n=len(train),
+        test_n=len(test),
+        train_mae=train_mae[selected],
+        test_mae=test_mae,
+        test_baseline_mae=test_baseline,
+        passed=test_mae < test_baseline,
+    )
+    return selected, split
+
+
 _BASELINES = ["baseline_wmean", "baseline_median"]
 
 
@@ -148,35 +211,58 @@ def run_backtest(
     seed: int = 42,
     draws: int = 2000,
     capability: float = 100.0,
+    capability_mode: str = "equal",
+    reference_point: bool = False,
+    q_grid: Sequence[float] = _Q_GRID,
     worst_n: int = 10,
     created_at: str | None = None,
 ) -> BacktestRecord:
     """Score every method over ``issues`` and assemble the deterministic :class:`BacktestRecord`.
 
-    The gate (fixed in advance): the primary solver config must beat BOTH naive baselines on MAE.
+    The gate (fixed in advance): the primary config must beat BOTH naive baselines on MAE. When
+    ``reference_point`` is set, the primary is the rp-anchored challenge at the split-sample-tuned
+    Q (this is the Session-10 "gate v2" — real capabilities + reference point vs the equally
+    equipped weighted mean).
     """
     if not issues:
         raise ValueError("no issues to backtest (the DEU CSV produced an empty issue set).")
 
+    methods = _base_methods()
+    split_sample: SplitSample | None = None
+    primary_key = "solver_paper"
+    primary_forecaster: Forecaster = _challenge(SolverConfig())
+
+    if reference_point:
+        selected_q, split_sample = _tune_rp_split_sample(issues, q_grid)
+        primary_forecaster = _rp_challenge(selected_q)
+        methods.append(
+            _Method(
+                "challenge_rp",
+                f"Challenge — rp-anchored, Q={selected_q:g} (tuned split-sample)",
+                "solver",
+                primary_forecaster,
+                {"reference_point": "per-issue DEU rp", "q": selected_q, "range_mode": "dynamic"},
+            )
+        )
+        primary_key = "challenge_rp"
+
     results: list[MethodResult] = []
     errors_by_key: dict[str, list[float]] = {}
-    for method in _methods():
+    for method in methods:
         result, errors = _method_result(method, issues)
         results.append(result)
         errors_by_key[method.key] = errors
 
     mae = {r.key: r.mae for r in results}
-    gate_passed = all(mae[_PRIMARY] < mae[b] for b in _BASELINES)
+    gate_passed = all(mae[primary_key] < mae[b] for b in _BASELINES)
 
-    # Worst issues by the primary method's absolute error (ties broken by issue id for determinism).
-    primary_errors = errors_by_key[_PRIMARY]
-    primary_cfg = SolverConfig()  # the paper-faithful config the primary method uses
+    primary_errors = errors_by_key[primary_key]
     ranked = sorted(range(len(issues)), key=lambda i: (-primary_errors[i], issues[i].issue_id))
     worst = [
         IssueError(
             issue_id=issues[i].issue_id,
             proposal_name=issues[i].proposal_name,
-            forecast=solver_forecast(issues[i].game, primary_cfg),
+            forecast=primary_forecaster(issues[i]),
             actual=issues[i].outcome,
             error=primary_errors[i],
         )
@@ -190,10 +276,13 @@ def run_backtest(
         seed=seed,
         draws=draws,
         capability=capability,
+        capability_mode=capability_mode,
+        reference_point_used=reference_point,
+        split_sample=split_sample,
         engine_version=engine_version(),
         created_at=created_at,
         methods=results,
-        primary_method=_PRIMARY,
+        primary_method=primary_key,
         baseline_methods=list(_BASELINES),
         gate_passed=gate_passed,
         worst_issues=worst,

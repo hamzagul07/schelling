@@ -42,6 +42,8 @@ def test_solve_reproduces_replication_forecast(tmp_path: Path) -> None:
             "100",
             "--seed",
             "42",
+            "--solver",
+            "challenge",
             "--out-dir",
             str(tmp_path),
         ],
@@ -51,9 +53,30 @@ def test_solve_reproduces_replication_forecast(tmp_path: Path) -> None:
     # the written record reproduces the deterministic Session-2 forecast (9.53)
     written = next(tmp_path.glob("*.json"))
     record = ForecastRecord.model_validate_json(written.read_text())
+    assert record.model == "challenge"
     assert record.ensemble.median == pytest.approx(9.53, abs=1e-2)  # exact value 9.52995...
     # zero-variance fixture: every draw identical, so CI80 collapses to the point forecast
     assert record.ensemble.p10 == record.ensemble.p90 == record.ensemble.median
+
+
+def test_solve_both_models_writes_two_records(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "solve",
+            str(FIXTURES / "emission_standards.json"),
+            "--draws",
+            "50",
+            "--out-dir",
+            str(tmp_path),
+        ],  # --solver defaults to both
+    )
+    assert result.exit_code == 0, result.output
+    assert "challenge" in result.output and "compromise" in result.output
+    models = {
+        ForecastRecord.model_validate_json(p.read_text()).model for p in tmp_path.glob("*.json")
+    }
+    assert models == {"challenge", "compromise"}
 
 
 def test_solve_missing_fixture_errors(tmp_path: Path) -> None:
@@ -301,13 +324,17 @@ def test_backtest_cli_on_sample_writes_md_and_record(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     assert "Gate" in result.output  # a verdict is printed
-    assert "capability x salience weighted mean" in result.output
+    assert "Compromise" in result.output  # the compromise/weighted-mean method is reported
     assert md.exists() and "DEU benchmark" in md.read_text()
     from schelling.schemas.backtest import BacktestRecord
 
     written = next(tmp_path.glob("backtest-*.json"))
     rec = BacktestRecord.model_validate_json(written.read_text())
-    assert rec.n_issues == 3 and rec.primary_method == "solver_paper"
+    # CLI defaults to the fair fight: sourced capabilities + rp-anchored primary (Session 10).
+    assert rec.n_issues == 3
+    assert rec.capability_mode == "sourced"
+    assert rec.primary_method == "challenge_rp"
+    assert rec.split_sample is not None
 
 
 def test_backtest_cli_missing_csv_is_friendly(tmp_path: Path) -> None:

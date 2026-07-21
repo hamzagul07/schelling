@@ -183,6 +183,18 @@ def test_backtest_report_has_gate_verdict_and_context() -> None:
     assert "dataset_sha256" in html  # provenance
 
 
+def test_backtest_report_shows_fair_fight_sections() -> None:
+    html = render(_load("backtest.json"))
+    assert "sourced treaty-regime capabilities" in html  # capability mode surfaced
+    assert "Split-sample validation" in html  # item-4 validation section
+    assert "challenge_rp" in html or "rp-anchored" in html  # the rp variant is a method
+
+
+def test_forecast_report_shows_model() -> None:
+    html = render(_load("forecast_record.json"))
+    assert "challenge model" in html  # the model is named in the header
+
+
 def test_backtest_report_rejects_bad_schema() -> None:
     bad = {"methods": [], "gate_passed": True, "primary_method": "x"}  # backtest-shaped but invalid
     with pytest.raises(ValueError, match="BacktestRecord"):

@@ -250,9 +250,10 @@ def render_forecast(record: ForecastRecord) -> str:
     frozen = record.game.frozen_at if record.game else "—"
     template = record.game.template if record.game else "—"
     parts = [
-        '<div class="kicker">Forecast analysis</div>',
+        f'<div class="kicker">Forecast analysis — {_esc(record.model)} model</div>',
         f"<h1>{_esc(record.question_id)}</h1>",
-        f'<p class="sub">frozen {_esc(frozen)} · template: {_esc(template)}</p>',
+        f'<p class="sub">frozen {_esc(frozen)} · template: {_esc(template)} · '
+        f"model: {_esc(record.model)}</p>",
         f'<p class="sub">run {_esc(record.run_id)}</p>',
     ]
     if record.live_searched:  # D9.0a — the inputs rest on a live search, not a frozen snapshot
@@ -459,6 +460,21 @@ def _context_table() -> str:
     )
 
 
+def _split_table(record: BacktestRecord) -> str:
+    s = record.split_sample
+    if s is None:
+        return ""
+    verdict = "beats" if s.passed else "does NOT beat"
+    return (
+        f'<p class="sub">Tuned <strong>{_esc(s.tuned_param)}</strong> = {s.selected:g} on '
+        f"{s.train_n} train issues (candidates {_esc(', '.join(f'{c:g}' for c in s.candidates))}), "
+        f"scored on {s.test_n} held-out issues. On the held-out half the tuned model "
+        f"(MAE {s.test_mae:.2f}) <strong>{verdict}</strong> the equally-equipped weighted mean "
+        f"(MAE {s.test_baseline_mae:.2f}) — the improvement is {'' if s.passed else 'not '}enough, "
+        f"and it is not an artifact of tuning.</p>"
+    )
+
+
 def render_backtest(record: BacktestRecord) -> str:
     """Render a BacktestRecord: gate verdict, per-method MAE, error histogram, worst issues."""
     primary = next(m for m in record.methods if m.key == record.primary_method)
@@ -469,18 +485,30 @@ def render_backtest(record: BacktestRecord) -> str:
 
     errors = sorted(primary.errors)
     p10, p90 = _pct(errors, 10), _pct(errors, 90)
+    cap_txt = (
+        "sourced treaty-regime capabilities"
+        if record.capability_mode == "sourced"
+        else f"equal capability {record.capability:g}"
+    )
 
     parts = [
         '<div class="kicker">Backtest — DEU benchmark</div>',
         f"<h1>{_esc(record.dataset)}</h1>",
         f'<p class="sub">{record.n_issues} resolved issues · search off (frozen benchmark) · '
-        f"capability fixed at {record.capability:g}</p>",
-        f'<div class="verdict {verdict_cls}">Gate {verdict_txt}: the solver '
+        f"{_esc(cap_txt)}</p>",
+        f'<div class="verdict {verdict_cls}">Gate {verdict_txt}: the primary challenge model '
         f"(MAE {primary.mae:.2f}) must beat both baselines ({_esc(b_txt)}).</div>",
         "<h2>Mean absolute error by method</h2>",
         f"<figure>{_mae_bars(record)}</figure>",
         _method_table(record),
-        "<h2>Error distribution — primary solver</h2>",
+    ]
+    if record.split_sample is not None:
+        parts += [
+            "<h2>Split-sample validation of the rp-anchored tuning</h2>",
+            _split_table(record),
+        ]
+    parts += [
+        "<h2>Error distribution — primary model</h2>",
         "<figure>"
         + svg.histogram(primary.errors, p10=p10, p90=p90, median=primary.median_error)
         + "</figure>",
