@@ -1,4 +1,4 @@
-<!-- Title candidate (not finalized): Structure, Not Magic: An Open Replication and Predictability Ceiling for the Bueno de Mesquita Forecasting Model -->
+# Structure, Not Magic: An Open Replication and Predictability Ceiling for the Bueno de Mesquita Forecasting Model
 
 ## Abstract
 

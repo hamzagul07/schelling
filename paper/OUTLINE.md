@@ -5,10 +5,11 @@
 > number appears here that is not sourced in EVIDENCE.md.
 
 ## Title candidates
-- "The LLM Structures, the Math Predicts: An Open, Deterministic Rebuild of the Bueno de Mesquita Group-Decision Model"
-- "Unbundling Policon: A Reproducible Expected-Utility Forecaster and Why a Weighted Mean Still Wins"
-- "Structure, Not Magic: Reinterpreting Expert-Elicitation Forecasting with a Fully Auditable BDM Engine"
-- "A Commit-Reveal Forecasting Engine: Replication, a Fair Fight, and a Suppressed Verdict"
+- **FINAL (D15.3):** "Structure, Not Magic: An Open Replication and Predictability Ceiling for the Bueno de Mesquita Forecasting Model" — set as the manuscript H1 in `00-abstract.md`.
+- ~~"The LLM Structures, the Math Predicts: An Open, Deterministic Rebuild of the Bueno de Mesquita Group-Decision Model"~~
+- ~~"Unbundling Policon: A Reproducible Expected-Utility Forecaster and Why a Weighted Mean Still Wins"~~
+- ~~"Structure, Not Magic: Reinterpreting Expert-Elicitation Forecasting with a Fully Auditable BDM Engine"~~
+- ~~"A Commit-Reveal Forecasting Engine: Replication, a Fair Fight, and a Suppressed Verdict"~~
 
 ## 1. Introduction & the Policon / BDM lineage
 - Problem: BDM/Policon forecasts are cited but not independently reproducible; equations behind paywalls/proprietary tools
