@@ -165,7 +165,8 @@ def assemble(repo_root: Path) -> tuple[str, list[str], list[str]]:
                  "paper-evidence`; the source artifact and provenance stamp follow each."]
     for tag, item in used.items():
         footnotes.append(
-            f"[^ev-{tag}]: **{tag}** = {item['value']} · source `{item['source']}` · `{item['prov']}`"
+            f"[^ev-{tag}]: **{tag}** = {item['value']} · source "
+            f"`{item['source']}` · `{item['prov']}`"
         )
 
     draft = resolved.rstrip() + "\n\n" + bib + "\n" + "\n".join(footnotes) + "\n"

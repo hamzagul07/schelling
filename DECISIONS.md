@@ -1002,3 +1002,34 @@ current sentence resolves **footnote-only** (e.g. "…comprises 351 scoreable is
 rather than "…issues (351)[^ev-E-DEU-N]"); multi-tag citations and values absent from the prose keep
 the parenthetical. Sentence detection ignores abbreviation dots ("et al. 2006") so the window is not
 truncated mid-citation. Still deterministic + idempotent.
+
+## Session 17 — integrity hardening
+
+### D17.1 — Pre-registered grading rubrics; seal refuses a rubric-less forecast
+A sealed forecast that cannot be graded by a rule fixed before resolution is a liability, so the
+question schema gains a `ResolutionRubric` block (`schemas/question.py`): the **binary resolution
+criterion**, the **adjudicating sources**, the **mapping rule** from real-world outcome to the 0–100
+settlement continuum, and the **grading formula**. It is *grading metadata, not a solver input* — so
+it is **excluded from `inputs_hash`** (`mc.monte_carlo.inputs_hash` dumps the game with
+`exclude={"resolution_rubric"}`): adding a rubric never changes a forecast or a run's content-address,
+and the four records sealed before the rubric existed keep byte-stable hashes. `schelling seal` now
+**refuses to seal** a forecast whose question carries no rubric (checked *after* the idempotency
+check, so already-sealed records re-seal harmlessly). `GRADING-Q-2026-USIRAN-STAGE2.md` is written
+now, ahead of the 2026-08-31 resolution, and referenced from FORECASTS.md.
+
+### D17.2 — External time-anchoring via OpenTimestamps
+On every seal, `schelling seal` timestamps the ledger with the OpenTimestamps `ots` client
+(`ledger.stamp_ledger`), storing the Bitcoin-anchored proof in `ledger-proofs/`, content-addressed by
+the ledger's SHA-256 (`FORECASTS.md-<sha12>.ots`). A Bitcoin timestamp cannot be backdated — not even
+by us — closing the "we could have written the commitment later" gap that a git history alone leaves
+open. Missing `ots` tool or any failure is a **soft no-op with a warning**: the seal still succeeds
+and the SHA-256 commitment stands. Proofs are committed as the audit trail; verification path
+(`ots upgrade` / `ots verify`) documented in FORECASTS.md and `ledger-proofs/README.md`.
+
+### D17.3 — `schelling verify <record.json>`: the one-command outsider audit
+`backtest/verify.py` + the `verify` command run three checks and report PASS/FAIL each: **ledger-match**
+(the record file's SHA-256 appears in FORECASTS.md — this exact artifact is the sealed one),
+**inputs-hash** (recomputing the canonical game+config hash reproduces the stored `inputs_hash`), and
+**determinism** (re-solving the embedded game with the record's own config + seed reproduces the
+ensemble byte-for-byte, rule 2). Exits non-zero if any check fails — the audit an outsider runs
+without trusting us.

@@ -16,6 +16,11 @@ Two model families are sealed per vintage: the **challenge** (BDM bargaining) so
 **compromise** (capability × salience weighted mean) model — a live, out-of-sample test of the
 DEU-backtest verdict that the compromise mean wins.
 
+**Grading rubric (pre-registered):** [GRADING-Q-2026-USIRAN-STAGE2.md](GRADING-Q-2026-USIRAN-STAGE2.md)
+— binary resolution criterion, adjudicating sources, the real-world → 0–100 mapping rule, and the
+grading formula, all fixed before resolution (D17.1). New forecasts cannot be sealed without such a
+rubric on their question.
+
 <!-- LEDGER:START -->
 | model | vintage | question | frozen_at | median | sha256 (of the runs/ record file) |
 |---|---|---|---|---:|---|
@@ -42,4 +47,23 @@ truth), and both vintages are sealed. The forecast medians are unchanged (v1 cha
 compromise 41.636); only the hash basis was corrected and v2 added.
 
 `schelling seal <record.json> --vintage <label>` appends a line here in one step (idempotent — a
-record already sealed is reported and left unchanged).
+record already sealed is reported and left unchanged). It refuses to seal a forecast whose question
+carries no pre-registered `resolution_rubric` (D17.1), and on each seal it anchors this ledger with
+OpenTimestamps (D17.2).
+
+## Independent verification
+
+Anyone can audit a sealed forecast without trusting us:
+
+1. **Recompute-and-match (`schelling verify <record.json>`).** Recomputes the record file's SHA-256
+   and matches it against the table above, recomputes the canonical inputs hash, and re-solves the
+   embedded game with the record's own config and seed to confirm the forecast reproduces
+   byte-for-byte (determinism, CLAUDE.md rule 2). Reports PASS/FAIL per check. Equivalently, by hand:
+   `sha256sum runs/<file>` and compare the digest to the matching row.
+2. **External time anchor (OpenTimestamps).** Each seal timestamps this file; the proofs live in
+   `ledger-proofs/` (content-addressed by the ledger's SHA-256). To confirm a commitment predates
+   resolution, install the client (`pip install opentimestamps-client`), then run
+   `ots verify ledger-proofs/FORECASTS.md-<sha12>.ots -f FORECASTS.md` (upgrade first with
+   `ots upgrade` once the Bitcoin attestation has confirmed). A Bitcoin-anchored timestamp cannot be
+   backdated — not even by us. When the `ots` client is absent at seal time, anchoring is a logged
+   no-op and the SHA-256 commitment still stands.
