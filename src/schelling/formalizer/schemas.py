@@ -54,7 +54,8 @@ class DraftMetadata(BaseModel):
     input_tokens: int
     output_tokens: int
     cost_usd: float
-    retries: int
+    retries: int  # schema-validation retries
+    leak_retries: int = 0  # firewall rephrase retries (D6.5)
     created_at: str | None = None  # ISO-8601; left None keeps drafts reproducible in tests
 
 
