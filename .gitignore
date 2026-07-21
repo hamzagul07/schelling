@@ -70,3 +70,5 @@ data/transcripts/
 data/*.db
 # Every solve writes a ForecastRecord here; these are run artifacts, not source.
 runs/
+# Local analysis working files (situations, sources, drafts) — not part of the engine.
+analyses/

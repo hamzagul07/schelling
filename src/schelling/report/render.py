@@ -14,8 +14,15 @@ from pydantic import ValidationError
 
 from schelling.formalizer.schemas import DraftGameSpec
 from schelling.report import svg
-from schelling.report.svg import ActorPoint, TornadoRow
-from schelling.schemas.forecast import Assumption, ForecastRecord
+from schelling.report.svg import ActorPoint, BarRow, ScatterPoint, TornadoRow
+from schelling.schemas.forecast import (
+    ADVISE_CAVEAT,
+    AdviseRecord,
+    Assumption,
+    ForecastRecord,
+    OwnMove,
+    PersuasionTarget,
+)
 from schelling.schemas.question import GameSpec
 
 _CSS = """
@@ -65,6 +72,9 @@ ul.checklist .why { color:var(--muted); font-size:12px; margin-top:3px; }
 .tick, .actor-label, .swing, .settle-label { font:11px sans-serif; fill:var(--muted); }
 .actor-label { fill:var(--ink); } .swing { fill:#374151; font-variant-numeric:tabular-nums; }
 .settle-label { fill:var(--accent); font-weight:600; }
+.caveat { border-left:3px solid var(--accent); background:#fff7ed; color:#7c2d12;
+  padding:11px 14px; font-size:13px; margin:14px 0; border-radius:0 6px 6px 0; }
+.flag { color:var(--accent); font-size:11px; }
 @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .wrap { max-width:none; padding:0 12px; } h2 { margin-top:24px; } }
 """
@@ -259,6 +269,77 @@ def _forecast_provenance(record: ForecastRecord) -> str:
     return f'<div class="prov">Provenance{_dl(pairs)}</div>'
 
 
+def _own_moves_table(moves: list[OwnMove]) -> str:
+    rows = "".join(
+        f"<tr><td>{_esc(m.dimension)}</td><td class='num'>{m.value:g}</td>"
+        f"<td class='num'>{m.settlement_median:.3f}</td>"
+        f"<td class='num'>{m.benefit:+.3f}</td><td class='num'>{m.cost:g}</td>"
+        f"<td>{'<span class="flag">beyond stated range</span>' if m.beyond_stated_range else ''}"
+        "</td></tr>"
+        for m in moves
+    )
+    return (
+        "<table><thead><tr><th>move</th><th>to</th><th>settlement</th><th>benefit</th>"
+        f"<th>cost</th><th></th></tr></thead><tbody>{rows}</tbody></table>"
+    )
+
+
+def _targets_table(targets: list[PersuasionTarget]) -> str:
+    rows = "".join(
+        f"<tr><td>{_esc(t.actor_id)}</td><td>{_esc(t.dimension)}</td>"
+        f"<td class='num'>{t.from_value:g} &rarr; {t.to_value:g}</td>"
+        f"<td class='num'>{t.settlement_median:.3f}</td><td class='num'>{t.benefit:+.3f}</td></tr>"
+        for t in targets
+    )
+    return (
+        "<table><thead><tr><th>actor</th><th>lever</th><th>shift</th><th>settlement</th>"
+        f"<th>benefit</th></tr></thead><tbody>{rows}</tbody></table>"
+    )
+
+
+def render_advise(record: AdviseRecord) -> str:
+    """Render an AdviseRecord: baseline map, own-moves benefit/cost, persuasion ranking, caveat."""
+    parts = [
+        '<div class="kicker">Strategic advice — one-sided lever search</div>',
+        f"<h1>{_esc(record.question_id)}</h1>",
+        f'<p class="sub">advising <strong>{_esc(record.advising_actor)}</strong> · '
+        f"ideal {record.ideal:g} · baseline settlement {record.baseline_median:.3f}</p>",
+        f'<div class="caveat"><strong>Caveat.</strong> {_esc(ADVISE_CAVEAT)}</div>',
+    ]
+    if record.game is not None:
+        amap = svg.actor_map(_actor_points(record.game), settlement=record.baseline_median)
+        parts += ["<h2>Baseline actor map &amp; settlement</h2>", f"<figure>{amap}</figure>"]
+    scatter_pts = [ScatterPoint(m.cost, m.benefit, "") for m in record.own_moves]
+    parts += [
+        "<h2>Own moves — benefit (toward ideal) vs. cost conceded</h2>",
+        f"<figure>{svg.scatter(scatter_pts, x_label='cost', y_label='benefit')}</figure>",
+        "<h2>Top own moves</h2>",
+        _own_moves_table(record.top_moves),
+    ]
+    bars = [BarRow(f"{t.actor_id}.{t.dimension}", t.benefit) for t in record.persuasion_targets[:8]]
+    parts += [
+        "<h2>Who to work on — persuasion targets</h2>",
+        f"<figure>{svg.hbars(bars)}</figure>",
+        _targets_table(record.persuasion_targets),
+        _advise_provenance(record),
+    ]
+    return _page(record.question_id, "".join(parts))
+
+
+def _advise_provenance(record: AdviseRecord) -> str:
+    adv = "  ".join(f"{k}={record.advise_config[k]}" for k in sorted(record.advise_config))
+    cfg = "  ".join(f"{k}={record.solver_config[k]}" for k in sorted(record.solver_config))
+    pairs = {
+        "seed": str(record.seed),
+        "baseline": record.baseline_run_id,
+        "inputs_hash": record.inputs_hash,
+        "engine": record.engine_version,
+        "advise_config": adv,
+        "solver_config": cfg,
+    }
+    return f'<div class="prov">Provenance{_dl(pairs)}</div>'
+
+
 def _fmt_err(exc: ValidationError) -> str:
     err = exc.errors()[0]
     loc = ".".join(str(p) for p in err.get("loc", ())) or "(root)"
@@ -275,8 +356,19 @@ def _looks_like_draft(data: dict[str, Any]) -> bool:
     return {"game", "assumptions", "template_classification"} <= set(data)
 
 
+def _looks_like_advise(data: dict[str, Any]) -> bool:
+    return "advising_actor" in data and "own_moves" in data
+
+
 def render(data: dict[str, Any]) -> str:
     """Detect the artifact type and render it. Raises ValueError with a named reason otherwise."""
+    if _looks_like_advise(data):
+        try:
+            return render_advise(AdviseRecord.model_validate(data))
+        except ValidationError as exc:
+            raise ValueError(
+                f"this looks like an AdviseRecord but does not match the schema ({_fmt_err(exc)})."
+            ) from exc
     if _looks_like_forecast(data):
         try:
             return render_forecast(ForecastRecord.model_validate(data))

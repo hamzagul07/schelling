@@ -152,3 +152,74 @@ class ForecastRecord(BaseModel):
     outcome_distribution: list[float] = Field(default_factory=list)  # raw draws (cache, D4.1)
     convergence_stats: dict[str, float] = Field(default_factory=dict)
     sensitivity: list[SensitivityEntry] = Field(default_factory=list)
+
+
+# Printed on every advise output (CLI + report): advise mode is a one-sided lever search.
+ADVISE_CAVEAT = (
+    "One-sided search: opponents are held to the model's fixed behavior; real adversaries "
+    "adapt. Treat as lever-finding, not a playbook."
+)
+
+
+class OwnMove(BaseModel):
+    """One candidate move the advising actor could make (Session 7 advise mode).
+
+    ``benefit`` and ``cost`` are reported separately and never combined into one score: benefit
+    is how much closer to the actor's ideal the settlement lands; cost is the position distance
+    the actor concedes to get there (0 for a salience move).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    dimension: str  # "position" | "salience"
+    value: float
+    settlement_median: float
+    benefit: float  # |median_before - ideal| - |median_after - ideal|
+    cost: float  # position distance conceded from the actor's ideal (0 for salience)
+    beyond_stated_range: bool
+
+
+class PersuasionTarget(BaseModel):
+    """A feasible shift of ANOTHER actor toward the advisor's ideal — the "who to work on" list."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    actor_id: str
+    dimension: str  # "position" | "salience"
+    from_value: float
+    to_value: float
+    settlement_median: float
+    benefit: float  # settlement shift toward the advisor's ideal
+
+
+class AdviseRecord(BaseModel):
+    """The advise-mode audit artifact — deterministic under ``seed`` like everything else.
+
+    A one-sided lever search from the advising actor's viewpoint: own moves (position/salience
+    sweeps) and persuasion targets (feasible shifts of other actors), each solved with the same
+    derived seeds for comparability. Not a playbook — opponents are held to the model's fixed
+    behaviour (see the standing caveat rendered on every advise report).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    question_id: str
+    run_id: str
+    engine_version: str
+    inputs_hash: str  # SHA-256 of canonical (game + solver_config + advise_config + actor)
+    seed: int
+    created_at: str | None = None
+
+    advising_actor: str
+    ideal: float  # the advisor's mode position before any move
+    baseline_median: float  # settlement with the game as-is (target_draws)
+    baseline_run_id: str  # the baseline ForecastRecord reference
+
+    advise_config: dict[str, str | float | int | bool] = Field(default_factory=dict)
+    solver_config: dict[str, str | float | int | bool] = Field(default_factory=dict)
+
+    own_moves: list[OwnMove] = Field(default_factory=list)
+    top_moves: list[OwnMove] = Field(default_factory=list)  # re-solved at target_draws
+    persuasion_targets: list[PersuasionTarget] = Field(default_factory=list)  # ranked
+
+    game: GameSpec | None = None  # for the report's baseline actor map

@@ -424,3 +424,48 @@ old schema (`forecast_median`/`ci80`, no `ensemble`, no `game`). The current eng
 file says "older schema (~Session 3); re-run `schelling solve`", anything else reports the first
 schema error. The stale record was regenerated in place (same `inputs_hash` → same filename) so
 it now renders.
+
+---
+
+## Session 7 — advise mode
+
+### D7.0 — Housekeeping: one install command, no silent extra-thrash, friendly missing-extra
+(a) The `analyses/` line (local situations/sources/drafts) is committed to `.gitignore`.
+(b) **`uv sync --all-extras` is the one documented install command** (README + CI). A partial
+`uv sync --extra X` installs *exactly* X and removes the others — that thrash bit earlier
+sessions (a `--extra formalize` sync silently uninstalled the `knowledge` torch stack). Using
+`--all-extras` everywhere makes the environment always complete; tests still need only base+dev
+(they inject fakes), and uv's cache absorbs the torch cost in CI. (c) When the `knowledge` extra
+is absent, `knowledge build/search` and `formalize` catch the lazy `ImportError` and print one
+sentence with the fix (`uv sync --all-extras`); `formalize --no-knowledge` proceeds ungrounded.
+
+### D7.1 — Advise mode: a one-sided lever search, benefit and cost kept separate
+`schelling advise <artifact> --actor <id>` accepts the same artifact types as `solve`. It sweeps
+the actor's **own moves** — position across the realized continuum (grid step 5) and salience
+down to a floor (20) and up to 100 — and, for every **other** actor, one feasible shift of its
+position and salience *toward the advisor's ideal* (within that actor's stated range). Every
+candidate is solved with the **same derived seeds** (`run_monte_carlo(seed=…)`), so a difference
+in settlement is attributable to the move alone. For each move we report **benefit**
+(`|median_before − ideal| − |median_after − ideal|`, ideal = the actor's mode position) and
+**cost** (position distance conceded; 0 for salience) **separately — never a single score**.
+Moves outside the actor's stated low–high are flagged "beyond stated range". The top-3 own moves
+are re-solved at `--target-draws` for final numbers; persuasion targets are ranked by benefit —
+the "who to work on" list. On the widened fixture advising germany (ideal 4, baseline 7.92): the
+only own lever is raising salience (→100, benefit +0.28, but beyond its point range), and the
+standout target is **france.position 10→8 (benefit +0.955)**. Runtime ≈ 69 s at defaults
+(2000 draws/candidate, 10k target).
+
+### D7.2 — Position sweep is data-driven (not hardcoded 0-100)
+The sweep range is the *realized* continuum — `[min(actors' pos.low), max(actors' pos.high)]` —
+so it is correct both for a 0-100 game and for the year-scale replication fixture (~2-12). The
+salience sweep is `[salience_floor, 100]`. Grid step is configurable (default 5).
+
+### D7.3 — `AdviseRecord` artifact + report, deterministic and caveated
+`AdviseRecord` (in `schemas/forecast.py`) carries the advising actor, ideal, the baseline
+reference (`baseline_run_id` + `baseline_median`), the full own-move and persuasion-target tables,
+top moves, seeds, `advise_config`, `solver_config`, `inputs_hash`, engine SHA, and the game (for
+the report's baseline map). Same inputs + seed → byte-identical record (rule 2). `schelling
+report` renders it: baseline actor map with the settlement marker, an own-moves benefit-vs-cost
+scatter, a persuasion-target bar ranking, and — printed on **every** advise output (CLI and
+report) — the standing caveat: *"One-sided search: opponents are held to the model's fixed
+behavior; real adversaries adapt. Treat as lever-finding, not a playbook."*
