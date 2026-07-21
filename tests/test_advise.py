@@ -78,6 +78,49 @@ def test_advise_persuasion_targets_ranked_by_benefit() -> None:
     assert benefits == sorted(benefits, reverse=True)
 
 
+# --------------------------------------------------------------- compromise lens (D12.4)
+def test_advise_compromise_is_exact_closed_form() -> None:
+    from schelling.advise.search import _compromise_settlement, _set_point
+
+    game = _game("emission_standards_widened.json")
+    rec, _ = advise(
+        game, "germany", model="compromise", draws_per_candidate=10, target_draws=10, seed=1
+    )
+    assert rec.model == "compromise" and rec.exact is True
+    # baseline is the exact capability x salience weighted mean
+    assert rec.baseline_median == pytest.approx(_compromise_settlement(game))
+    # every own move's settlement equals the exact weighted mean of the modified game
+    idx = [a.id for a in game.actors].index("germany")
+    for mv in rec.own_moves:
+        expected = _compromise_settlement(_set_point(game, idx, mv.dimension, mv.value))
+        assert mv.settlement_median == pytest.approx(expected, abs=1e-9)
+
+
+def test_advise_compromise_position_pull_matches_weight_share() -> None:
+    # Closed-form: moving actor i's position by d shifts the mean by (w_i / sum w) * d.
+    from schelling.advise.search import _compromise_settlement, _set_point
+
+    game = _game("emission_standards_widened.json")
+    ids = [a.id for a in game.actors]
+    i = ids.index("germany")
+    w = [a.capability.mode * a.salience.mode for a in game.actors]
+    share = w[i] / sum(w)
+    base = _compromise_settlement(game)
+    moved = _compromise_settlement(
+        _set_point(game, i, "position", game.actors[i].position.mode + 10)
+    )
+    assert moved - base == pytest.approx(share * 10.0, abs=1e-9)
+
+
+def test_advise_both_carries_second_lens_side_by_side() -> None:
+    game = _game("emission_standards_widened.json")
+    rec, _ = advise(game, "germany", model="both", draws_per_candidate=20, target_draws=20, seed=1)
+    assert rec.model == "challenge" and rec.exact is False  # primary is the simulated lens
+    s = rec.second_lens
+    assert s is not None and s.model == "compromise" and s.exact is True
+    assert s.top_moves and s.persuasion_targets  # the exact lens is populated
+
+
 def test_advise_unknown_actor_raises() -> None:
     game = _game("emission_standards_widened.json")
     with pytest.raises(ValueError, match="not in this game"):

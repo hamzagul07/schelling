@@ -15,17 +15,38 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
 import numpy as np
 
 from schelling.mc.monte_carlo import engine_version, forecast, run_monte_carlo
-from schelling.schemas.forecast import AdviseRecord, ForecastRecord, OwnMove, PersuasionTarget
+from schelling.schemas.forecast import (
+    AdviseLens,
+    AdviseRecord,
+    ForecastRecord,
+    OwnMove,
+    PersuasionTarget,
+)
 from schelling.schemas.question import GameSpec
 from schelling.schemas.stakeholders import Actor, TriangularEstimate
 from schelling.solver.config import SolverConfig
 
 _EPS = 1e-9
+Settle = Callable[[GameSpec], float]
+
+
+def _compromise_settlement(game: GameSpec) -> float:
+    """The compromise model's exact settlement: the capability x salience weighted mean (D12.4).
+
+    Closed-form — no simulation. A move's effect is exact: shifting actor i's position by d moves
+    the settlement by ``(w_i / Σw)·d``; changing its salience re-weights the mean analytically.
+    """
+    w = [a.capability.mode * a.salience.mode for a in game.actors]
+    x = [a.position.mode for a in game.actors]
+    total = sum(w)
+    if total <= 0:
+        return sum(x) / len(x)
+    return sum(wi * xi for wi, xi in zip(w, x, strict=True)) / total
 
 
 def _grid(lo: float, hi: float, step: float) -> list[float]:
@@ -79,10 +100,115 @@ def _inputs_hash(
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _lens_moves(
+    game: GameSpec,
+    advisor_idx: int,
+    ideal: float,
+    settle_lite: Settle,
+    settle_final: Settle,
+    baseline_lite: float,
+    baseline_final: float,
+    pos_step: float,
+    sal_step: float,
+    salience_floor: float,
+) -> tuple[list[OwnMove], list[OwnMove], list[PersuasionTarget]]:
+    """Sweep own moves + persuasion targets under a given settlement function (D12.4).
+
+    ``settle_lite``/``settle_final`` map a modified game to a settlement (a Monte-Carlo median for
+    the challenge lens; the exact weighted mean for the compromise lens). Benefit/cost logic is
+    identical across lenses — only how the settlement is computed differs.
+    """
+    advisor = game.actors[advisor_idx]
+
+    def benefit(after: float, before: float) -> float:
+        return abs(before - ideal) - abs(after - ideal)
+
+    own_moves: list[OwnMove] = []
+    pos_lo = min(a.position.low for a in game.actors)
+    pos_hi = max(a.position.high for a in game.actors)
+    for v in _grid(pos_lo, pos_hi, pos_step):
+        m = settle_lite(_set_point(game, advisor_idx, "position", v))
+        own_moves.append(
+            OwnMove(
+                dimension="position",
+                value=v,
+                settlement_median=m,
+                benefit=benefit(m, baseline_lite),
+                cost=abs(v - ideal),
+                beyond_stated_range=not (advisor.position.low <= v <= advisor.position.high),
+            )
+        )
+    for v in _grid(salience_floor, 100.0, sal_step):
+        m = settle_lite(_set_point(game, advisor_idx, "salience", v))
+        own_moves.append(
+            OwnMove(
+                dimension="salience",
+                value=v,
+                settlement_median=m,
+                benefit=benefit(m, baseline_lite),
+                cost=0.0,
+                beyond_stated_range=not (advisor.salience.low <= v <= advisor.salience.high),
+            )
+        )
+
+    ranked = sorted(own_moves, key=lambda mv: (-mv.benefit, mv.cost, mv.dimension, mv.value))
+    top_moves: list[OwnMove] = []
+    for mv in ranked[:3]:
+        m = settle_final(_set_point(game, advisor_idx, mv.dimension, mv.value))
+        top_moves.append(
+            OwnMove(
+                dimension=mv.dimension,
+                value=mv.value,
+                settlement_median=m,
+                benefit=benefit(m, baseline_final),
+                cost=mv.cost,
+                beyond_stated_range=mv.beyond_stated_range,
+            )
+        )
+    top_moves.sort(key=lambda mv: (-mv.benefit, mv.cost, mv.dimension, mv.value))
+
+    targets: list[PersuasionTarget] = []
+    for j, a in enumerate(game.actors):
+        if j == advisor_idx:
+            continue
+        to_pos = a.position.high if ideal >= a.position.mode else a.position.low
+        m_pos = settle_lite(_set_point(game, j, "position", to_pos))
+        targets.append(
+            PersuasionTarget(
+                actor_id=a.id,
+                dimension="position",
+                from_value=a.position.mode,
+                to_value=to_pos,
+                settlement_median=m_pos,
+                benefit=benefit(m_pos, baseline_lite),
+                kind="energize",
+            )
+        )
+        best: PersuasionTarget | None = None
+        for to_sal in (a.salience.low, a.salience.high):
+            m_sal = settle_lite(_set_point(game, j, "salience", to_sal))
+            cand = PersuasionTarget(
+                actor_id=a.id,
+                dimension="salience",
+                from_value=a.salience.mode,
+                to_value=to_sal,
+                settlement_median=m_sal,
+                benefit=benefit(m_sal, baseline_lite),
+                kind="energize" if to_sal >= a.salience.mode else "defuse",
+            )
+            if best is None or cand.benefit > best.benefit:
+                best = cand
+        if best is not None:
+            targets.append(best)
+    targets.sort(key=lambda t: (-t.benefit, t.actor_id, t.dimension))
+    return own_moves, top_moves, targets
+
+
 def advise(
     game: GameSpec,
     advising_actor: str,
     *,
+    model: str = "challenge",
     solver_config: SolverConfig | None = None,
     draws_per_candidate: int = 2000,
     target_draws: int = 10000,
@@ -93,11 +219,12 @@ def advise(
 ) -> tuple[AdviseRecord, ForecastRecord]:
     """Run the advise search and return ``(AdviseRecord, baseline ForecastRecord)``.
 
-    Raises ``ValueError`` if ``advising_actor`` is not an actor in the game.
+    ``model`` selects the lens: ``challenge`` (Monte-Carlo simulated search, the default),
+    ``compromise`` (exact closed-form weighted-mean levers, D12.4), or ``both`` (challenge primary
+    with the exact compromise lens attached as ``second_lens``, rendered side by side).
 
-    ``grid_step`` sets the position sweep resolution; when ``None`` (the default) it is adaptive —
-    the realized continuum span / 20 — so a year-scale game and a 0-100 game both get ~20 points
-    (D8.0a). Salience is always swept at a fixed step of 5 (it lives on the 0-100 scale).
+    Raises ``ValueError`` if ``advising_actor`` is not an actor in the game. ``grid_step`` sets the
+    position sweep resolution; when ``None`` it is adaptive (span / 20). Salience steps at 5.
     """
     cfg = solver_config or SolverConfig()
     index = {a.id: i for i, a in enumerate(game.actors)}
@@ -105,115 +232,63 @@ def advise(
         known = ", ".join(index)
         raise ValueError(f"actor {advising_actor!r} is not in this game (actors: {known}).")
     advisor_idx = index[advising_actor]
-    advisor = game.actors[advisor_idx]
-    ideal = advisor.position.mode
+    ideal = game.actors[advisor_idx].position.mode
 
-    # Baseline: the game as-is. The target-draws record is the authoritative reference; a
-    # draws-per-candidate baseline is the comparison point for the (lighter) sweep.
-    baseline_record = forecast(game, cfg, n_draws=target_draws, seed=seed, write=False)
-    baseline_median = baseline_record.ensemble.median
-    baseline_lite = _median(game, cfg, draws_per_candidate, seed)
-
-    def benefit(after: float, before: float = baseline_lite) -> float:
-        return abs(before - ideal) - abs(after - ideal)
-
-    own_moves: list[OwnMove] = []
-    # Position sweep across the realized continuum (span of all actors' position ranges).
     pos_lo = min(a.position.low for a in game.actors)
     pos_hi = max(a.position.high for a in game.actors)
-    # Adaptive default: ~20 points across the realized span; explicit --grid-step overrides (D8.0a).
     pos_step = grid_step if grid_step is not None else max(round((pos_hi - pos_lo) / 20.0, 6), _EPS)
     sal_step = grid_step if grid_step is not None else 5.0
-    for v in _grid(pos_lo, pos_hi, pos_step):
-        m = _candidate_median(game, cfg, advisor_idx, "position", v, draws_per_candidate, seed)
-        own_moves.append(
-            OwnMove(
-                dimension="position",
-                value=v,
-                settlement_median=m,
-                benefit=benefit(m),
-                cost=abs(v - ideal),
-                beyond_stated_range=not (advisor.position.low <= v <= advisor.position.high),
-            )
-        )
-    # Salience sweep: down to the floor and up to 100 (salience is on a 0-100 scale).
-    for v in _grid(salience_floor, 100.0, sal_step):
-        m = _candidate_median(game, cfg, advisor_idx, "salience", v, draws_per_candidate, seed)
-        own_moves.append(
-            OwnMove(
-                dimension="salience",
-                value=v,
-                settlement_median=m,
-                benefit=benefit(m),
-                cost=0.0,
-                beyond_stated_range=not (advisor.salience.low <= v <= advisor.salience.high),
-            )
-        )
 
-    # Top 3 own moves by benefit (cost as tie-break); re-solved at target_draws for final numbers.
-    ranked = sorted(own_moves, key=lambda mv: (-mv.benefit, mv.cost, mv.dimension, mv.value))
-    top_moves: list[OwnMove] = []
-    for mv in ranked[:3]:
-        m = _candidate_median(game, cfg, advisor_idx, mv.dimension, mv.value, target_draws, seed)
-        top_moves.append(
-            OwnMove(
-                dimension=mv.dimension,
-                value=mv.value,
-                settlement_median=m,
-                benefit=benefit(m, baseline_median),
-                cost=mv.cost,
-                beyond_stated_range=mv.beyond_stated_range,
-            )
+    def challenge_lens() -> tuple[AdviseLens, ForecastRecord]:
+        base_rec = forecast(game, cfg, n_draws=target_draws, seed=seed, write=False)
+        base_final = base_rec.ensemble.median
+        base_lite = _median(game, cfg, draws_per_candidate, seed)
+        om, tm, tg = _lens_moves(
+            game, advisor_idx, ideal,
+            lambda g: _median(g, cfg, draws_per_candidate, seed),
+            lambda g: _median(g, cfg, target_draws, seed),
+            base_lite, base_final, pos_step, sal_step, salience_floor,
         )
-    top_moves.sort(key=lambda mv: (-mv.benefit, mv.cost, mv.dimension, mv.value))
+        lens = AdviseLens(
+            model="challenge", exact=False, baseline_median=base_final,
+            own_moves=om, top_moves=tm, persuasion_targets=tg,
+        )
+        return lens, base_rec
 
-    # Persuasion targets: feasible shifts of every OTHER actor toward the advisor's ideal.
-    targets: list[PersuasionTarget] = []
-    for j, a in enumerate(game.actors):
-        if a.id == advising_actor:
-            continue
-        to_pos = a.position.high if ideal >= a.position.mode else a.position.low
-        m_pos = _candidate_median(game, cfg, j, "position", to_pos, draws_per_candidate, seed)
-        targets.append(
-            PersuasionTarget(
-                actor_id=a.id,
-                dimension="position",
-                from_value=a.position.mode,
-                to_value=to_pos,
-                settlement_median=m_pos,
-                benefit=benefit(m_pos),
-                kind="energize",  # pulling a position toward the advisor's ideal (D8.0b)
-            )
+    def compromise_lens() -> tuple[AdviseLens, ForecastRecord]:
+        base_rec = forecast(
+            game, cfg, n_draws=target_draws, seed=seed, write=False, model="compromise"
         )
-        # Salience: the feasible edge (within the actor's range) that most helps the advisor.
-        best: PersuasionTarget | None = None
-        for to_sal in (a.salience.low, a.salience.high):
-            m_sal = _candidate_median(game, cfg, j, "salience", to_sal, draws_per_candidate, seed)
-            cand = PersuasionTarget(
-                actor_id=a.id,
-                dimension="salience",
-                from_value=a.salience.mode,
-                to_value=to_sal,
-                settlement_median=m_sal,
-                benefit=benefit(m_sal),
-                # raising an actor's salience energizes them; lowering it defuses them (D8.0b)
-                kind="energize" if to_sal >= a.salience.mode else "defuse",
-            )
-            if best is None or cand.benefit > best.benefit:
-                best = cand
-        if best is not None:
-            targets.append(best)
-    targets.sort(key=lambda t: (-t.benefit, t.actor_id, t.dimension))
+        base = _compromise_settlement(game)
+        om, tm, tg = _lens_moves(
+            game, advisor_idx, ideal, _compromise_settlement, _compromise_settlement,
+            base, base, pos_step, sal_step, salience_floor,
+        )
+        lens = AdviseLens(
+            model="compromise", exact=True, baseline_median=base,
+            own_moves=om, top_moves=tm, persuasion_targets=tg,
+        )
+        return lens, base_rec
+
+    second: AdviseLens | None = None
+    if model == "compromise":
+        primary, baseline_record = compromise_lens()
+    elif model == "both":
+        primary, baseline_record = challenge_lens()
+        second, _ = compromise_lens()
+    else:
+        primary, baseline_record = challenge_lens()
 
     advise_cfg: dict[str, str | float | int | bool | None] = {
+        "model": model,
         "draws_per_candidate": draws_per_candidate,
         "target_draws": target_draws,
-        "grid_step": pos_step,  # effective position step (adaptive unless overridden)
+        "grid_step": pos_step,
         "salience_step": sal_step,
         "salience_floor": salience_floor,
     }
     hashed = _inputs_hash(game, cfg, advise_cfg, advising_actor)
-    run_id = f"{game.question_id}-advise-{advising_actor}-s{seed}-{hashed[:12]}"
+    run_id = f"{game.question_id}-advise-{model}-{advising_actor}-s{seed}-{hashed[:12]}"
     record = AdviseRecord(
         question_id=game.question_id,
         run_id=run_id,
@@ -223,13 +298,16 @@ def advise(
         created_at=created_at,
         advising_actor=advising_actor,
         ideal=ideal,
-        baseline_median=baseline_median,
+        baseline_median=primary.baseline_median,
         baseline_run_id=baseline_record.run_id,
         advise_config=advise_cfg,
         solver_config=cfg.model_dump(mode="json"),
-        own_moves=own_moves,
-        top_moves=top_moves,
-        persuasion_targets=targets,
+        model=primary.model,
+        exact=primary.exact,
+        own_moves=primary.own_moves,
+        top_moves=primary.top_moves,
+        persuasion_targets=primary.persuasion_targets,
+        second_lens=second,
         game=game,
     )
     return record, baseline_record
