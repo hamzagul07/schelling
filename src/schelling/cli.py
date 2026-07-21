@@ -809,6 +809,38 @@ def seal(
     typer.echo(f"  sha256 {sha}")
 
 
+@app.command("paper-evidence")
+def paper_evidence(
+    repo_root: Path = typer.Option(Path("."), "--repo-root", help="Repository root."),
+    out_dir: Path = typer.Option(Path("paper"), "--out-dir", help="Where paper/ artifacts go."),
+) -> None:
+    """Regenerate paper/EVIDENCE.md + paper/figures/ deterministically from artifacts (D14.1/2).
+
+    Every number is computed from the repo's own artifacts (fixtures, DEU data pinned by SHA-256,
+    the sealed ledger) — never hand-typed — so the evidence table and figures can be regenerated and
+    diffed forever. Numbers no artifact can source are listed as open questions, never guessed.
+    """
+    from schelling.paper.evidence import build_evidence, evidence_markdown
+    from schelling.paper.figures import write_figures
+
+    bundle = build_evidence(repo_root)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "EVIDENCE.md").write_text(evidence_markdown(bundle))
+    figs = write_figures(out_dir / "figures", bundle.record, bundle.report)
+
+    typer.echo(f"EVIDENCE.md: {len(bundle.items)} sourced numbers → {out_dir / 'EVIDENCE.md'}")
+    typer.echo(f"figures: {len(figs)} written → {out_dir / 'figures'}")
+    if figs:
+        for f in figs:
+            typer.echo(f"  {f}")
+    if bundle.open_questions:
+        typer.echo(f"open questions (unsourced): {len(bundle.open_questions)}")
+        for q in bundle.open_questions:
+            typer.echo(f"  - {q}")
+    else:
+        typer.echo("open questions: none — every cited number resolved to an artifact.")
+
+
 @knowledge_app.command("search")
 def knowledge_search(
     query: str = typer.Argument(..., help="Free-text query."),
