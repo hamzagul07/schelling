@@ -134,7 +134,11 @@ class ForecastRecord(BaseModel):
     engine_version: str  # git SHA of the engine that produced this record
     inputs_hash: str  # SHA-256 of the canonical (GameSpec + SolverConfig) JSON
     seed: int  # Monte Carlo master seed
-    solver_config: dict[str, str | float | int | bool] = Field(default_factory=dict)
+    # Which forecasting model produced the ensemble (Session 10, D10.5): "challenge" (the BDM
+    # bargaining solver) or "compromise" (the capability x salience weighted mean). Default keeps
+    # legacy records — which are all challenge-model — valid.
+    model: str = "challenge"
+    solver_config: dict[str, str | float | int | bool | None] = Field(default_factory=dict)
     created_at: str | None = None  # ISO-8601; outside hashed content; None keeps runs identical
 
     ensemble: Ensemble
@@ -221,8 +225,8 @@ class AdviseRecord(BaseModel):
     baseline_median: float  # settlement with the game as-is (target_draws)
     baseline_run_id: str  # the baseline ForecastRecord reference
 
-    advise_config: dict[str, str | float | int | bool] = Field(default_factory=dict)
-    solver_config: dict[str, str | float | int | bool] = Field(default_factory=dict)
+    advise_config: dict[str, str | float | int | bool | None] = Field(default_factory=dict)
+    solver_config: dict[str, str | float | int | bool | None] = Field(default_factory=dict)
 
     own_moves: list[OwnMove] = Field(default_factory=list)
     top_moves: list[OwnMove] = Field(default_factory=list)  # re-solved at target_draws
