@@ -858,3 +858,40 @@ factored into a shared `_formalize_or_exit` helper (index open, key check, `run_
 `formalize` command is left untouched so its tests are unaffected. Search follows rule 7: a
 `--search` analyze stamps `frozen_at = today` and marks the draft live-searched; never use it for
 backtests.
+
+## Session 13 — blind dual-entry verification of the case library
+
+### D13.0 — The verification protocol: blind dual machine transcription + human ratification
+Case-library files (`data/coercive-cases/`) are verified in two separable steps, and the
+`transcription.verified` flag is gated on the second, never the first:
+- **Blind dual entry (machine).** The source PDF is downloaded into `docs/papers/`, rendered to page
+  images, and the stakeholder tables are transcribed **twice, independently, by agents that never see
+  the existing JSON**, then diffed against each other and against the file. Where the source prints a
+  derived `Exercised Power = Influence × Salience / 100` column it is used as a per-row checksum; the
+  `Influence` column maps to the JSON's `capability`, and the derived Exercised-Power column is not
+  stored (it is recomputable). A new `transcription.verification_method` field records the protocol;
+  `verification_note` records what the diff found.
+- **Human ratification (Hassan).** Transcribing numbers is mechanical; the interpretive choices are
+  not — outcome codings, continuum wording, and the horizon rule are put to Hassan as explicit yes/no
+  questions and are his call. `verified` flips to `true` **only after he ratifies**, with his words
+  quoted in `verification_note` — **even when the numeric diff is clean**, because a perfect number
+  transcription does not settle a judgment. `verified` remains Hassan's flag alone.
+
+**China (Efird, Lester & Wise 2016, JEAS 16; `docs/papers/efird_2016_china_coalitions.pdf`) — result.**
+Numbers are exact: all 26 Policy-Space rows (Table 2) and all 34 Competitive-Space rows (Table 3)
+match on position/capability/salience across both blind reads and the JSON; every Exercised-Power
+checksum reproduces; actor counts (26/34) and the `capability ← Influence` mapping are correct. Both
+continua are faithful — case 1 to Figure 1 (p.129), case 2 to **Figure 6 (p.138)**, whose printed
+markers (0 status quo, 10 end-of-patronage, 30 transparent tendering, **60 divest major assets e.g.
+pipelines on open access**, 100 break up CNPC) match the JSON, so the Position-60 marker the long-run
+coding leans on is genuinely in the paper. Both `published_model_forecast` notes match the paper's
+results. **`verified` stays `false`**: the four outcome codings (25/25 near-term, 55/60 long-run) are
+Claude-proposed real-world codings, and — a substantive finding — **the paper states no calendar
+horizon** (its 10 "turns" are bargaining rounds, not years; the only temporal phrase is "in the near
+term"), so the `by_2017 / by_2020 / 5-year` framing is an imposed convention, not the paper's own.
+These three are the ratification questions for Hassan (D13 item 2).
+
+**Japan (KAPSARC KS-2018-DP47) — BLOCKED.** The PDF is not in `docs/papers/`; the scaffold
+(`drafts/ktab-japan-2017-scaffold.json`) records the differing column order (Influence | Position |
+Salience) and the Exercised-Power checksum to apply. The same blind protocol runs when Hassan supplies
+the PDF. Its 5 known rows are internally checksum-consistent but remain unverified against the source.

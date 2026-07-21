@@ -21,12 +21,33 @@ One JSON file per source (`<slug>.json`) in this directory. The loader reads eve
   "transcription": {
     "status": "human-readable provenance / TODO note",
     "verified": false,          // flip to true only after every number is checked against the source
+    "verification_method": "blind dual machine transcription + human ratification of judgments",
+    "verification_note": "what the blind diff found + the quoted human ratification once given",
     "source_pdf": "url or path to the source"
   },
   "cases": [ { …case… } ],
   "notes": [ "free-text caveats — e.g. domain, horizon rule, bonus columns" ]
 }
 ```
+
+### The verification protocol (`verification_method`)
+
+Every case file is verified by **blind dual machine transcription + human ratification of
+judgments**:
+
+1. **Blind dual entry.** The stakeholder table is transcribed twice, independently, from rendered
+   images of the source PDF — by two agents that never see the existing JSON. The two
+   transcriptions are diffed against each other, then against the JSON. Where the source prints a
+   derived `Exercised Power = Influence × Salience / 100` column, it is used as a per-row checksum.
+   The `Influence` column maps to the JSON's `capability`.
+2. **Human ratification of judgments.** Transcribing the numbers is mechanical; the *interpretive*
+   choices are not — outcome codings, the continuum wording, and the horizon rule. These are put to
+   Hassan as explicit yes/no questions and are **his call, never the machine's**.
+
+`transcription.verified` flips to `true` **only after Hassan ratifies the judgment questions**, and
+his ratification is quoted verbatim in `verification_note`. Until then it stays `false` **even when
+the numeric diff is clean** — a perfect transcription of the numbers does not settle the judgments.
+`verified` is Hassan's flag alone.
 
 ### A case
 
