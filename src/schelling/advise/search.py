@@ -205,7 +205,7 @@ def advise(
             targets.append(best)
     targets.sort(key=lambda t: (-t.benefit, t.actor_id, t.dimension))
 
-    advise_cfg: dict[str, str | float | int | bool] = {
+    advise_cfg: dict[str, str | float | int | bool | None] = {
         "draws_per_candidate": draws_per_candidate,
         "target_draws": target_draws,
         "grid_step": pos_step,  # effective position step (adaptive unless overridden)

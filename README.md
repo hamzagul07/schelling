@@ -81,6 +81,17 @@ solver must beat both baselines. **It does not** — the solver (MAE 28.31) lose
 mean (23.64), reproducing the canonical DEU finding that a simple weighted mean is hard to beat.
 A negative finding, written up honestly in [`BACKTEST.md`](BACKTEST.md) (D9.x).
 
+**Session 10 (done) — the fair fight (Phase 2):** the DEU backtest now runs with **sourced
+capabilities** (member-state Council power by treaty regime — pre-Nice / Nice weighted votes,
+Lisbon-era population — feeding the challenge solver *and* the weighted-mean baseline equally,
+D10.1) and a **reference-point-anchored** challenge variant whose Q is tuned split-sample (D10.4).
+The compromise model (capability×salience weighted mean) is now a first-class solver
+(`solve --solver challenge|compromise|both`, D10.5), and sealed forecasts are pre-registered in
+[`FORECASTS.md`](FORECASTS.md) for later grading (D10.6). **Gate v2 (fixed in advance): the
+challenge solver, fully equipped, must beat the weighted mean — it still doesn't** (26.83 vs 22.99
+MAE; the fair fight narrowed the gap but the compromise model wins, split-sample confirmed). The
+ICB coercive benchmark is scheduled next (D10.7).
+
 ## CLI
 
 ```sh
@@ -110,8 +121,15 @@ schelling advise game.json --actor germany --draws-per-candidate 2000 --target-d
 # Render any artifact (draft, ForecastRecord, AdviseRecord, or BacktestRecord) to a report
 schelling report runs/Q-1994-EMISSIONS-mc10000-s42-*.json -o report.html --open
 
-# Backtest the solver + naive baselines against the DEU benchmark (search off; writes BACKTEST.md)
+# Solve a game with both models side by side (challenge / compromise); writes a record for each
+schelling solve game.json --solver both --draws 10000
+
+# Backtest the fair fight (sourced capabilities + reference point; search off; writes BACKTEST.md)
 schelling backtest data/deu/ --draws 2000 --seed 42 --html backtest.html
+schelling backtest data/deu/ --capability-mode equal --no-reference-point   # Session-9 baseline
+
+# Seal both models' forecasts for a real, unresolved question into FORECASTS.md (graded later)
+schelling ledger game.json --grade-date 2026-09-01 --note "what is being forecast"
 ```
 
 The DEU dataset is not redistributed here; download the four open-access DEU III files

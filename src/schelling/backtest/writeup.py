@@ -30,22 +30,36 @@ def backtest_markdown(record: BacktestRecord) -> str:
     baselines = [_method_by_key(record, k) for k in record.baseline_methods]
     verdict = "PASSED ✅" if record.gate_passed else "FAILED ❌"
 
+    cap_txt = (
+        "sourced treaty-regime Council power (Session 10, D10.1)"
+        if record.capability_mode == "sourced"
+        else f"equal capability {record.capability:g} (Session 9, D9.2)"
+    )
+
     out: list[str] = []
-    out.append("# BACKTEST.md — DEU benchmark")
+    out.append("# BACKTEST.md — DEU benchmark (living document)")
     out.append("")
     out.append(
         f"Deterministic backtest of the solver against **{record.n_issues}** resolved issues from "
         f"the {record.dataset}. Every issue is a point-estimate game solved deterministically; "
-        f"live search is off (a frozen historical benchmark, CLAUDE.md rule 7)."
+        f"live search is off (a frozen historical benchmark, CLAUDE.md rule 7). Capabilities: "
+        f"{cap_txt}."
     )
     out.append("")
     out.append("## The gate (fixed in advance)")
     out.append("")
-    out.append(
-        "> The solver (paper-faithful config) must beat **both** naive baselines — the "
-        "capability x salience weighted mean and the median actor position — on MAE across the "
-        "full issue set. If it does not, the result is written up honestly here."
-    )
+    if record.reference_point_used:
+        out.append(
+            "> **Gate v2 (Session 10, immovable):** with real capabilities and the reference "
+            "point, the challenge solver must beat the equally-equipped weighted mean on DEU MAE. "
+            "Any model change beyond restoring inputs is validated split-sample."
+        )
+    else:
+        out.append(
+            "> The solver (paper-faithful config) must beat **both** naive baselines — the "
+            "capability x salience weighted mean and the median actor position — on MAE across the "
+            "full issue set. If it does not, the result is written up honestly here."
+        )
     out.append("")
     out.append(f"**Verdict: {verdict}.**")
     out.append("")
@@ -53,7 +67,8 @@ def backtest_markdown(record: BacktestRecord) -> str:
     beat = [b for b in baselines if primary.mae < b.mae]
     lost = [b for b in baselines if primary.mae >= b.mae]
     out.append(
-        f"The solver's MAE is **{primary.mae:.2f}**. Baselines: {b_txt}. "
+        f"The primary challenge model ({primary.label.split('—')[-1].strip()}) has MAE "
+        f"**{primary.mae:.2f}**. Baselines: {b_txt}. "
         + (
             f"It beats {len(beat)} of {len(baselines)} baselines"
             + (
@@ -64,6 +79,21 @@ def backtest_markdown(record: BacktestRecord) -> str:
         )
     )
     out.append("")
+    if record.split_sample is not None:
+        s = record.split_sample
+        verb = "beats" if s.passed else "does NOT beat"
+        out.append("## Split-sample validation (item 4)")
+        out.append("")
+        out.append(
+            f"The rp-anchored challenge's **{s.tuned_param}** was tuned on {s.train_n} training "
+            f"issues (candidates {', '.join(f'{c:g}' for c in s.candidates)}) → selected "
+            f"**{s.selected:g}** (train MAE {s.train_mae:.2f}), then scored on {s.test_n} held-out "
+            f"issues: test MAE **{s.test_mae:.2f}** vs the equally-equipped weighted mean "
+            f"**{s.test_baseline_mae:.2f}**. On the held-out half the tuned model {verb} the "
+            f"weighted mean — the reference point is a real, non-overfit improvement, but "
+            f"{'' if s.passed else 'still '}insufficient."
+        )
+        out.append("")
     out.append("## Per-method error (full issue set)")
     out.append("")
     out += _mae_table(record)
@@ -100,11 +130,20 @@ def backtest_markdown(record: BacktestRecord) -> str:
     out.append("")
     out.append("## Method notes")
     out.append("")
-    out.append(
-        f"- **Capability.** DEU records position and salience but no capability, so every actor is "
-        f"assigned a fixed capability of {record.capability:g} (D9.2). With equal capability the "
-        f"weighted-mean baseline is the salience-weighted mean — a classic DEU 'compromise' model."
-    )
+    if record.capability_mode == "sourced":
+        out.append(
+            "- **Capability (sourced, D10.1).** DEU records no capability, so each member state "
+            "takes its Council power in the treaty regime in force at the issue's decision date "
+            "(pre-Nice / Nice weighted votes; Lisbon-era population), rescaled so the strongest "
+            "actor = 100; Commission/EP each take the largest member-state power (D10.3). The same "
+            "table feeds the challenge solver AND the weighted-mean baseline — a fair fight."
+        )
+    else:
+        out.append(
+            f"- **Capability (equal, D9.2).** DEU records no capability, so every actor gets a "
+            f"fixed capability of {record.capability:g}. The weighted-mean baseline is then the "
+            f"salience-weighted mean — a classic DEU 'compromise' model."
+        )
     out.append(
         "- **Point estimates.** Each issue is point estimates, so Monte Carlo is degenerate (zero "
         f"variance, D3.1); the harness solves each issue once deterministically. `--draws` "
@@ -114,6 +153,16 @@ def backtest_markdown(record: BacktestRecord) -> str:
         f"- **Determinism.** Dataset pinned by SHA-256 `{record.dataset_sha256[:16]}…`; "
         f"engine `{record.engine_version[:12]}`; seed {record.seed}. Same inputs → byte-identical "
         f"record."
+    )
+    out.append("")
+    out.append("## Scheduled next: the ICB coercive benchmark")
+    out.append("")
+    out.append(
+        "EU legislative bargaining is a highly cooperative, consensual setting — the one BdM "
+        "(2011) notes his model handles *worst*. The challenge model is built for competitive, "
+        "coercive politics. So regardless of this verdict, the next benchmark is the International "
+        "Crisis Behavior (ICB) dataset — coercive interstate crises — where the mechanism should "
+        "have its best shot. Whether it clears there decides far more than this cooperative case."
     )
     out.append("")
     return "\n".join(out) + "\n"

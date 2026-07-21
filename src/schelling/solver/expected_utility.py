@@ -29,25 +29,36 @@ class BasicUtilities:
 
 
 def basic_utilities(
-    x_i: float, x_j: float, mu: float, cont_range: float, r: float
+    x_i: float,
+    x_j: float,
+    mu: float,
+    cont_range: float,
+    r: float,
+    reference_point: float | None = None,
 ) -> BasicUtilities:
     """Compute the five basic utilities for challenger ``i`` against ``j`` (Scholz eqs. 15-24).
 
     ``mu`` is the current median-voter position; ``cont_range`` is ``R = x_max - x_min``. Each
     bracketed base lies in ``[0, 1]`` (because every normalized distance is ``<= 1``), so raising
     to a fractional ``r`` stays real — this is exactly the scaling Scholz preserve with the 2s
-    and 4s (p. 21).
+    and 4s (p. 21). When ``reference_point`` is set, the status-quo utility is the utility of an
+    outcome at that point (distance-scaled), not the constant "no move" value (D10.4).
     """
     if cont_range <= 0.0:
         raise ValueError(f"cont_range must be positive, got {cont_range}")
     d_ij = abs(x_i - x_j) / cont_range
     d_bw = (abs(x_i - mu) + abs(x_i - x_j)) / cont_range
+    if reference_point is None:
+        u_sq = 2.0 - 4.0 * (0.5) ** r
+    else:
+        d_sq = min(abs(x_i - reference_point) / cont_range, 1.0)
+        u_sq = 2.0 - 4.0 * (0.5 + 0.5 * d_sq) ** r
     return BasicUtilities(
         u_s=2.0 - 4.0 * (0.5 - 0.5 * d_ij) ** r,
         u_f=2.0 - 4.0 * (0.5 + 0.5 * d_ij) ** r,
         u_b=2.0 - 4.0 * (0.5 - 0.25 * d_bw) ** r,
         u_w=2.0 - 4.0 * (0.5 + 0.25 * d_bw) ** r,
-        u_sq=2.0 - 4.0 * (0.5) ** r,
+        u_sq=u_sq,
     )
 
 
@@ -89,6 +100,7 @@ def expected_utility(
     cont_range: float,
     r_challenger: float,
     q: float,
+    reference_point: float | None = None,
 ) -> float:
     """Expected utility to ``challenger`` of challenging ``responder`` (Scholz eqs. 5-7 / 25).
 
@@ -100,7 +112,7 @@ def expected_utility(
     x_r = float(positions[responder])
     s_resp = float(saliences[responder]) / 100.0  # normalize 0-100 salience to a [0,1] weight
     p = prevail_probability(x_c, x_r, positions, cs_weights)
-    u = basic_utilities(x_c, x_r, mu, cont_range, r_challenger)
+    u = basic_utilities(x_c, x_r, mu, cont_range, r_challenger, reference_point)
     t = t_indicator(x_c, x_r, mu)
     e_challenge = s_resp * (p * u.u_s + (1.0 - p) * u.u_f) + (1.0 - s_resp) * u.u_s
     e_no_challenge = q * u.u_sq + (1.0 - q) * (t * u.u_b + (1.0 - t) * u.u_w)
@@ -115,6 +127,7 @@ def eu_matrix(
     cont_range: float,
     r: FloatArray,
     q: float,
+    reference_point: float | None = None,
 ) -> FloatArray:
     """Matrix ``EU[i, j]`` = expected utility to challenger ``i`` of challenging responder ``j``.
 
@@ -147,7 +160,11 @@ def eu_matrix(
     u_f = 2.0 - 4.0 * np.maximum(0.5 + 0.5 * d_ij, 0.0) ** r_col
     u_b = 2.0 - 4.0 * np.maximum(0.5 - 0.25 * d_bw, 0.0) ** r_col
     u_w = 2.0 - 4.0 * np.maximum(0.5 + 0.25 * d_bw, 0.0) ** r_col
-    u_sq = (2.0 - 4.0 * (0.5) ** r)[:, None]  # per challenger i
+    if reference_point is None:
+        u_sq = (2.0 - 4.0 * (0.5) ** r)[:, None]  # per challenger i: status quo = "no move"
+    else:
+        d_sq = np.minimum(np.abs(x - reference_point) / cont_range, 1.0)  # per i, capped at edge
+        u_sq = (2.0 - 4.0 * (0.5 + 0.5 * d_sq) ** r)[:, None]  # status quo = outcome at rp (D10.4)
 
     t = (np.abs(x[:, None] - mu) < dist).astype(np.float64)  # T[i, j]
     s_resp = saliences[None, :] / 100.0  # responder j's salience, normalized

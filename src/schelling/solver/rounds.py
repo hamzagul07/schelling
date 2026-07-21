@@ -57,12 +57,13 @@ def _round_eu(
     recompute (Appendix steps 8-10). Returns ``(eu_second_pass, r_exponents)``.
     """
     n = positions.size
+    rp = config.reference_point
     r_ones = np.ones(n, dtype=np.float64)
-    eu_first = eu_matrix(positions, saliences, cs_weights, mu, cont_range, r_ones, config.q)
+    eu_first = eu_matrix(positions, saliences, cs_weights, mu, cont_range, r_ones, config.q, rp)
     if not config.apply_risk:
         return eu_first, r_ones
     r_vals = risk_exponents(risk_basis(security_levels(eu_first, config.security_mode)))
-    eu_second = eu_matrix(positions, saliences, cs_weights, mu, cont_range, r_vals, config.q)
+    eu_second = eu_matrix(positions, saliences, cs_weights, mu, cont_range, r_vals, config.q, rp)
     return eu_second, r_vals
 
 

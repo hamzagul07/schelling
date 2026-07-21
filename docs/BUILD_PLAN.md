@@ -257,3 +257,9 @@ the §7 index. **Phase 2** — GDELT via BigQuery, UCDP/ACLED/CoW/ICB ingestion,
 backtest harness (20 resolved crises), and the ablation gate: engine vs. plain-LLM vs.
 base rates on identical questions, Brier-scored. The gate decides whether Phase 3 (the
 situation room, the public scoreboard, the API) gets built at all.
+
+> **Phase 2 status (Sessions 9–10).** DEU benchmark done: the challenge (BDM) solver loses to a
+> capability×salience weighted mean on EU legislative bargaining, even in a fair fight with sourced
+> capabilities and a reference point (`BACKTEST.md`, D9–D10). **Scheduled next: the ICB coercive
+> benchmark** — coercive interstate crises, the setting the challenge model is actually built for.
+> The DEU result alone does not justify a Phase-3 build; ICB is the decisive test.

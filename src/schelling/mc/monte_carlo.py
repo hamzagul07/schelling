@@ -30,6 +30,11 @@ from schelling.schemas.forecast import (
 from schelling.schemas.question import GameSpec
 from schelling.solver.config import SolverConfig
 from schelling.solver.model import run
+from schelling.solver.votes import weighted_mean
+
+# Forecasting models the MC layer can run per draw (D10.5).
+MODEL_CHALLENGE = "challenge"  # the BDM bargaining solver (headline = converged weighted median)
+MODEL_COMPROMISE = "compromise"  # the capability x salience weighted mean (Van den Bos / DEU)
 
 FloatArray = npt.NDArray[np.float64]
 IntArray = npt.NDArray[np.int64]
@@ -50,17 +55,26 @@ class MonteCarloResult:
     seed: int
 
 
+def _compromise_forecast(game: GameSpec) -> float:
+    """The compromise model: the capability x salience weighted mean of positions (D10.5)."""
+    positions = np.array([a.position.mode for a in game.actors], dtype=np.float64)
+    weights = np.array([a.capability.mode * a.salience.mode for a in game.actors], dtype=np.float64)
+    return weighted_mean(positions, weights)
+
+
 def run_monte_carlo(
     game: GameSpec,
     config: SolverConfig | None = None,
     n_draws: int = DEFAULT_DRAWS,
     seed: int = 0,
+    model: str = MODEL_CHALLENGE,
 ) -> MonteCarloResult:
     """Solve ``n_draws`` triangular draws deterministically and collect per-draw outputs.
 
     Draw ``i`` uses ``derive_rng(seed, i)``; a point-estimate game yields identical draws
-    (zero variance). The round loop is plain Python but the contest math is vectorized, so
-    10k draws finish well under the §6 60-second budget.
+    (zero variance). ``model`` selects the per-draw forecast: the challenge (BDM) solver's
+    converged median, or the compromise weighted mean (D10.5). The round loop is plain Python but
+    the contest math is vectorized, so 10k draws finish well under the §6 60-second budget.
     """
     cfg = config or SolverConfig()
     medians = np.empty(n_draws, dtype=np.float64)
@@ -68,11 +82,19 @@ def run_monte_carlo(
     rounds = np.empty(n_draws, dtype=np.int64)
     stops: list[StoppingRule] = []
     for i in range(n_draws):
-        result = run(sample_game(game, derive_rng(seed, i)), cfg)
-        medians[i] = result.forecast_median
-        means[i] = result.forecast_mean
-        rounds[i] = result.rounds_executed
-        stops.append(result.stopping_rule)
+        draw = sample_game(game, derive_rng(seed, i))
+        if model == MODEL_COMPROMISE:
+            value = _compromise_forecast(draw)
+            medians[i] = value
+            means[i] = value
+            rounds[i] = 0
+            stops.append(StoppingRule.CONVERGED)
+        else:
+            result = run(draw, cfg)
+            medians[i] = result.forecast_median
+            means[i] = result.forecast_mean
+            rounds[i] = result.rounds_executed
+            stops.append(result.stopping_rule)
     return MonteCarloResult(
         median_distribution=medians,
         mean_distribution=means,
@@ -138,6 +160,7 @@ def build_forecast_record(
     assumptions: list[Assumption] | None = None,
     formalizer_metadata: DraftMetadata | None = None,
     live_searched: bool = False,
+    model: str = MODEL_CHALLENGE,
 ) -> ForecastRecord:
     """Assemble the complete :class:`ForecastRecord` from a Monte Carlo run.
 
@@ -146,21 +169,26 @@ def build_forecast_record(
     outcome), ``ensemble.p10``/``p90`` (CI80). See D4.2. ``run_id`` is derived from the inputs
     hash and seed, so identical inputs address the same record file deterministically. When the
     game came from a formalized draft, its ``assumptions`` and formalize metadata are carried
-    through so the provenance chain is end-to-end (D6.8).
+    through so the provenance chain is end-to-end (D6.8). ``model`` records which forecaster
+    produced the ensemble (D10.5).
     """
     dist = np.sort(mc.median_distribution)
     hashed = inputs_hash(game, config)
-    run_id = f"{game.question_id}-mc{mc.n_draws}-s{mc.seed}-{hashed[:12]}"
+    tag = "" if model == MODEL_CHALLENGE else f"-{model}"
+    run_id = f"{game.question_id}{tag}-mc{mc.n_draws}-s{mc.seed}-{hashed[:12]}"
     p10, p90 = ci80(mc.median_distribution)
-    # Deterministic mode-game solve -> the per-round median trajectory embedded in the record.
-    mode_result = run(game, config)
-    trajectory = [rl.weighted_median for rl in mode_result.rounds]
+    # The challenge model embeds its per-round median trajectory; the compromise model has none.
+    if model == MODEL_CHALLENGE:
+        trajectory = [rl.weighted_median for rl in run(game, config).rounds]
+    else:
+        trajectory = []
     return ForecastRecord(
         question_id=game.question_id,
         run_id=run_id,
         engine_version=engine_version(),
         inputs_hash=hashed,
         seed=mc.seed,
+        model=model,
         solver_config=config.model_dump(mode="json"),
         created_at=created_at,
         ensemble=Ensemble(
@@ -201,15 +229,18 @@ def forecast(
     assumptions: list[Assumption] | None = None,
     formalizer_metadata: DraftMetadata | None = None,
     live_searched: bool = False,
+    model: str = MODEL_CHALLENGE,
 ) -> ForecastRecord:
     """Run Monte Carlo + sensitivity, build the ForecastRecord, and (by default) persist it.
 
     This is the one entry point that emits a complete audit artifact for a question. Pass a
     draft's ``assumptions`` and ``formalizer_metadata`` to carry its provenance into the record.
+    ``model`` selects the challenge (BDM) or compromise (weighted-mean) forecaster (D10.5).
     """
     cfg = config or SolverConfig()
-    mc = run_monte_carlo(game, cfg, n_draws=n_draws, seed=seed)
-    sensitivity = tornado(game, cfg)
+    mc = run_monte_carlo(game, cfg, n_draws=n_draws, seed=seed, model=model)
+    # The tornado re-solves the challenge model; it is not meaningful for the compromise mean.
+    sensitivity = tornado(game, cfg) if model == MODEL_CHALLENGE else []
     record = build_forecast_record(
         game,
         cfg,
@@ -219,6 +250,7 @@ def forecast(
         assumptions=assumptions,
         formalizer_metadata=formalizer_metadata,
         live_searched=live_searched,
+        model=model,
     )
     if write:
         write_record(record, out_dir)
