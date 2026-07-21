@@ -5,10 +5,13 @@ change them only with a matching entry in DECISIONS.md.
 """
 
 from schelling.schemas.forecast import (
+    AdviseRecord,
     Assumption,
     DraftMetadata,
     Ensemble,
     ForecastRecord,
+    OwnMove,
+    PersuasionTarget,
     RoundLog,
     SensitivityEntry,
     SolverResult,
@@ -18,6 +21,7 @@ from schelling.schemas.stakeholders import Actor, Evidence, TriangularEstimate
 
 __all__ = [
     "Actor",
+    "AdviseRecord",
     "Assumption",
     "Continuum",
     "DraftMetadata",
@@ -25,6 +29,8 @@ __all__ = [
     "Evidence",
     "ForecastRecord",
     "GameSpec",
+    "OwnMove",
+    "PersuasionTarget",
     "RoundLog",
     "SensitivityEntry",
     "SolverResult",
