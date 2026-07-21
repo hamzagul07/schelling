@@ -22,6 +22,7 @@ from pydantic import ValidationError
 from schelling.advise.search import advise as run_advise
 from schelling.backtest.deu import load_deu_issues
 from schelling.backtest.harness import run_backtest
+from schelling.backtest.ledger import append_entry, ledger_entry, new_ledger
 from schelling.backtest.writeup import backtest_markdown
 from schelling.formalizer.client import AnthropicClient, WebSearchUnavailableError
 from schelling.formalizer.firewall import IndexLeakageError
@@ -111,11 +112,17 @@ def solve(
     conflict_resolves: bool = typer.Option(False, "--conflict-resolves/--no-conflict-resolves"),
     apply_risk: bool = typer.Option(True, "--apply-risk/--no-apply-risk"),
     max_rounds: int = typer.Option(20, "--max-rounds", min=1),
+    solver: str = typer.Option(
+        "both", "--solver", help="'challenge' (BDM), 'compromise' (weighted mean), or 'both'."
+    ),
     out_dir: Path = typer.Option(Path("runs"), "--out-dir", help="Where the record is written."),
 ) -> None:
-    """Solve a game (bare GameSpec or a formalizer DraftGameSpec) and write the ForecastRecord."""
+    """Solve a game (bare GameSpec or DraftGameSpec) and write the ForecastRecord(s)."""
     if not fixture.exists():
         typer.echo(f"input not found: {fixture}", err=True)
+        raise typer.Exit(code=2)
+    if solver not in ("challenge", "compromise", "both"):
+        typer.echo("--solver must be 'challenge', 'compromise', or 'both'.", err=True)
         raise typer.Exit(code=2)
     try:
         game, assumptions, formalizer_metadata, live_searched = _load_solve_input(fixture)
@@ -131,31 +138,32 @@ def solve(
         max_rounds=max_rounds,
         seed=seed,
     )
-    record = forecast(
-        game,
-        config,
-        n_draws=draws,
-        seed=seed,
-        out_dir=out_dir,
-        assumptions=assumptions,
-        formalizer_metadata=formalizer_metadata,
-        live_searched=live_searched,
-    )
-    e = record.ensemble
-    conv = record.convergence_stats
-    typer.echo(f"Question:  {record.question_id}")
-    typer.echo(
-        f"Forecast:  median {e.median:.3f}   mean {e.mean:.3f}   (n={e.n_draws} draws, seed {seed})"
-    )
-    typer.echo(f"CI80:      [{e.p10:.3f}, {e.p90:.3f}]")
-    typer.echo(
-        f"Converge:  {conv.get('converged_fraction', 0.0) * 100:.1f}% converged, "
-        f"mean {conv.get('rounds_mean', 0.0):.1f} rounds (max {conv.get('rounds_max', 0.0):.0f})"
-    )
+    models = ["challenge", "compromise"] if solver == "both" else [solver]
+    typer.echo(f"Question:  {game.question_id}")
+    records = []
+    for model in models:
+        record = forecast(
+            game,
+            config,
+            n_draws=draws,
+            seed=seed,
+            out_dir=out_dir,
+            assumptions=assumptions,
+            formalizer_metadata=formalizer_metadata,
+            live_searched=live_searched,
+            model=model,
+        )
+        records.append(record)
+        e = record.ensemble
+        typer.echo(
+            f"{model:<11} median {e.median:.3f}   mean {e.mean:.3f}   "
+            f"CI80 [{e.p10:.3f}, {e.p90:.3f}]   (n={e.n_draws}, seed {seed})"
+        )
     typer.echo("")
-    typer.echo(format_tornado(record.sensitivity))
+    typer.echo(format_tornado(records[0].sensitivity))
     typer.echo("")
-    typer.echo(f"Record written: {out_dir / (record.run_id + '.json')}")
+    for record in records:
+        typer.echo(f"Record written: {out_dir / (record.run_id + '.json')}")
 
 
 def _rng(est: TriangularEstimate) -> str:
@@ -384,7 +392,15 @@ def backtest(
     draws: int = typer.Option(2000, "--draws", help="Nominal MC draws (point estimates: no-op)."),
     seed: int = typer.Option(42, "--seed"),
     capability: float = typer.Option(
-        100.0, "--capability", help="Fixed capability for all actors."
+        100.0, "--capability", help="Fixed capability (equal mode only)."
+    ),
+    capability_mode: str = typer.Option(
+        "sourced", "--capability-mode", help="'sourced' (treaty regime, D10.1) or 'equal' (D9.2)."
+    ),
+    reference_point: bool = typer.Option(
+        True,
+        "--reference-point/--no-reference-point",
+        help="Add the rp-anchored challenge (D10.4).",
     ),
     min_actors: int = typer.Option(3, "--min-actors", min=1),
     out_dir: Path = typer.Option(Path("runs"), "--out-dir"),
@@ -400,8 +416,14 @@ def backtest(
             err=True,
         )
         raise typer.Exit(code=2)
+    if capability_mode not in ("sourced", "equal"):
+        typer.echo("--capability-mode must be 'sourced' or 'equal'.", err=True)
+        raise typer.Exit(code=2)
 
-    issues = load_deu_issues(csv_path, capability=capability, min_actors=min_actors)
+    sourced = capability_mode == "sourced"
+    issues = load_deu_issues(
+        csv_path, capability=capability, sourced_capability=sourced, min_actors=min_actors
+    )
     if not issues:
         typer.echo(f"no scoreable issues parsed from {csv_path}.", err=True)
         raise typer.Exit(code=2)
@@ -411,7 +433,9 @@ def backtest(
         dataset_label=_DEU_LABEL,
         seed=seed,
         draws=draws,
-        capability=capability,
+        capability=0.0 if sourced else capability,
+        capability_mode=capability_mode,
+        reference_point=reference_point,
     )
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -431,6 +455,54 @@ def backtest(
     verdict = "PASSED" if record.gate_passed else "FAILED"
     typer.echo(f"Gate {verdict}: primary must beat both {record.baseline_methods}.")
     typer.echo(f"Record: {record_path}   BACKTEST.md: {md_out}")
+
+
+@app.command()
+def ledger(
+    game_json: Path = typer.Argument(
+        ..., help="A GameSpec or DraftGameSpec to seal a forecast on."
+    ),
+    grade_date: str = typer.Option(..., "--grade-date", help="ISO date to grade the outcome."),
+    note: str = typer.Option("", "--note", help="A one-line note (what is being forecast)."),
+    continuum: str = typer.Option("", "--continuum", help="Continuum description for the ledger."),
+    seed: int = typer.Option(42, "--seed"),
+    draws: int = typer.Option(10_000, "--draws"),
+    out: Path = typer.Option(Path("FORECASTS.md"), "-o", "--out", help="The ledger file."),
+    out_dir: Path = typer.Option(Path("runs"), "--out-dir", help="Where the records are written."),
+) -> None:
+    """Seal both models' forecasts for a game into the ledger (FORECASTS.md), graded later."""
+    if not game_json.exists():
+        typer.echo(f"game not found: {game_json}", err=True)
+        raise typer.Exit(code=2)
+    try:
+        game, assumptions, fm, live_searched = _load_solve_input(game_json)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    records = [
+        forecast(
+            game,
+            SolverConfig(seed=seed),
+            n_draws=draws,
+            seed=seed,
+            out_dir=out_dir,
+            assumptions=assumptions,
+            formalizer_metadata=fm,
+            live_searched=live_searched,
+            model=model,
+        )
+        for model in ("challenge", "compromise")
+    ]
+    entry = ledger_entry(
+        records, continuum=continuum or "(see sealed game)", grade_date=grade_date, note=note
+    )
+    text = append_entry(out.read_text(), entry) if out.exists() else new_ledger(entry)
+    out.write_text(text if text.endswith("\n") else text + "\n")
+
+    typer.echo(f"Sealed {game.question_id} into {out}:")
+    for r in records:
+        typer.echo(f"  {r.model:<11} median {r.ensemble.median:.3f}   (grade {grade_date})")
 
 
 @knowledge_app.command("search")
