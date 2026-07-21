@@ -20,6 +20,9 @@ from dotenv import find_dotenv, load_dotenv
 from pydantic import ValidationError
 
 from schelling.advise.search import advise as run_advise
+from schelling.backtest.deu import load_deu_issues
+from schelling.backtest.harness import run_backtest
+from schelling.backtest.writeup import backtest_markdown
 from schelling.formalizer.client import AnthropicClient, WebSearchUnavailableError
 from schelling.formalizer.firewall import IndexLeakageError
 from schelling.formalizer.formalize import formalize as run_formalize
@@ -62,8 +65,14 @@ def _first_error(exc: ValidationError) -> str:
     return f"{loc}: {err.get('msg', 'invalid')}"
 
 
-def _load_solve_input(path: Path) -> tuple[GameSpec, list[Assumption], DraftMetadata | None]:
-    """Load a GameSpec or a DraftGameSpec; raises ValueError with a one-sentence friendly reason."""
+def _load_solve_input(
+    path: Path,
+) -> tuple[GameSpec, list[Assumption], DraftMetadata | None, bool]:
+    """Load a GameSpec or a DraftGameSpec; raises ValueError with a one-sentence friendly reason.
+
+    Returns ``(game, assumptions, formalizer_metadata, live_searched)``; the last three are empty
+    for a bare GameSpec.
+    """
     try:
         data = json.loads(path.read_text())
     except json.JSONDecodeError as exc:
@@ -79,9 +88,9 @@ def _load_solve_input(path: Path) -> tuple[GameSpec, list[Assumption], DraftMeta
                 f"{path} looks like a DraftGameSpec (formalizer output) but does not match the "
                 f"schema ({_first_error(exc)}); re-run `schelling formalize` to regenerate it."
             ) from exc
-        return draft.game, list(draft.assumptions), draft.metadata
+        return draft.game, list(draft.assumptions), draft.metadata, draft.live_searched
     try:
-        return GameSpec.model_validate(data), [], None
+        return GameSpec.model_validate(data), [], None, False
     except ValidationError as exc:
         shape = "a DraftGameSpec" if isinstance(data, dict) and "game" in data else "a GameSpec"
         raise ValueError(
@@ -109,7 +118,7 @@ def solve(
         typer.echo(f"input not found: {fixture}", err=True)
         raise typer.Exit(code=2)
     try:
-        game, assumptions, formalizer_metadata = _load_solve_input(fixture)
+        game, assumptions, formalizer_metadata, live_searched = _load_solve_input(fixture)
     except ValueError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
@@ -130,6 +139,7 @@ def solve(
         out_dir=out_dir,
         assumptions=assumptions,
         formalizer_metadata=formalizer_metadata,
+        live_searched=live_searched,
     )
     e = record.ensemble
     conv = record.convergence_stats
@@ -321,7 +331,7 @@ def advise(
         typer.echo(f"input not found: {fixture}", err=True)
         raise typer.Exit(code=2)
     try:
-        game, _assumptions, _fm = _load_solve_input(fixture)
+        game, _assumptions, _fm, _ls = _load_solve_input(fixture)
         record, baseline = run_advise(
             game,
             actor,
@@ -362,6 +372,65 @@ def advise(
     typer.echo("")
     typer.echo(f"AdviseRecord written: {out}")
     typer.echo(ADVISE_CAVEAT)
+
+
+_DEU_CSV_NAME = "Dataset_DEU_III.csv"
+_DEU_LABEL = "DEU III (doi:10.34810/data53)"
+
+
+@app.command()
+def backtest(
+    data_dir: Path = typer.Argument(..., help="Directory holding the DEU CSV (e.g. data/deu/)."),
+    draws: int = typer.Option(2000, "--draws", help="Nominal MC draws (point estimates: no-op)."),
+    seed: int = typer.Option(42, "--seed"),
+    capability: float = typer.Option(
+        100.0, "--capability", help="Fixed capability for all actors."
+    ),
+    min_actors: int = typer.Option(3, "--min-actors", min=1),
+    out_dir: Path = typer.Option(Path("runs"), "--out-dir"),
+    md_out: Path = typer.Option(Path("BACKTEST.md"), "--md", help="Where to write BACKTEST.md."),
+    html_out: Path | None = typer.Option(None, "--html", help="Also render an HTML report here."),
+) -> None:
+    """Backtest the solver + naive baselines against DEU outcomes; write BACKTEST.md + record."""
+    csv_path = data_dir / _DEU_CSV_NAME if data_dir.is_dir() else data_dir
+    if not csv_path.exists():
+        typer.echo(
+            f"DEU CSV not found at {csv_path}. Download the open-access DEU III dataset "
+            f"(doi:10.34810/data53) into data/deu/ — see BACKTEST.md / README.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    issues = load_deu_issues(csv_path, capability=capability, min_actors=min_actors)
+    if not issues:
+        typer.echo(f"no scoreable issues parsed from {csv_path}.", err=True)
+        raise typer.Exit(code=2)
+    record = run_backtest(
+        issues,
+        csv_path=csv_path,
+        dataset_label=_DEU_LABEL,
+        seed=seed,
+        draws=draws,
+        capability=capability,
+    )
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    record_path = out_dir / f"backtest-{record.dataset_sha256[:12]}.json"
+    record_path.write_text(record.model_dump_json(indent=2) + "\n")
+    md_out.write_text(backtest_markdown(record))
+    if html_out is not None:
+        html_out.write_text(render_report(json.loads(record.model_dump_json())))
+
+    typer.echo(f"Dataset:   {record.dataset}  ({record.n_issues} issues, seed {seed})")
+    typer.echo("")
+    typer.echo(f"{'method':<48}{'MAE':>8}{'RMSE':>8}{'MedAE':>8}")
+    for m in record.methods:
+        mark = " *" if m.key == record.primary_method else ""
+        typer.echo(f"{m.label[:46]:<48}{m.mae:>8.2f}{m.rmse:>8.2f}{m.median_error:>8.2f}{mark}")
+    typer.echo("")
+    verdict = "PASSED" if record.gate_passed else "FAILED"
+    typer.echo(f"Gate {verdict}: primary must beat both {record.baseline_methods}.")
+    typer.echo(f"Record: {record_path}   BACKTEST.md: {md_out}")
 
 
 @knowledge_app.command("search")
