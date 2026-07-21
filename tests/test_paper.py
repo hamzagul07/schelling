@@ -8,6 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from schelling.cli import app
+from schelling.paper.assemble import _resolve_tags, assemble, parse_evidence
 from schelling.paper.evidence import (
     EvidenceBundle,
     EvidenceItem,
@@ -131,3 +132,75 @@ def test_paper_evidence_cli_end_to_end_and_deterministic(tmp_path: Path) -> None
     )  # no open questions with data present
     run()  # regenerate
     assert (tmp_path / "EVIDENCE.md").read_bytes() == ev1  # byte-identical
+
+
+# --------------------------------------------------------------- assembly (Session 15, D15.1)
+def test_parse_evidence_reads_the_table() -> None:
+    md = "\n".join(
+        [
+            "| E-tag | Section | Metric | Value | Source | Provenance | Note |",
+            "|---|---|---|---|---|---|---|",
+            "| E-FOO | S | m | 12.3 | `a.csv` | `abc123` | note |",
+        ]
+    )
+    ev = parse_evidence(md)
+    assert ev["E-FOO"] == {"value": "12.3", "source": "a.csv", "prov": "abc123"}
+
+
+def test_resolve_tag_inline_value_and_provenance_footnote() -> None:
+    ev = {"E-FOO": {"value": "12.3", "source": "a.csv", "prov": "abc"}}
+    out, used, todos = _resolve_tags("the value is [E-FOO].", ev)
+    assert "(12.3)[^ev-E-FOO]" in out and "E-FOO" in used and todos == []
+
+
+def test_resolve_two_tags_in_one_bracket_keeps_connective() -> None:
+    ev = {
+        "E-A": {"value": "1", "source": "s", "prov": "p"},
+        "E-B": {"value": "2", "source": "s", "prov": "p"},
+    }
+    out, used, _ = _resolve_tags("[E-A vs E-B]", ev)
+    assert "(1 vs 2)[^ev-E-A][^ev-E-B]" in out and set(used) == {"E-A", "E-B"}
+
+
+def test_resolve_family_prefix_joins_members() -> None:
+    ev = {
+        "E-LEDGER-x": {"value": "9", "source": "F", "prov": "p"},
+        "E-LEDGER-y": {"value": "8", "source": "F", "prov": "p"},
+    }
+    out, used, _ = _resolve_tags("[E-LEDGER]", ev)
+    assert "(9, 8)[^ev-E-LEDGER]" in out and "E-LEDGER" in used
+
+
+def test_resolve_unknown_tag_is_visible_todo_never_silent() -> None:
+    out, used, todos = _resolve_tags("[E-NOPE]", {})
+    assert "**TODO(E-NOPE)**" in out and todos == ["E-NOPE"] and used == {}
+
+
+def test_assemble_repo_deterministic_complete_and_consistent() -> None:
+    a, todos_a, missing_a = assemble(REPO)
+    b, _todos_b, _missing_b = assemble(REPO)
+    assert a == b  # deterministic + idempotent
+    assert todos_a == [] and missing_a == []  # committed EVIDENCE.md resolves every draft tag
+    for heading in ("## Abstract", "## 1. Introduction", "## 2. ", "## 10. Conclusion"):
+        assert heading in a  # eleven sections concatenated in order
+    assert "figures/fig_deu_error_histogram.svg" in a and "figures/fig_r1_split.svg" in a
+    assert "Section 9 limitations. Section 10 concludes." in a  # roadmap fixed (item 5)
+    assert "Meehl, P. E. (1954)" in a  # bibliography skeleton appended
+    assert "(351)[^ev-E-DEU-N]" in a and "[^ev-E-DEU-N]:" in a  # inline value + footnote def
+
+
+def test_paper_assemble_cli_reports_no_unresolved(tmp_path: Path) -> None:
+    out = tmp_path / "DRAFT.md"
+    result = runner.invoke(app, ["paper-assemble", "-o", str(out)])
+    assert result.exit_code == 0, result.output
+    assert out.exists() and "unresolved E-tags: none" in result.output
+
+
+@pytest.mark.skipif(not DEU_CSV.exists(), reason="DEU III data not present (gitignored)")
+def test_round1_and_context_tags_present(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["paper-evidence", "--out-dir", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    text = (tmp_path / "EVIDENCE.md").read_text()
+    assert "| E-DEU-MAE-r1 |" in text and "| 28.31 |" in text  # handicapped round-1 challenge
+    assert "| E-BASE-WMEAN-r1 |" in text and "| 23.64 |" in text  # round-1 weighted mean
+    assert "| E-CTX-bdm2011 |" in text and "| E-WORST |" in text
