@@ -149,6 +149,9 @@ class ForecastRecord(BaseModel):
     # open assumptions and its formalize-call metadata. Empty/None when solving a bare GameSpec.
     assumptions: list[Assumption] = Field(default_factory=list)
     formalizer_metadata: DraftMetadata | None = None
+    # True when the source draft was grounded on a live web search (carried from the draft, D9.0a):
+    # the report then prints a caveat that the inputs rest on a live search, not a frozen snapshot.
+    live_searched: bool = False
 
     outcome_distribution: list[float] = Field(default_factory=list)  # raw draws (cache, D4.1)
     convergence_stats: dict[str, float] = Field(default_factory=dict)
