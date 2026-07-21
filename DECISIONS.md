@@ -972,3 +972,10 @@ issue aggregate, from the backtest record. The bibliography skeleton (`paper/BIB
 stubs for Feder 1987, Scholz–Calbert–Smith 2011, Thomson et al. 2006, Achen 2006, Bueno de Mesquita
 2011, Meehl 1954, Dawes 1979, Tetlock 2005, Green & Armstrong 2007 (plus Arregui & Perarnaud 2021,
 the DEU III dataset the paper actually evaluates on).
+
+### D15.3 — Title finalized
+The paper's title is finalized as **"Structure, Not Magic: An Open Replication and Predictability
+Ceiling for the Bueno de Mesquita Forecasting Model."** The "title candidate (not finalized)" comment
+in `paper/draft/00-abstract.md` is replaced by this title as the manuscript's H1; the decision is
+recorded in `paper/OUTLINE.md`'s title-candidates block (chosen; the others struck through);
+`paper/DRAFT.md` regenerated to carry it.
