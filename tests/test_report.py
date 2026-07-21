@@ -32,13 +32,18 @@ def test_draft_report_matches_golden() -> None:
     assert html == (FIXTURES / "draft_report.html").read_text()
 
 
+def test_advise_report_matches_golden() -> None:
+    html = render(_load("advise.json"))
+    assert html == (FIXTURES / "advise_report.html").read_text()
+
+
 def test_render_is_deterministic() -> None:
     data = _load("forecast_record.json")
     assert render(data) == render(data)
 
 
 # --------------------------------------------------------------- offline / self-contained
-@pytest.mark.parametrize("name", ["forecast_record.json", "draft.json"])
+@pytest.mark.parametrize("name", ["forecast_record.json", "draft.json", "advise.json"])
 def test_report_references_no_external_resources(name: str) -> None:
     html = render(_load(name)).lower()
     for token in _NETWORK_TOKENS:
@@ -128,3 +133,13 @@ def test_render_malformed_forecast_names_the_reason() -> None:
     bad = {"run_id": "x", "question_id": "Q", "ensemble": {"median": "not-a-number"}}
     with pytest.raises(ValueError, match="does not match the current schema"):
         render(bad)
+
+
+# --------------------------------------------------------------- advise report (D7.x)
+def test_advise_report_has_sections_and_caveat() -> None:
+    html = render(_load("advise.json"))
+    for heading in ("Baseline actor map", "Own moves", "Top own moves", "Who to work on"):
+        assert heading in html
+    assert "One-sided search" in html  # the standing caveat
+    assert 'class="caveat"' in html
+    assert "advising <strong>germany" in html
