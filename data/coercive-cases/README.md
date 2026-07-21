@@ -77,6 +77,60 @@ All of `position`, `salience`, `capability`, and every outcome `proposed_value` 
 continuum. Capability is relative influence/clout (strongest actor ≈ 100). Positions map onto the
 case's own continuum (`anchor_0` = 0, `anchor_100` = 100).
 
+## MT-1.0 coding flags (`coding_flags`) — for the model-three reading
+
+Optional per case. Present **only** for cases coded for the pre-registered Model Three / Asabiyyah
+reading ([`specs/MT-1.0.md`](../../specs/MT-1.0.md) §5). Flags are coded **ex ante**, under the same
+blind dual-entry protocol, **with a citation per flag**, and **sealed with the case's verification —
+before any model run**. `reference_point` (rp) already lives at the case level; the block adds the
+other MT inputs:
+
+```json
+"coding_flags": {
+  "case": {
+    "horizon_months": { "value": 24, "citation": "source, p.N" },
+    "vulnerability":   { "value": 1,  "citation": "settlement terms; canon D1" },
+    "guarantor":       { "value": 0,  "citation": "no committed third party" }
+  },
+  "actors": {
+    "<actor_id>": {
+      "cohesion":   { "value": "exceptional", "citation": "canon B3 observables" },
+      "endurance":  { "value": "hardened",    "citation": "canon D2 sacred stakes" },
+      "loss":       { "value": 1,             "citation": "actor's own loss framing; canon A3" },
+      "perception": { "value": "ledger",      "citation": "itemized-grievance hostility; canon E2" }
+    }
+  }
+}
+```
+
+| flag | scope | values | coding rule (MT-1.0 §5) |
+|---|---|---|---|
+| `cohesion` (h) | actor | `fractured` / `baseline` / `exceptional` | canon B3 observables; `exceptional`/`fractured` each need positive evidence; silence → `baseline` |
+| `endurance` (e) | actor | `hardened` / `comfortable` | comfort proxies (wealth, casualty insulation, accountability); sacred-stakes framing (canon D2) forces `hardened` |
+| `loss` (L) | actor | `0` / `1` | the actor's own framing of the status quo as intolerable loss (canon A3) |
+| `perception` (m) | actor | `ledger` / `lens` / `none` | Grape Trap (canon E2): itemized-grievance hostility → `ledger`, generalized-filter → `lens`; **only principals** are coded |
+| `horizon_months` (T) | case | integer months, or omit | the source's stated horizon (library horizon rule) |
+| `vulnerability` (V) | case | `0` / `1` | does the contested settlement require the weaker side to accept post-deal vulnerability (canon D1) |
+| `guarantor` (G) | case | `0` / `1` | is ≥1 third party with capability **and** stake credibly committed to enforcement (canon D1) |
+
+**Ambiguity default (§5):** an ambiguous flag takes its **null value** and the ambiguity is recorded
+on the coding sheet — `cohesion → baseline`, `endurance → comfortable` (hardened only if evidenced),
+`loss → 0`, `perception → none`; per case `vulnerability → 0`, `guarantor → 0`, `horizon_months →`
+omitted. The loader applies these defaults for any absent flag.
+
+### Coding-sheet template
+
+Fill one row per actor plus the case row, each cell with `value` + `citation`, before sealing:
+
+```
+CASE <case_id> — coder: ____  date: ____  (ex ante: sources predate the outcome)
+  case:  horizon_months = __ [cite ____]   vulnerability = 0/1 [cite ____]   guarantor = 0/1 [cite ____]
+  actor <id>:  cohesion = fractured/baseline/exceptional [cite ____]
+               endurance = hardened/comfortable [cite ____]
+               loss = 0/1 [cite ____]   perception = ledger/lens/none [cite ____]
+  ambiguities recorded: ____________________________________________
+```
+
 ## Registered cases
 
 - `ktab-china-2014.json` — Efird, Lester & Wise (2016), *Analyzing Coalitions in China's Policy

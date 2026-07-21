@@ -21,6 +21,7 @@ from pathlib import Path
 
 import numpy as np
 
+from schelling.backtest.model_three import MTActor, model_three_forecast
 from schelling.backtest.successor import compromise_estimate, load_candidate, predict_for_game
 from schelling.schemas.question import Continuum, GameSpec
 from schelling.schemas.stakeholders import Actor, TriangularEstimate
@@ -29,6 +30,31 @@ from schelling.solver.model import run
 
 DEFAULT_LIBRARY = Path("data/coercive-cases")
 _METHODS = ("challenge", "compromise", "gravity", "regime")
+MODEL_THREE = "model-three"
+
+# Ambiguity defaults (specs/MT-1.0.md §5): an ambiguous flag takes its null value and the ambiguity
+# is recorded on the coding sheet. h→baseline, e→comfortable (hardened only if evidenced), L→0,
+# m→none; per case V→0, G→0, T→None.
+_ACTOR_FLAG_DEFAULTS = {
+    "cohesion": "baseline",
+    "endurance": "comfortable",
+    "loss": 0,
+    "perception": "none",
+}
+
+
+@dataclass(frozen=True)
+class CaseCoding:
+    """The MT-1.0 §5 coding-flag block for a case (per-actor h/e/L/m + per-case T/V/G), if coded.
+
+    Built by the loader from the case JSON's ``coding_flags``; the §5 ambiguity defaults fill any
+    absent flag. Present only for cases coded and sealed for the model-three reading.
+    """
+
+    horizon_months: int | None  # T (the source's stated horizon, per the library horizon rule)
+    vulnerability: bool  # V
+    guarantor: bool  # G
+    mt_actors: list[MTActor]  # per-actor MT inputs (p/s/c from the game + coded flags), game order
 
 
 @dataclass(frozen=True)
@@ -47,6 +73,7 @@ class CoerciveCase:
     published_forecast: str  # the incumbent model's stated forecast (prose), for context
     reference_point: float | None
     game: GameSpec
+    coding: CaseCoding | None = None  # MT-1.0 §5 flags, present only when coded + sealed
 
 
 def _point(value: object) -> TriangularEstimate:
@@ -98,6 +125,45 @@ def _split_outcomes(case: dict) -> tuple[float, list[float]]:  # type: ignore[ty
     return primary, secondary
 
 
+def _flag_value(block: dict, key: str, default: object) -> object:  # type: ignore[type-arg]
+    """Read a ``{"value", "citation"}`` coding entry, or apply the §5 ambiguity default."""
+    entry = block.get(key)
+    if entry is None:
+        return default
+    return entry.get("value", default) if isinstance(entry, dict) else entry
+
+
+def _build_coding(case: dict) -> CaseCoding | None:  # type: ignore[type-arg]
+    """Build the MT-1.0 §5 coding block from ``case['coding_flags']`` (None if not coded)."""
+    cf = case.get("coding_flags")
+    if not cf:
+        return None
+    case_flags = cf.get("case", {})
+    actor_flags = cf.get("actors", {})
+    mt_actors: list[MTActor] = []
+    for a in case["actors"]:
+        af = actor_flags.get(str(a["id"]), {})
+        d = _ACTOR_FLAG_DEFAULTS
+        mt_actors.append(
+            MTActor(
+                position=float(a["position"]),
+                salience=float(a["salience"]),
+                capability=float(a["capability"]),
+                cohesion=str(_flag_value(af, "cohesion", d["cohesion"])),
+                endurance=str(_flag_value(af, "endurance", d["endurance"])),
+                loss=bool(int(_flag_value(af, "loss", d["loss"]))),  # type: ignore[call-overload]
+                perception=str(_flag_value(af, "perception", d["perception"])),
+            )
+        )
+    horizon = _flag_value(case_flags, "horizon_months", None)
+    return CaseCoding(
+        horizon_months=None if horizon is None else int(horizon),  # type: ignore[call-overload]
+        vulnerability=bool(int(_flag_value(case_flags, "vulnerability", 0))),  # type: ignore[call-overload]
+        guarantor=bool(int(_flag_value(case_flags, "guarantor", 0))),  # type: ignore[call-overload]
+        mt_actors=mt_actors,
+    )
+
+
 def load_library(path: Path = DEFAULT_LIBRARY) -> list[CoerciveCase]:
     """Load every case from a library file or directory (``*.json``); [] if nothing is there."""
     if path.is_dir():
@@ -129,6 +195,7 @@ def load_library(path: Path = DEFAULT_LIBRARY) -> list[CoerciveCase]:
                         None if c.get("reference_point") is None else float(c["reference_point"])
                     ),
                     game=_build_game(c),
+                    coding=_build_coding(c),
                 )
             )
     return cases
@@ -155,6 +222,19 @@ def _forecast(method: str, case: CoerciveCase) -> float:
         return compromise_estimate(case.game)
     if method == "challenge":
         return run(case.game, SolverConfig(reference_point=case.reference_point)).forecast_median
+    if method == MODEL_THREE:
+        if case.coding is None:
+            raise ValueError(
+                f"case {case.case_id} has no coding_flags — model-three cannot score it "
+                "(specs/MT-1.0.md §5; flags are coded and sealed with the case)"
+            )
+        return model_three_forecast(
+            case.coding.mt_actors,
+            reference_point=case.reference_point,
+            horizon_months=case.coding.horizon_months,
+            vulnerability=case.coding.vulnerability,
+            guarantor=case.coding.guarantor,
+        )
     return predict_for_game(load_candidate(method), case.game, case.reference_point)
 
 
@@ -174,9 +254,17 @@ def _caveat(cases: list[CoerciveCase]) -> str:
 
 
 def head_to_head(
-    cases: list[CoerciveCase], *, seed: int = 20260721, n_boot: int = 2000
+    cases: list[CoerciveCase],
+    *,
+    seed: int = 20260721,
+    n_boot: int = 2000,
+    methods: tuple[str, ...] = _METHODS,
 ) -> CoerciveReport:
-    """Score every model on the library with paired bootstrap CIs vs the compromise mean."""
+    """Score each of ``methods`` on the library with paired bootstrap CIs vs the compromise mean.
+
+    ``methods`` defaults to the four standing models; MT-1.0 (``model-three``) is added only for its
+    pre-registered reading (never on the real library before then — see the CLI gate).
+    """
     if not cases:
         return CoerciveReport(
             n_cases=0,
@@ -184,13 +272,13 @@ def head_to_head(
             note="No cases yet — coercive library deferred (sources paywalled; see D11.1).",
         )
     y = np.array([c.outcome for c in cases])
-    abs_err = {m: np.abs(np.array([_forecast(m, c) for c in cases]) - y) for m in _METHODS}
+    abs_err = {m: np.abs(np.array([_forecast(m, c) for c in cases]) - y) for m in methods}
     comp = abs_err["compromise"]
     rng = np.random.default_rng(seed)
     idx = rng.integers(0, len(cases), size=(n_boot, len(cases)))
 
     results = []
-    for m in _METHODS:
+    for m in methods:
         deltas = abs_err[m][idx].mean(axis=1) - comp[idx].mean(axis=1)
         lo, hi = np.percentile(deltas, [2.5, 97.5])
         results.append(
