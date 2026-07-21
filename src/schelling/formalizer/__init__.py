@@ -14,7 +14,12 @@ from schelling.formalizer.client import (
     cost_usd,
     replay_from_text,
 )
-from schelling.formalizer.firewall import IndexLeakageError, assert_no_leakage, find_leaks
+from schelling.formalizer.firewall import (
+    IndexLeakageError,
+    Leak,
+    assert_no_leakage,
+    find_leaks,
+)
 from schelling.formalizer.formalize import FormalizeError, formalize
 from schelling.formalizer.prompt import RULE_F, build_system_prompt, build_user_prompt
 from schelling.formalizer.schemas import (
@@ -36,6 +41,7 @@ __all__ = [
     "IndexLeakageError",
     "LLMClient",
     "LLMResult",
+    "Leak",
     "Message",
     "ReplayClient",
     "TemplateClassification",
