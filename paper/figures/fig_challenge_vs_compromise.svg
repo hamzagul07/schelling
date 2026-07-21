@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" font-family="Helvetica,Arial,sans-serif">
+<text x="320" y="26" text-anchor="middle" font-size="17" font-weight="bold" fill="#1a1a2e">Abs-error distribution — challenge vs compromise</text>
+<line x1="60" y1="300" x2="600" y2="300" stroke="#888"/>
+<rect x="63" y="80" width="24" height="220" fill="#c0392b"/>
+<rect x="87" y="95" width="24" height="205" fill="#2471a3"/>
+<text x="87" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">0</text>
+<rect x="117" y="205" width="24" height="95" fill="#c0392b"/>
+<rect x="141" y="146" width="24" height="154" fill="#2471a3"/>
+<text x="141" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">10</text>
+<rect x="171" y="205" width="24" height="95" fill="#c0392b"/>
+<rect x="195" y="184" width="24" height="116" fill="#2471a3"/>
+<text x="195" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">20</text>
+<rect x="225" y="243" width="24" height="57" fill="#c0392b"/>
+<rect x="249" y="226" width="24" height="74" fill="#2471a3"/>
+<text x="249" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">30</text>
+<rect x="279" y="253" width="24" height="47" fill="#c0392b"/>
+<rect x="303" y="253" width="24" height="47" fill="#2471a3"/>
+<text x="303" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">40</text>
+<rect x="333" y="234" width="24" height="66" fill="#c0392b"/>
+<rect x="357" y="262" width="24" height="38" fill="#2471a3"/>
+<text x="357" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">50</text>
+<rect x="387" y="275" width="24" height="25" fill="#c0392b"/>
+<rect x="411" y="285" width="24" height="15" fill="#2471a3"/>
+<text x="411" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">60</text>
+<rect x="441" y="287" width="24" height="13" fill="#c0392b"/>
+<rect x="465" y="287" width="24" height="13" fill="#2471a3"/>
+<text x="465" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">70</text>
+<rect x="495" y="289" width="24" height="11" fill="#c0392b"/>
+<rect x="519" y="296" width="24" height="4" fill="#2471a3"/>
+<text x="519" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">80</text>
+<rect x="549" y="264" width="24" height="36" fill="#c0392b"/>
+<rect x="573" y="300" width="24" height="0" fill="#2471a3"/>
+<text x="573" y="316" text-anchor="middle" font-size="10" fill="#1a1a2e">90</text>
+<rect x="60" y="44" width="14" height="14" fill="#c0392b"/>
+<text x="80" y="56" font-size="12" fill="#1a1a2e">challenge (primary)</text>
+<rect x="230" y="44" width="14" height="14" fill="#2471a3"/>
+<text x="250" y="56" font-size="12" fill="#1a1a2e">compromise mean</text>
+<text x="320" y="354" text-anchor="middle" font-size="11" fill="#1a1a2e">absolute error bin (0-100)</text>
+</svg>
