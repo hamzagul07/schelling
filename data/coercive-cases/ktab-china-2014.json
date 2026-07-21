@@ -1,9 +1,12 @@
 {
   "library_version": "draft-1",
   "transcription": {
-    "status": "UNVERIFIED — first entry by Claude from PDF text extraction; Hassan must verify every number against the PDF (Tables 2-3, pp. 125-131) and flip verified to true",
+    "status": "NUMBERS VERIFIED (blind dual entry, all 60 rows + checksums clean); JUDGMENTS PENDING Hassan's ratification — verified stays false until then",
     "verified": false,
-    "source_pdf": "https://www.cambridge.org/core/services/aop-cambridge-core/content/view/02CBC45E77B24847E06A3631ADA20771/S1598240815000041a.pdf/analyzing_coalitions_in_chinas_policy_formulation_reforming_the_role_of_stateowned_enterprises_in_chinas_energy_sector.pdf"
+    "verification_method": "blind dual machine transcription + human ratification of judgments",
+    "verification_note": "Blind dual entry (Session 13, D13.0): the PDF was rendered to page images and Tables 2-3 transcribed TWICE independently by two agents that never saw this JSON, then diffed against each other and against this file. RESULT — numeric data is exact: all 26 Policy-Space rows (Table 2, pp.125-126) and all 34 Competitive-Space rows (Table 3, pp.130-131) match on position, capability, and salience; the two blind reads agree on every cell; the printed Exercised Power = Influence x Salience / 100 column reproduces on every row (used as a checksum); the JSON's capability = the paper's Influence column; the derived Exercised Power column is correctly omitted. Continua are faithful to the paper: case 1 to Figure 1 (p.129); case 2 to Figure 6 (p.138), whose printed markers are 0=status quo, 10=end of patronage, 30=transparent tendering, 60='Divest major identified assets; e.g. pipelines' (open access), 100=break up CNPC — i.e. the Position-60 marker the long-run coding leans on IS printed in the paper. Both published_model_forecast notes match the paper's results (Policy converges ~30, sweep 15-45; Competitive Position 20-40, sweep 30-50). OPEN JUDGMENTS FOR HASSAN (not decided by the machine): (a) the near-term outcome codings 25/25; (b) the long-run codings 55/60, incl. whether the Dec-2019 PipeChina divestiture = the paper's printed Position-60 marker; (c) the horizon rule — NOTE the paper states NO calendar horizon (its 10 'turns' are bargaining rounds, not years; the only temporal phrase is 'in the near term'), so the by_2017 / by_2020 / 5-year framing below is an imposed convention, not the paper's own. Quote Hassan's ratification here and flip verified to true only after he answers (a)-(c).",
+    "source_pdf": "https://www.cambridge.org/core/services/aop-cambridge-core/content/view/02CBC45E77B24847E06A3631ADA20771/S1598240815000041a.pdf/analyzing_coalitions_in_chinas_policy_formulation_reforming_the_role_of_stateowned_enterprises_in_chinas_energy_sector.pdf",
+    "source_pdf_local": "docs/papers/efird_2016_china_coalitions.pdf"
   },
   "cases": [
     {
