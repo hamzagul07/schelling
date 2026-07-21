@@ -19,7 +19,14 @@ import numpy.typing as npt
 
 from schelling.mc.sampling import derive_rng, sample_game
 from schelling.mc.sensitivity import tornado
-from schelling.schemas.forecast import Ensemble, ForecastRecord, SensitivityEntry, StoppingRule
+from schelling.schemas.forecast import (
+    Assumption,
+    DraftMetadata,
+    Ensemble,
+    ForecastRecord,
+    SensitivityEntry,
+    StoppingRule,
+)
 from schelling.schemas.question import GameSpec
 from schelling.solver.config import SolverConfig
 from schelling.solver.model import run
@@ -128,13 +135,17 @@ def build_forecast_record(
     mc: MonteCarloResult,
     sensitivity: list[SensitivityEntry],
     created_at: str | None = None,
+    assumptions: list[Assumption] | None = None,
+    formalizer_metadata: DraftMetadata | None = None,
 ) -> ForecastRecord:
     """Assemble the complete :class:`ForecastRecord` from a Monte Carlo run.
 
     The headline statistics live in the ``ensemble`` block and summarize the per-draw
     converged **median**: ``ensemble.median`` (central estimate), ``ensemble.mean`` (expected
     outcome), ``ensemble.p10``/``p90`` (CI80). See D4.2. ``run_id`` is derived from the inputs
-    hash and seed, so identical inputs address the same record file deterministically.
+    hash and seed, so identical inputs address the same record file deterministically. When the
+    game came from a formalized draft, its ``assumptions`` and formalize metadata are carried
+    through so the provenance chain is end-to-end (D6.8).
     """
     dist = np.sort(mc.median_distribution)
     hashed = inputs_hash(game, config)
@@ -160,6 +171,8 @@ def build_forecast_record(
         ),
         game=game,
         median_trajectory=trajectory,
+        assumptions=list(assumptions or []),
+        formalizer_metadata=formalizer_metadata,
         outcome_distribution=[float(v) for v in dist],
         convergence_stats=convergence_stats(mc),
         sensitivity=sensitivity,
@@ -183,15 +196,26 @@ def forecast(
     out_dir: str | Path = "runs",
     created_at: str | None = None,
     write: bool = True,
+    assumptions: list[Assumption] | None = None,
+    formalizer_metadata: DraftMetadata | None = None,
 ) -> ForecastRecord:
     """Run Monte Carlo + sensitivity, build the ForecastRecord, and (by default) persist it.
 
-    This is the one entry point that emits a complete audit artifact for a question.
+    This is the one entry point that emits a complete audit artifact for a question. Pass a
+    draft's ``assumptions`` and ``formalizer_metadata`` to carry its provenance into the record.
     """
     cfg = config or SolverConfig()
     mc = run_monte_carlo(game, cfg, n_draws=n_draws, seed=seed)
     sensitivity = tornado(game, cfg)
-    record = build_forecast_record(game, cfg, mc, sensitivity, created_at=created_at)
+    record = build_forecast_record(
+        game,
+        cfg,
+        mc,
+        sensitivity,
+        created_at=created_at,
+        assumptions=assumptions,
+        formalizer_metadata=formalizer_metadata,
+    )
     if write:
         write_record(record, out_dir)
     return record

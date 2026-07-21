@@ -5,6 +5,8 @@ change them only with a matching entry in DECISIONS.md.
 """
 
 from schelling.schemas.forecast import (
+    Assumption,
+    DraftMetadata,
     Ensemble,
     ForecastRecord,
     RoundLog,
@@ -16,7 +18,9 @@ from schelling.schemas.stakeholders import Actor, Evidence, TriangularEstimate
 
 __all__ = [
     "Actor",
+    "Assumption",
     "Continuum",
+    "DraftMetadata",
     "Ensemble",
     "Evidence",
     "ForecastRecord",

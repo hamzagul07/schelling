@@ -62,6 +62,53 @@ def test_solve_missing_fixture_errors(tmp_path: Path) -> None:
     assert "not found" in result.output
 
 
+# --------------------------------------------------------------- solve accepts drafts (D6.8)
+def test_solve_on_draft_carries_assumptions_and_provenance(tmp_path: Path) -> None:
+    draft = FIXTURES / "report" / "draft.json"  # a DraftGameSpec
+    result = runner.invoke(app, ["solve", str(draft), "--draws", "20", "--out-dir", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    record = ForecastRecord.model_validate_json(next(tmp_path.glob("*.json")).read_text())
+    assert len(record.assumptions) == 2  # carried from the draft
+    assert record.formalizer_metadata is not None
+    assert record.formalizer_metadata.model == "claude-opus-4-8"
+
+
+def test_solve_on_bare_gamespec_has_no_draft_provenance(tmp_path: Path) -> None:
+    fixture = str(FIXTURES / "emission_standards.json")  # a bare GameSpec
+    result = runner.invoke(app, ["solve", fixture, "--draws", "20", "--out-dir", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    record = ForecastRecord.model_validate_json(next(tmp_path.glob("*.json")).read_text())
+    assert record.assumptions == []
+    assert record.formalizer_metadata is None
+
+
+def test_solve_invalid_json_is_friendly(tmp_path: Path) -> None:
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not valid json")
+    result = runner.invoke(app, ["solve", str(bad), "--out-dir", str(tmp_path)])
+    assert result.exit_code == 2
+    assert "not valid JSON" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_solve_malformed_draft_is_friendly(tmp_path: Path) -> None:
+    bad = tmp_path / "d.json"
+    bad.write_text(json.dumps({"game": {}, "assumptions": [], "template_classification": {}}))
+    result = runner.invoke(app, ["solve", str(bad), "--out-dir", str(tmp_path)])
+    assert result.exit_code == 2
+    assert "DraftGameSpec" in result.output and "formalize" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_solve_bad_gamespec_is_friendly(tmp_path: Path) -> None:
+    bad = tmp_path / "g.json"
+    bad.write_text(json.dumps({"question_id": "Q", "actors": []}))  # not draft-shaped, invalid game
+    result = runner.invoke(app, ["solve", str(bad), "--out-dir", str(tmp_path)])
+    assert result.exit_code == 2
+    assert "GameSpec" in result.output
+    assert "Traceback" not in result.output
+
+
 def test_knowledge_build_then_search(tmp_path: Path) -> None:
     db = tmp_path / "k.db"
     build = runner.invoke(

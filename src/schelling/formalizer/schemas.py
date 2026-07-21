@@ -6,22 +6,26 @@ evidence), a template classification citing the concept library as *conceptual g
 and provenance metadata (model, token usage, cost). The LLM structures; nothing here produces a
 probability (CLAUDE.md rule 1), and every real-world claim must trace to the supplied situation
 text or sources (CLAUDE.md rule 6).
+
+``Assumption`` and ``DraftMetadata`` are core data contracts (they also ride inside a
+``ForecastRecord`` when solving a draft), so they live in ``schemas.forecast`` and are
+re-exported here for convenience.
 """
 
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from schelling.schemas.forecast import Assumption, DraftMetadata
 from schelling.schemas.question import GameSpec
 
-
-class Assumption(BaseModel):
-    """Something the draft asserts that is NOT backed by the supplied text/sources."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    statement: str
-    why: str  # why it had to be assumed (what evidence was missing)
+__all__ = [
+    "Assumption",
+    "DraftExtraction",
+    "DraftGameSpec",
+    "DraftMetadata",
+    "TemplateClassification",
+]
 
 
 class TemplateClassification(BaseModel):
@@ -43,20 +47,6 @@ class DraftExtraction(BaseModel):
     game: GameSpec
     assumptions: list[Assumption]
     template_classification: TemplateClassification
-
-
-class DraftMetadata(BaseModel):
-    """Provenance for one formalize call — model, token usage, cost, retries."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    model: str
-    input_tokens: int
-    output_tokens: int
-    cost_usd: float
-    retries: int  # schema-validation retries
-    leak_retries: int = 0  # firewall rephrase retries (D6.5)
-    created_at: str | None = None  # ISO-8601; left None keeps drafts reproducible in tests
 
 
 class DraftGameSpec(BaseModel):

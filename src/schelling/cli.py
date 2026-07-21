@@ -16,6 +16,7 @@ from pathlib import Path
 
 import typer
 from dotenv import find_dotenv, load_dotenv
+from pydantic import ValidationError
 
 from schelling.formalizer.client import AnthropicClient
 from schelling.formalizer.firewall import IndexLeakageError
@@ -26,6 +27,7 @@ from schelling.knowledge.index import DEFAULT_DB_PATH, DEFAULT_TRANSCRIPTS, Know
 from schelling.mc.monte_carlo import forecast
 from schelling.mc.sensitivity import format_tornado
 from schelling.report.render import render as render_report
+from schelling.schemas.forecast import Assumption, DraftMetadata
 from schelling.schemas.question import GameSpec
 from schelling.schemas.stakeholders import TriangularEstimate
 from schelling.solver.config import RangeMode, SolverConfig
@@ -47,9 +49,44 @@ def _startup() -> None:
     load_dotenv(find_dotenv(usecwd=True))
 
 
+def _first_error(exc: ValidationError) -> str:
+    err = exc.errors()[0]
+    loc = ".".join(str(p) for p in err.get("loc", ())) or "(root)"
+    return f"{loc}: {err.get('msg', 'invalid')}"
+
+
+def _load_solve_input(path: Path) -> tuple[GameSpec, list[Assumption], DraftMetadata | None]:
+    """Load a GameSpec or a DraftGameSpec; raises ValueError with a one-sentence friendly reason."""
+    try:
+        data = json.loads(path.read_text())
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{path} is not valid JSON ({exc}).") from exc
+    is_draft = isinstance(data, dict) and {"game", "assumptions", "template_classification"} <= set(
+        data
+    )
+    if is_draft:
+        try:
+            draft = DraftGameSpec.model_validate(data)
+        except ValidationError as exc:
+            raise ValueError(
+                f"{path} looks like a DraftGameSpec (formalizer output) but does not match the "
+                f"schema ({_first_error(exc)}); re-run `schelling formalize` to regenerate it."
+            ) from exc
+        return draft.game, list(draft.assumptions), draft.metadata
+    try:
+        return GameSpec.model_validate(data), [], None
+    except ValidationError as exc:
+        shape = "a DraftGameSpec" if isinstance(data, dict) and "game" in data else "a GameSpec"
+        raise ValueError(
+            f"{path} is not a solvable game — `solve` expects a GameSpec or a DraftGameSpec "
+            f"(from `schelling formalize`); this looks {shape}-shaped but invalid "
+            f"({_first_error(exc)})."
+        ) from exc
+
+
 @app.command()
 def solve(
-    fixture: Path = typer.Argument(..., help="Path to a GameSpec JSON fixture."),
+    fixture: Path = typer.Argument(..., help="A GameSpec or DraftGameSpec JSON."),
     draws: int = typer.Option(10_000, "--draws", help="Number of Monte Carlo draws."),
     seed: int = typer.Option(42, "--seed", help="Monte Carlo master seed."),
     range_mode: RangeMode = typer.Option(RangeMode.DYNAMIC, "--range-mode"),
@@ -60,11 +97,15 @@ def solve(
     max_rounds: int = typer.Option(20, "--max-rounds", min=1),
     out_dir: Path = typer.Option(Path("runs"), "--out-dir", help="Where the record is written."),
 ) -> None:
-    """Solve a game with Monte Carlo, print the forecast + tornado, write the ForecastRecord."""
+    """Solve a game (bare GameSpec or a formalizer DraftGameSpec) and write the ForecastRecord."""
     if not fixture.exists():
-        typer.echo(f"fixture not found: {fixture}", err=True)
+        typer.echo(f"input not found: {fixture}", err=True)
         raise typer.Exit(code=2)
-    game = GameSpec.model_validate(json.loads(fixture.read_text()))
+    try:
+        game, assumptions, formalizer_metadata = _load_solve_input(fixture)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
     config = SolverConfig(
         range_mode=range_mode,
         q=q,
@@ -74,7 +115,15 @@ def solve(
         max_rounds=max_rounds,
         seed=seed,
     )
-    record = forecast(game, config, n_draws=draws, seed=seed, out_dir=out_dir)
+    record = forecast(
+        game,
+        config,
+        n_draws=draws,
+        seed=seed,
+        out_dir=out_dir,
+        assumptions=assumptions,
+        formalizer_metadata=formalizer_metadata,
+    )
     e = record.ensemble
     conv = record.convergence_stats
     typer.echo(f"Question:  {record.question_id}")

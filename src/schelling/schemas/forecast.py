@@ -70,6 +70,37 @@ class SensitivityEntry(BaseModel):
     swing: float  # forecast_at_high - forecast_at_low
 
 
+class Assumption(BaseModel):
+    """Something a formalized draft asserted that the supplied text/sources do NOT establish.
+
+    Defined here (a core data contract) so the ``ForecastRecord`` can carry a draft's assumptions
+    end-to-end; the formalizer re-exports it. See D6.8.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    statement: str
+    why: str  # why it had to be assumed (what evidence was missing)
+
+
+class DraftMetadata(BaseModel):
+    """Provenance for one formalize call — model, token usage, cost, retries.
+
+    Carried into the ``ForecastRecord`` as ``formalizer_metadata`` so the provenance chain runs
+    from formalization through the forecast (D6.8).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    model: str
+    input_tokens: int
+    output_tokens: int
+    cost_usd: float
+    retries: int  # schema-validation retries
+    leak_retries: int = 0  # firewall rephrase retries (D6.5)
+    created_at: str | None = None  # ISO-8601; left None keeps drafts reproducible in tests
+
+
 class Ensemble(BaseModel):
     """Ensemble statistics over the per-draw converged **median** (the headline forecast).
 
@@ -112,6 +143,11 @@ class ForecastRecord(BaseModel):
     # trajectory need no re-solve (D6.1). ``game`` is None on legacy records.
     game: GameSpec | None = None
     median_trajectory: list[float] = Field(default_factory=list)
+
+    # Formalizer provenance, carried through when solving a DraftGameSpec (D6.8): the draft's
+    # open assumptions and its formalize-call metadata. Empty/None when solving a bare GameSpec.
+    assumptions: list[Assumption] = Field(default_factory=list)
+    formalizer_metadata: DraftMetadata | None = None
 
     outcome_distribution: list[float] = Field(default_factory=list)  # raw draws (cache, D4.1)
     convergence_stats: dict[str, float] = Field(default_factory=dict)

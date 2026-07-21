@@ -391,3 +391,36 @@ feeding the flagged phrases back to the model ("rephrase without these phrases i
 fields"), then **fails closed**. `DraftMetadata.leak_retries` counts these (distinct from
 validation `retries`). The CLI writes the rejected draft to `<output>.quarantine.json` and prints
 the located leaks, so a human can inspect exactly what was blocked.
+
+---
+
+## Session 6.6 — wire the draft into solve (hotfix)
+
+### D6.8 — `solve` accepts a DraftGameSpec; assumptions + formalizer provenance run end-to-end
+`schelling solve` now accepts **both** a bare `GameSpec` (test fixtures) and a `DraftGameSpec`
+(formalizer output). For a draft it solves `.game` and carries the draft's `assumptions` and
+formalize-call metadata into the `ForecastRecord` (new fields `assumptions` and
+`formalizer_metadata`, defaulting empty/None so bare-GameSpec runs and legacy records are
+unchanged). The forecast report then renders an "Assumptions carried from the draft" checklist
+and a formalizer line in the provenance footer, closing the chain formalize → solve → report.
+**Layering:** `Assumption` and `DraftMetadata` moved to `schemas/forecast.py` (a core contract)
+and are re-exported from `formalizer/schemas.py` — importing the formalizer package *into* the
+core schemas would have pulled the whole formalizer + knowledge (sqlite-vec/torch) stack into any
+solver/MC import, which is wrong; keeping the shared models in `schemas` avoids that inversion.
+
+### D6.9 — Friendly input errors on `solve` (no pydantic tracebacks)
+`_load_solve_input` sniffs the artifact by shape (`{game, assumptions, template_classification}`
+→ draft; else GameSpec) and, on a `ValidationError`, raises a single-sentence `ValueError` that
+says what the file looks like and what `solve` expected (e.g. "looks like a DraftGameSpec … but
+does not match the schema (metadata: field required); re-run `schelling formalize`"). The command
+catches it and exits 2 — never a traceback, the same pattern as the missing-key path.
+
+### D6.10 — Report renders every current record; old ones fail with a named reason
+The `runs/…WIDENED….json` that reported "unrecognized artifact" was a **stale Session-3 record**:
+old schema (`forecast_median`/`ci80`, no `ensemble`, no `game`). The current engine writes
+`ensemble` records that render fine (the golden proves it). Detection is now robust: a file that
+*looks* like a ForecastRecord (`run_id` + one of `ensemble`/`forecast_median`/
+`outcome_distribution`) is validated, and on failure raises a **named** reason — a pre-`ensemble`
+file says "older schema (~Session 3); re-run `schelling solve`", anything else reports the first
+schema error. The stale record was regenerated in place (same `inputs_hash` → same filename) so
+it now renders.
