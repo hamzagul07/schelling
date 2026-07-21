@@ -20,9 +20,11 @@ from dotenv import find_dotenv, load_dotenv
 from pydantic import ValidationError
 
 from schelling.advise.search import advise as run_advise
+from schelling.analog.icb import ICBAnalogIndex, to_panel
 from schelling.backtest.deu import load_deu_issues
 from schelling.backtest.harness import run_backtest
 from schelling.backtest.ledger import append_entry, ledger_entry, new_ledger
+from schelling.backtest.oracle import oracle_summary
 from schelling.backtest.successor import forecast_candidate as run_forecast_candidate
 from schelling.backtest.successor import leaderboard_markdown, run_successor_search
 from schelling.backtest.writeup import backtest_markdown
@@ -35,7 +37,7 @@ from schelling.knowledge.index import DEFAULT_DB_PATH, DEFAULT_TRANSCRIPTS, Know
 from schelling.mc.monte_carlo import forecast, write_record
 from schelling.mc.sensitivity import format_tornado
 from schelling.report.render import render as render_report
-from schelling.schemas.forecast import ADVISE_CAVEAT, Assumption, DraftMetadata
+from schelling.schemas.forecast import ADVISE_CAVEAT, AnalogPanel, Assumption, DraftMetadata
 from schelling.schemas.question import GameSpec
 from schelling.schemas.stakeholders import TriangularEstimate
 from schelling.solver.config import RangeMode, SolverConfig
@@ -103,6 +105,29 @@ def _load_solve_input(
         ) from exc
 
 
+def _analog_panel(spec: str) -> AnalogPanel:
+    """Parse ``gravity=..,violence=..,actors=..`` tags and build an ICB base-rate panel."""
+    tags: dict[str, float] = {}
+    for part in spec.split(","):
+        key, _, val = part.partition("=")
+        key = key.strip().lower()
+        try:
+            tags[key] = float(val)
+        except ValueError as exc:
+            raise ValueError(
+                f"bad --analog tag {part!r}; use e.g. gravity=6,violence=3,actors=8"
+            ) from exc
+    missing = {"gravity", "violence", "actors"} - set(tags)
+    if missing:
+        raise ValueError(f"--analog needs gravity, violence and actors tags (missing {missing}).")
+    result = ICBAnalogIndex.load().search(
+        gravity=tags["gravity"], violence=tags["violence"], n_actors=tags["actors"]
+    )
+    panel = to_panel(result)
+    assert isinstance(panel, AnalogPanel)
+    return panel
+
+
 @app.command()
 def solve(
     fixture: Path = typer.Argument(..., help="A GameSpec or DraftGameSpec JSON."),
@@ -124,6 +149,11 @@ def solve(
         "--reference-point",
         help="Status-quo point (used by gravity/regime and rp challenge).",
     ),
+    analog: str | None = typer.Option(
+        None,
+        "--analog",
+        help="ICB base-rate panel tags, e.g. 'gravity=6,violence=3,actors=8' (off by default).",
+    ),
     out_dir: Path = typer.Option(Path("runs"), "--out-dir", help="Where the record is written."),
 ) -> None:
     """Solve a game (bare GameSpec or DraftGameSpec) and write the ForecastRecord(s)."""
@@ -136,6 +166,7 @@ def solve(
         raise typer.Exit(code=2)
     try:
         game, assumptions, formalizer_metadata, live_searched = _load_solve_input(fixture)
+        panel = _analog_panel(analog) if analog else None
     except ValueError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
@@ -155,7 +186,7 @@ def solve(
     for model in models:
         if model in ("gravity", "regime"):
             record = run_forecast_candidate(
-                game, model, n_draws=draws, seed=seed, rp=reference_point, out_dir=out_dir
+                game, model, n_draws=draws, seed=seed, rp=reference_point, write=False
             )
         else:
             record = forecast(
@@ -163,12 +194,15 @@ def solve(
                 config,
                 n_draws=draws,
                 seed=seed,
-                out_dir=out_dir,
+                write=False,
                 assumptions=assumptions,
                 formalizer_metadata=formalizer_metadata,
                 live_searched=live_searched,
                 model=model,
             )
+        if panel is not None:
+            record = record.model_copy(update={"analog_panel": panel})
+        write_record(record, out_dir)
         records.append(record)
         e = record.ensemble
         typer.echo(
@@ -179,6 +213,9 @@ def solve(
     if records[0].sensitivity:
         typer.echo(format_tornado(records[0].sensitivity))
         typer.echo("")
+    if panel is not None:
+        dist = "  ".join(f"{k} {v * 100:.0f}%" for k, v in panel.outcome_distribution.items())
+        typer.echo(f"ICB base rate (n={panel.n}, NOT blended): {dist}")
     for record in records:
         typer.echo(f"Record written: {out_dir / (record.run_id + '.json')}")
 
@@ -444,6 +481,8 @@ def backtest(
     if not issues:
         typer.echo(f"no scoreable issues parsed from {csv_path}.", err=True)
         raise typer.Exit(code=2)
+    # Noise-floor diagnostic (D11.0); needs enough issues for cross-validation.
+    oracle = oracle_summary(issues) if sourced and len(issues) >= 40 else None
     record = run_backtest(
         issues,
         csv_path=csv_path,
@@ -453,6 +492,7 @@ def backtest(
         capability=0.0 if sourced else capability,
         capability_mode=capability_mode,
         reference_point=reference_point,
+        oracle=oracle,
     )
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -516,6 +556,32 @@ def successor(
         else "No survivor — nothing sealed. The compromise model stands."
     )
     typer.echo(f"Leaderboard written to {md_out}.")
+
+
+@app.command()
+def coercive(
+    library: Path = typer.Argument(
+        Path("data/coercive/library.json"), help="Coercive case library JSON (games + outcomes)."
+    ),
+) -> None:
+    """Run the pre-registered coercive head-to-head (challenge vs compromise vs successors)."""
+    from schelling.backtest.coercive import head_to_head, load_library
+
+    report = head_to_head(load_library(library))
+    if report.n_cases == 0:
+        typer.echo(report.note)
+        typer.echo(
+            "Provide expert-coded coercive tables (position/salience/capability/outcome) as "
+            f"{library} to run the head-to-head — see BACKTEST.md / D11.1."
+        )
+        return
+    typer.echo(f"Coercive head-to-head ({report.n_cases} cases):")
+    for m in report.methods:
+        typer.echo(
+            f"  {m.key:<11} MAE {m.mae:6.2f}   vs compromise {m.delta_vs_compromise:+.2f} "
+            f"[{m.ci_lo:+.2f}, {m.ci_hi:+.2f}]"
+        )
+    typer.echo(report.note)
 
 
 @app.command()
