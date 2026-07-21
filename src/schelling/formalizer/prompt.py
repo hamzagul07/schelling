@@ -60,8 +60,22 @@ Rules for the numbers and evidence:
   game or into any evidence note."""
 
 
-def build_system_prompt() -> str:
-    """The formalizer system prompt: rule (f) verbatim + the required output contract."""
+_SEARCH_GUIDANCE = (
+    "Before drafting, you MAY use the web_search tool to find current sources for this situation "
+    "(recent positions, capabilities, statements). Anything you fetch is EVIDENCE, on the same "
+    "footing as the supplied SOURCES: you may cite a fetched page in an evidence note, and you "
+    "SHOULD prefer a fetched citation over an assumption. This does NOT relax the rule above — the "
+    "concepts library is still never a source of facts. Finish by returning the JSON object."
+)
+
+
+def build_system_prompt(*, search: bool = False) -> str:
+    """The formalizer system prompt: rule (f) verbatim + the required output contract.
+
+    With ``search=True`` a paragraph is added telling the model that web-search results are
+    evidence (citable like supplied sources), while the concepts-library rule is unchanged.
+    """
+    search_block = f"{_SEARCH_GUIDANCE}\n\n" if search else ""
     return (
         "You are the formalizer for an open, deterministic strategic-forecasting engine. You "
         "turn a described situation into a formal multilateral-bargaining game specification for "
@@ -72,6 +86,7 @@ def build_system_prompt() -> str:
         "You MUST include an explicit assumptions[] list for anything you assert that is not "
         "established by the supplied situation text or sources. If in doubt, add an assumption "
         "rather than fabricate evidence.\n\n"
+        f"{search_block}"
         f"{_SCHEMA}"
     )
 

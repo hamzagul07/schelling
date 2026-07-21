@@ -9,6 +9,7 @@ verifies nothing retrieved leaked into a factual field. Never auto-solves.
 from __future__ import annotations
 
 import json
+from datetime import date
 from importlib.resources import files
 from typing import Any, cast
 
@@ -20,11 +21,18 @@ from schelling.formalizer.client import (
     AnthropicClient,
     LLMClient,
     Message,
+    WebSource,
     cost_usd,
+    search_cost_usd,
 )
 from schelling.formalizer.firewall import IndexLeakageError, Leak, find_leaks
 from schelling.formalizer.prompt import build_system_prompt, build_user_prompt
-from schelling.formalizer.schemas import DraftExtraction, DraftGameSpec, DraftMetadata
+from schelling.formalizer.schemas import (
+    DraftExtraction,
+    DraftGameSpec,
+    DraftMetadata,
+    FetchedSource,
+)
 from schelling.knowledge.index import KnowledgeIndex
 
 
@@ -80,6 +88,9 @@ def formalize(
     max_leak_retries: int = 1,
     max_tokens: int = 16_000,
     top_k_chunks: int = 6,
+    search: bool = False,
+    max_searches: int = 5,
+    today: str | None = None,
     created_at: str | None = None,
 ) -> DraftGameSpec:
     """Formalize ``situation_text`` (+ optional ``sources``) into a reviewable draft game.
@@ -90,6 +101,13 @@ def formalize(
     extra attempts. A firewall then checks for concept-library leakage into factual fields; on a
     leak it re-prompts once (``max_leak_retries``) with the flagged phrases, then fails closed
     with :class:`IndexLeakageError`. Validation and leak retries are counted in the metadata.
+
+    With ``search=True`` the model may first run server-side web searches (up to ``max_searches``);
+    everything it fetches is EVIDENCE — each source joins ``allowed_text`` for the firewall and is
+    recorded in ``sources_fetched``. The concept index stays banned from factual fields regardless.
+    A live-searched draft cannot be frozen in the past: ``game.frozen_at`` is forced to ``today``
+    and ``live_searched`` is set (D8.3). ``today`` defaults to the real date on the live path; tests
+    pass a fixed value for determinism.
     """
     sources = sources or {}
     llm = client or AnthropicClient(model=model)
@@ -98,23 +116,27 @@ def formalize(
     card_lines = _card_lines(cards)
     chunk_lines, chunk_concepts = _chunk_lines(index, situation_text, top_k_chunks)
 
-    system = build_system_prompt()
+    system = build_system_prompt(search=search)
     user = build_user_prompt(situation_text, sources, card_lines, chunk_lines)
     messages: list[Message] = [Message("user", user)]
 
-    allowed_text = "\n".join([situation_text, *sources.values()])
     concepts_text = "\n".join([*card_lines, chunk_concepts])
 
-    totals = {"in": 0, "out": 0}
+    totals = {"in": 0, "out": 0, "searches": 0}
+    fetched: list[WebSource] = []
     validation_retries = 0
     leak_retries = 0
     extraction: DraftExtraction
     while True:
         extraction, raw_text, vr = _generate_valid(
-            llm, system, messages, max_tokens, max_retries, totals
+            llm, system, messages, max_tokens, max_retries, totals, fetched, search, max_searches
         )
         validation_retries += vr
-        # Firewall: no concept-library content may reach a factual field (CLAUDE.md rule 6).
+        # Fetched web sources are legitimate evidence, so they join the allowed text; the concept
+        # index never does (CLAUDE.md rule 6). Recomputed each pass as sources accumulate.
+        allowed_text = "\n".join(
+            [situation_text, *sources.values(), *(f"{s.title}\n{s.snippet}" for s in fetched)]
+        )
         leaks = find_leaks(extraction, allowed_text, concepts_text)
         if not leaks:
             break
@@ -124,21 +146,44 @@ def formalize(
         messages.append(Message("assistant", raw_text))
         messages.append(Message("user", _rephrase_prompt(leaks)))
 
+    run_today = today if today is not None else date.today().isoformat()
+    game = extraction.game
+    sources_fetched: list[FetchedSource] = []
+    if search:
+        game = game.model_copy(update={"frozen_at": run_today})  # freeze discipline (D8.3)
+        sources_fetched = [
+            FetchedSource(url=s.url, title=s.title, retrieved_at=run_today, snippet=s.snippet)
+            for s in _dedup_sources(fetched)
+        ]
+
+    searches = totals["searches"]
+    total_cost = cost_usd(llm.model, totals["in"], totals["out"]) + search_cost_usd(searches)
     metadata = DraftMetadata(
         model=llm.model,
         input_tokens=totals["in"],
         output_tokens=totals["out"],
-        cost_usd=round(cost_usd(llm.model, totals["in"], totals["out"]), 6),
+        cost_usd=round(total_cost, 6),
         retries=validation_retries,
         leak_retries=leak_retries,
+        searches_used=searches,
         created_at=created_at,
     )
     return DraftGameSpec(
-        game=extraction.game,
+        game=game,
         assumptions=extraction.assumptions,
         template_classification=extraction.template_classification,
         metadata=metadata,
+        sources_fetched=sources_fetched,
+        live_searched=search,
     )
+
+
+def _dedup_sources(sources: list[WebSource]) -> list[WebSource]:
+    """Distinct sources by URL, order preserved (a source may recur across retries)."""
+    seen: dict[str, WebSource] = {}
+    for s in sources:
+        seen.setdefault(s.url, s)
+    return list(seen.values())
 
 
 def _generate_valid(
@@ -148,14 +193,21 @@ def _generate_valid(
     max_tokens: int,
     max_retries: int,
     totals: dict[str, int],
+    fetched: list[WebSource],
+    search: bool,
+    max_searches: int,
 ) -> tuple[DraftExtraction, str, int]:
     """Call the model until it returns schema-valid JSON; returns (extraction, text, retries)."""
     attempts = max_retries + 1
     last_error = ""
     for attempt in range(attempts):
-        result = llm.complete(system, messages, max_tokens)
+        result = llm.complete(
+            system, messages, max_tokens, search=search, max_searches=max_searches
+        )
         totals["in"] += result.input_tokens
         totals["out"] += result.output_tokens
+        totals["searches"] += result.searches_used
+        fetched.extend(result.sources)
         try:
             data = json.loads(_extract_json(result.text))
             return DraftExtraction.model_validate(data), result.text, attempt
