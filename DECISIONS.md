@@ -1136,3 +1136,41 @@ Fearon, Bueno de Mesquita, …) do not false-positive — single tokens are not 
 **Scope discipline:** no solver changes, no model terms wired in — the canon is classification and
 formalizer-guidance fuel only until the model-three spec selects candidate terms from it. The card
 "Model term / Candidate term" annotations are documentation, not code. 305 tests green.
+
+## Session 20 — Model Three (Asabiyyah, MT-1.0), sealed before its exam
+
+### D20.0 — Pre-registration: specs/MT-1.0.md committed before the coercive library exists
+`specs/MT-1.0.md` (working name **Asabiyyah**, the one text change from the approved drop-off) is
+committed verbatim as the pre-registration — its git timestamp precedes any coercive case entering the
+library beyond the current two. Every parameter is fixed now and may never be fitted, tuned, or
+revised; any change is MT-1.1, reported separately. The model is scored **once**, at the 8-verified-
+case coercive reading, alongside challenge / compromise / each source's published forecast.
+
+### D20.1 — Implementation of `--solver model-three`, faithful to §3
+`backtest/model_three.py` implements the §3 pipeline exactly and in order: (1) loss intensity
+s←min(100, s×1.15) for L=1; (2) comfort decay s←s×0.80 for comfortable actors at T≥18 (hardened never
+decay); (3) cohesion c←c×{0.85,1.00,1.15}; (4) WM′ = Σp·c·s / Σc·s over the adjusted values; (5)
+status-quo pull λ = min(0.40, 0.25·[V=1∧G=0] + 0.15·[trap]), trap active iff the materially stronger
+principal codes ledger and the weaker lens, prediction (1−λ)·WM′+λ·rp, with the no-rp fallback →
+WM′. Every constant lives in one frozen `MTConstants` block quoting the spec's literals; a test
+asserts the code's constants appear in `specs/MT-1.0.md` and equal the code
+character-for-character. Wired into the coercive harness (`_forecast`, opt-in `head_to_head(methods=)`)
+and `schelling coercive --solver model-three`, which **refuses to run until the 8-verified-case
+reading** (specs/MT-1.0.md §6) — so the model is never run against the real library before then.
+
+### D20.2 — §5 coding-flag schema, README, and coding sheet
+The case-library schema gains an optional `coding_flags` block: per actor cohesion (h) / endurance
+(e) / loss (L) / perception (m); per case horizon_months (T) / vulnerability (V) / guarantor (G);
+`reference_point` (rp) already existed. Each flag carries a `{value, citation}`; the §5
+ambiguity-default rule (h→baseline, e→comfortable, L→0, m→none; V→0, G→0, T omitted) is applied by the
+loader for any absent flag. Flags are coded ex ante, blind dual-entry, and **sealed with the case's
+verification before any model run**. `data/coercive-cases/README.md` documents the block and carries a
+coding-sheet template. No case's flags were coded this session (that is a separate ratified step).
+
+### D20.3 — Golden tests + the pre-registered BACKTEST.md row
+Golden tests on synthetic fixtures cover every term firing alone and composed against an independent
+hand-computation of §3 (the trap-active no-guarantor case shows λ=0.40 capped), plus determinism, the
+constants-vs-spec check, and the coercive-harness integration; the existing suite stays green (321
+total). MT-1.0 is added to BACKTEST.md's coercive section as **"PRE-REGISTERED — awaiting the
+reading"** with the §6 gate quoted verbatim (generated in `writeup.py` so it survives regeneration).
+The model is NOT run against the real library — scored once, at the reading, never before.

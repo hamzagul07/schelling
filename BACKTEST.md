@@ -74,7 +74,7 @@ These are **not** directly comparable to our numbers (different DEU version, iss
 
 - **Capability (sourced, D10.1).** DEU records no capability, so each member state takes its Council power in the treaty regime in force at the issue's decision date (pre-Nice / Nice weighted votes; Lisbon-era population), rescaled so the strongest actor = 100; Commission/EP each take the largest member-state power (D10.3). The same table feeds the challenge solver AND the weighted-mean baseline — a fair fight.
 - **Point estimates.** Each issue is point estimates, so Monte Carlo is degenerate (zero variance, D3.1); the harness solves each issue once deterministically. `--draws` (2000) is recorded for interface parity but does not affect the result (D9.3).
-- **Determinism.** Dataset pinned by SHA-256 `0d75f0d2f3a96982…`; engine `c9bc727a783b`; seed 42. Same inputs → byte-identical record.
+- **Determinism.** Dataset pinned by SHA-256 `0d75f0d2f3a96982…`; engine `f07d44cad2b1`; seed 42. Same inputs → byte-identical record.
 
 ## Domain verdicts, side by side
 
@@ -82,6 +82,13 @@ These are **not** directly comparable to our numbers (different DEU version, iss
 |---|---|---|
 | Cooperative (EU legislative) | DEU III, 351 issues | **Compromise mean wins.** The challenge solver loses even fully equipped; the noise-floor oracle shows the mean is at the extractable-signal ceiling. |
 | Coercive (interstate crises) | Coercive library | **PENDING.** The expert-coded coercive tables (Hong Kong 1985, Iran 1984, ...) are in paywalled books; the harness is built and waits on the printed inputs (D11.1). |
+
+## Coercive contenders
+
+| Model | Status | Result |
+|---|---|---|
+| Challenge (BDM), compromise mean, gravity, regime | scored when cases arrive | awaiting the coercive library |
+| **Model Three — Asabiyyah (MT-1.0)** | **PRE-REGISTERED — awaiting the reading** | Specification sealed ([`specs/MT-1.0.md`](specs/MT-1.0.md), D20.0) while the library holds two verified cases, none coercive. Scored **once**, at the 8-verified-case reading. **Gate (§6, verbatim):** *"Primary: at the pre-registered 8-verified-case coercive reading, MT-1.0 must beat the unadjusted compromise mean on MAE, reported with paired bootstrap intervals. … Negative results are published with the same prominence as positive ones. If MT-1.0 fails, it is retired exactly as R1's candidates were; its committed specification remains as the record that the theory stated its claim before the evidence existed."* |
 
 ## Scheduled next: the ICB coercive benchmark
 
