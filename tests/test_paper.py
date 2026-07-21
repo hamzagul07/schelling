@@ -176,6 +176,19 @@ def test_resolve_unknown_tag_is_visible_todo_never_silent() -> None:
     assert "**TODO(E-NOPE)**" in out and todos == ["E-NOPE"] and used == {}
 
 
+def test_resolve_suppresses_echo_when_value_already_in_prose() -> None:
+    # D16.2: a tag confirming a number already written in the sentence resolves footnote-only.
+    ev = {"E-N": {"value": "351", "source": "s", "prov": "p"}}
+    out, used, _ = _resolve_tags("comprises 351 scoreable issues [E-N].", ev)
+    assert "issues[^ev-E-N]" in out and "(351)" not in out and "E-N" in used
+
+
+def test_resolve_keeps_echo_when_value_absent_from_prose() -> None:
+    ev = {"E-M": {"value": "9.530", "source": "s", "prov": "p"}}
+    out, _used, _ = _resolve_tags("reproduces the reference case [E-M].", ev)
+    assert "(9.530)[^ev-E-M]" in out  # no prose number -> value echoed
+
+
 def test_assemble_repo_deterministic_complete_and_consistent() -> None:
     a, todos_a, missing_a = assemble(REPO)
     b, _todos_b, _missing_b = assemble(REPO)
@@ -185,8 +198,10 @@ def test_assemble_repo_deterministic_complete_and_consistent() -> None:
         assert heading in a  # eleven sections concatenated in order
     assert "figures/fig_deu_error_histogram.svg" in a and "figures/fig_r1_split.svg" in a
     assert "Section 9 limitations. Section 10 concludes." in a  # roadmap fixed (item 5)
-    assert "Meehl, P. E. (1954)" in a  # bibliography skeleton appended
-    assert "(351)[^ev-E-DEU-N]" in a and "[^ev-E-DEU-N]:" in a  # inline value + footnote def
+    assert "Meehl, P.E. (1954)" in a  # verified bibliography appended
+    # duplicate-number suppression (D16.2): E-DEU-N confirms the prose "351" -> footnote-only
+    assert "issues[^ev-E-DEU-N]" in a and "(351)[^ev-E-DEU-N]" not in a
+    assert "[^ev-E-DEU-N]:" in a  # provenance footnote still defined
 
 
 def test_paper_assemble_cli_reports_no_unresolved(tmp_path: Path) -> None:
