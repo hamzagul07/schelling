@@ -1109,3 +1109,30 @@ The empty `calibrate/` stub package is deleted (it returns post-September as a r
 CLAUDE.md §5 mypy-scope sentence is corrected to match reality: mypy runs `--strict` **globally**
 across the package, not only on `src/schelling/solver`. (Item 6 dossier correction is a no-op —
 `docs/DOSSIER.md` does not exist in the repo.)
+
+## Session 19 — canon ingestion
+
+### D19.0 — The canon joins the concepts corpus (classification fuel only)
+Hassan's `CANON.md` (28 validated conflict-science concept cards, families A–E, each with an evidence
+tag + coding rule + candidate-term flag) is placed at `data/concepts/canon.md` — a committed,
+redistributable concept corpus, distinct from the gitignored lecture transcripts. A card-aware
+chunker (`chunk_concept_cards`, split on the `**X#. Title (cites).**` bold markers, DOTALL so a
+wrapped citation list keeps the card whole) turns each card into one retrievable chunk with a
+`Canon <code>: <title>` citation ref; `KnowledgeIndex.build_from_corpus` (wired into `schelling
+knowledge build --concepts`) indexes transcripts + concept cards together. The rebuilt index holds 98
+chunks (70 transcript + 28 canon).
+
+**Firewall verified both directions (no firewall code change — its whitelist is `templates.yaml`
+only, so canon phrases stay catchable as leaks):** (a) all existing planted-fact leak tests stay
+green; (b) a distinctive canon phrase ("loss-domain risk seeking", card A3) in an actor's **evidence**
+field trips the leak detector, while the same concept citing the canon in **template_classification**
+(excluded from the factual scan) passes; (c) the canon's theorist surnames (Kahneman, Tversky,
+Fearon, Bueno de Mesquita, …) do not false-positive — single tokens are not distinctive 4-grams.
+
+**Retrieval confirmed (bge-m3):** "why do weak actors win" → **Canon A1 (Interest asymmetry)** #1;
+"settlement enforcement" → **Canon D1 (Third-party guarantees)** #1; "sacred stakes" → **Canon D2
+(Indivisibility and sacred stakes)** #1.
+
+**Scope discipline:** no solver changes, no model terms wired in — the canon is classification and
+formalizer-guidance fuel only until the model-three spec selects candidate terms from it. The card
+"Model term / Candidate term" annotations are documentation, not code. 305 tests green.

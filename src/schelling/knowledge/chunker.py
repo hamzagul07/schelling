@@ -166,6 +166,43 @@ def chunk_directory(directory: Path) -> list[Chunk]:
     return chunks
 
 
+# A concept card heads with a bold ``**A1. Title (citations).**`` marker at line start (Session 19).
+# One card = one chunk (cards are short and self-contained); its ``lecture`` ref is ``Canon A1: Title``.
+# DOTALL so a header whose citation list wraps across a line (e.g. "Trachtenberg\n2012)") still matches.
+_CARD = re.compile(r"^\*\*([A-Z]\d+)\.\s+(.+?)\*\*", re.MULTILINE | re.DOTALL)
+
+
+def chunk_concept_cards(text: str, source_file: str) -> list[Chunk]:
+    """Split a concept-card document (e.g. canon.md) into one chunk per ``**X#. Title**`` card."""
+    matches = list(_CARD.finditer(text))
+    chunks: list[Chunk] = []
+    for idx, match in enumerate(matches):
+        start = match.start()
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
+        code = match.group(1)
+        title = match.group(2).split(" (")[0].strip()  # concept name, before the citations
+        chunks.append(
+            Chunk(
+                text=text[start:end].strip(),
+                source_file=source_file,
+                lecture=f"Canon {code}: {title}",
+                lecture_number=idx + 1,
+                chunk_index=0,
+                char_start=start,
+                char_end=end,
+            )
+        )
+    return chunks
+
+
+def chunk_concepts_directory(directory: Path) -> list[Chunk]:
+    """Chunk every ``*.md`` concept-card file in ``directory`` (sorted for determinism)."""
+    chunks: list[Chunk] = []
+    for path in sorted(directory.glob("*.md")):
+        chunks.extend(chunk_concept_cards(path.read_text(encoding="utf-8-sig"), path.name))
+    return chunks
+
+
 def lecture_names(directory: Path) -> list[str]:
     """List every detected lecture name across the directory (for heading-pattern review)."""
     names: list[str] = []

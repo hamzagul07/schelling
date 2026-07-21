@@ -186,3 +186,44 @@ def test_cost_usd_uses_opus_pricing() -> None:
     # 1M input + 1M output at Opus 4.8 rates = 5 + 25.
     assert cost_usd("claude-opus-4-8", 1_000_000, 1_000_000) == pytest.approx(30.0)
     assert cost_usd("unknown-model", 1_000_000, 0) == 0.0
+
+
+# ---------------------------------------------------------------- (Session 19) the canon in the firewall
+_CANON = (Path(__file__).parent.parent / "data" / "concepts" / "canon.md").read_text()
+
+
+def _draft_with_evidence_note(note: str) -> DraftExtraction:
+    d = json.loads(_clean_draft_text())
+    d["game"]["actors"][0]["evidence"][0]["note"] = note
+    return DraftExtraction.model_validate(d)
+
+
+def test_canon_phrase_in_evidence_field_trips_the_firewall() -> None:
+    # A distinctive canon phrase ("loss-domain risk seeking", card A3) copied into a FACTUAL field is
+    # a leak: the canon classifies, it never sources a draft's facts (rule 6).
+    draft = _draft_with_evidence_note(
+        "Belland exhibits loss-domain risk seeking under the deadline."
+    )
+    leaks = find_leaks(draft, allowed_text=SITUATION, concepts_text=_CANON)
+    assert leaks and any("loss domain risk seeking" in leak.phrase for leak in leaks)
+    assert all("evidence" in leak.location for leak in leaks)  # located to the factual field
+
+
+def test_canon_concept_shaping_template_classification_passes() -> None:
+    # The SAME concept legitimately citing the canon in template_classification does NOT trip the
+    # firewall — that field is where the concept library is meant to be cited (excluded from the scan).
+    d = json.loads(_clean_draft_text())
+    d["template_classification"]["rationale"] = (
+        "Belland's deadline framing suggests loss-domain risk seeking; the bargaining template holds."
+    )
+    d["template_classification"]["template_cards"] = ["Canon A3: Loss-domain risk seeking"]
+    draft = DraftExtraction.model_validate(d)
+    assert find_leaks(draft, allowed_text=SITUATION, concepts_text=_CANON) == []
+
+
+def test_canon_theorist_names_do_not_false_positive() -> None:
+    # Theorist surnames from the canon appearing in a draft (single tokens, not distinctive 4-grams)
+    # must not be flagged — the firewall targets factual content, not academic attribution.
+    note = "Analysts invoke Kahneman, Tversky, Fearon, and Bueno de Mesquita to read the standoff."
+    draft = _draft_with_evidence_note(note)
+    assert find_leaks(draft, allowed_text=SITUATION, concepts_text=_CANON) == []
