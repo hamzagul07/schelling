@@ -979,3 +979,26 @@ Ceiling for the Bueno de Mesquita Forecasting Model."** The "title candidate (no
 in `paper/draft/00-abstract.md` is replaced by this title as the manuscript's H1; the decision is
 recorded in `paper/OUTLINE.md`'s title-candidates block (chosen; the others struck through);
 `paper/DRAFT.md` regenerated to carry it.
+
+## Session 16 — references
+
+### D16.1 — §6 citation correction + verified bibliography
+The §6 "game-theorists vs unaided-judgement" finding is Green's sole-authored IJF studies, so
+`06-reinterpretation.md` now cites **(Green 2002; 2005)** in place of the incorrect "(Green and
+Armstrong 2007)"; the Green & Armstrong 2007 stub is removed. `paper/BIBLIOGRAPHY.md` is replaced
+with verified full citations, and the **three `[VERIFY]` fields were resolved against the sources**
+(no TODOs): Achen (2006) Ch. 10 = pp. **264–298** (Cambridge core); Bueno de Mesquita (2011) =
+CMPS 28(1): **65–87**, doi:**10.1177/0738894210388127**; Feder (1987) = *Studies in Intelligence*
+31(1): **41–57**, with the 1995 Westerfield reprint (pp. 274–292) noted. **One correction flagged:**
+the requested Scholz citation ("Scholz, JG.J., & Smith, G.A.") dropped co-author **Calbert** and
+garbled the initials; the verified form **Scholz, J.B., Calbert, G.J., & Smith, G.A.** (JTP 23(4):
+510–531, doi:10.1177/0951629811418142) is used instead. Added Arregui & Perarnaud (2022) journal
+citation with the 2021 data-deposit DOI kept separate.
+
+### D16.2 — Assembler duplicate-number suppression
+`schelling paper-assemble` no longer echoes a value in parentheses when it merely confirms a number
+already written in the same sentence's prose: a single-tag citation whose value appears in the
+current sentence resolves **footnote-only** (e.g. "…comprises 351 scoreable issues[^ev-E-DEU-N]"
+rather than "…issues (351)[^ev-E-DEU-N]"); multi-tag citations and values absent from the prose keep
+the parenthetical. Sentence detection ignores abbreviation dots ("et al. 2006") so the window is not
+truncated mid-citation. Still deterministic + idempotent.

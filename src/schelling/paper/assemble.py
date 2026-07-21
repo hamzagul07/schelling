@@ -18,7 +18,18 @@ import re
 from pathlib import Path
 
 _TAG = re.compile(r"E-[A-Za-z0-9_-]+")
-_GROUP = re.compile(r"\[([^\[\]]*E-[A-Za-z0-9_-]+[^\[\]]*)\]")
+_GROUP = re.compile(r"( ?)\[([^\[\]]*E-[A-Za-z0-9_-]+[^\[\]]*)\]")
+# A sentence ends at ; : newline, or a . ! ? followed by whitespace + a capital — the last rule
+# ignores abbreviation dots ("et al. 2006", "e.g.") so the current-sentence window is not truncated.
+_SENTENCE_END = re.compile(r"[.!?]\s+(?=[A-Z])")
+
+
+def _current_sentence(prefix: str) -> str:
+    """The prose of the sentence that ``prefix`` (text before a citation) ends in."""
+    cut = max(prefix.rfind(";"), prefix.rfind(":"), prefix.rfind("\n"))
+    for m in _SENTENCE_END.finditer(prefix):
+        cut = max(cut, m.start())
+    return prefix[cut + 1 :]
 
 # Figures placed after the section whose evidence they illustrate (drafts carry no anchors).
 _FIG_AFTER: dict[str, list[tuple[str, str]]] = {
@@ -80,6 +91,7 @@ def _resolve_tags(
     todos: list[str] = []
 
     def repl_group(m: re.Match[str]) -> str:
+        space, inner = m.group(1), m.group(2)
         marks: list[str] = []
 
         def repl_tag(tm: re.Match[str]) -> str:
@@ -93,9 +105,16 @@ def _resolve_tags(
             marks.append(tag)
             return item["value"]
 
-        resolved = _TAG.sub(repl_tag, m.group(1))
+        resolved = _TAG.sub(repl_tag, inner)
         footnotes = "".join(f"[^ev-{t}]" for t in dict.fromkeys(marks))
-        return f"({resolved}){footnotes}"
+        # Duplicate-number suppression (D16.2): a single tag whose value already appears in the
+        # current sentence's prose resolves footnote-only — no redundant parenthetical echo.
+        if len(_TAG.findall(inner)) == 1 and marks:
+            value = used[marks[0]]["value"]
+            sentence = _current_sentence(m.string[: m.start()])
+            if re.search(r"(?<![\w.])" + re.escape(value) + r"(?![\w.])", sentence):
+                return footnotes
+        return f"{space}({resolved}){footnotes}"
 
     return _GROUP.sub(repl_group, text), used, todos
 
