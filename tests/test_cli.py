@@ -11,7 +11,7 @@ import pytest
 from typer.testing import CliRunner
 
 from schelling.cli import _startup, app
-from schelling.formalizer.client import LLMResult, ReplayClient
+from schelling.formalizer.client import LLMResult, ReplayClient, WebSource
 from schelling.knowledge.chunker import Chunk
 from schelling.knowledge.embed import HashingEmbedder
 from schelling.knowledge.index import KnowledgeIndex
@@ -224,6 +224,38 @@ def test_formalize_writes_draft_and_never_solves(
     assert '"question_id": "Q-COAL-PHASEOUT"' in written
     game = GameSpec.model_validate(json.loads(written)["game"])
     assert len(game.actors) == 3
+
+
+def test_formalize_search_prints_sources_and_marks_live(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    draft_text = (FIXTURES / "formalize_replay.json").read_text()
+    source = WebSource(
+        url="https://src.example/aland", title="Aland 2030 target", snippet="2030 phase-out."
+    )
+
+    def make(model: str = "replay-model") -> ReplayClient:
+        return ReplayClient(
+            [LLMResult(draft_text, 100, 100, searches_used=2, sources=(source,))], model_name=model
+        )
+
+    monkeypatch.setattr("schelling.cli.AnthropicClient", make)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")  # the live-client key gate
+    situation = tmp_path / "s.txt"
+    situation.write_text("Aland, Belland and Cesta negotiate a coal phase-out year.")
+    out = tmp_path / "d.json"
+    result = runner.invoke(
+        app,
+        ["formalize", str(situation), "-o", str(out), "--db", str(tmp_path / "n.db"), "--search"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Live-searched" in result.output and "Aland 2030 target" in result.output
+    from schelling.formalizer.schemas import DraftGameSpec
+
+    draft = DraftGameSpec.model_validate_json(out.read_text())
+    assert draft.live_searched is True
+    assert [s.url for s in draft.sources_fetched] == ["https://src.example/aland"]
+    assert draft.metadata.searches_used == 2
 
 
 def test_formalize_missing_situation_errors(tmp_path: Path) -> None:

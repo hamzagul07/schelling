@@ -37,6 +37,11 @@ def test_advise_report_matches_golden() -> None:
     assert html == (FIXTURES / "advise_report.html").read_text()
 
 
+def test_searched_draft_report_matches_golden() -> None:
+    html = render(_load("draft_searched.json"))
+    assert html == (FIXTURES / "draft_searched_report.html").read_text()
+
+
 def test_render_is_deterministic() -> None:
     data = _load("forecast_record.json")
     assert render(data) == render(data)
@@ -136,6 +141,25 @@ def test_render_malformed_forecast_names_the_reason() -> None:
 
 
 # --------------------------------------------------------------- advise report (D7.x)
+# --------------------------------------------------------------- sources_fetched (D8.4)
+def test_searched_draft_report_renders_linked_source_list() -> None:
+    html = render(_load("draft_searched.json"))
+    assert "Sources fetched" in html and "live-searched" in html
+    assert 'class="sources"' in html
+    # each fetched source is a clickable link with its retrieval date
+    assert '<a href="https://example.org/aland-coal-policy"' in html
+    assert "retrieved 2026-07-21" in html
+
+
+def test_searched_draft_report_loads_no_external_resource() -> None:
+    # A hyperlink to a cited source is fine (nothing loads on open); resource-loading tokens
+    # must still be absent, so the report stays self-contained and offline (D8.4).
+    html = render(_load("draft_searched.json")).lower()
+    for token in ("<script", "<link", "src=", "@import", "url("):
+        assert token not in html, f"draft_searched contains resource token {token!r}"
+    assert 'href="https://' in html  # but hyperlinks to sources are present and expected
+
+
 def test_advise_report_has_sections_and_caveat() -> None:
     html = render(_load("advise.json"))
     for heading in ("Baseline actor map", "Own moves", "Top own moves", "Who to work on"):
@@ -143,3 +167,4 @@ def test_advise_report_has_sections_and_caveat() -> None:
     assert "One-sided search" in html  # the standing caveat
     assert 'class="caveat"' in html
     assert "advising <strong>germany" in html
+    assert ">play</th>" in html and "energize" in html  # D8.0b energize/defuse labels
