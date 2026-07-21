@@ -1051,3 +1051,21 @@ lives in this committed pre-registration and validates against `ResolutionRubric
 checked to tile [0,100] with no gaps or overlaps. **Final — no edits under any circumstances after
 2026-08-31.** `opentimestamps-client` was added as a project dependency (`uv add`) so `ots` is
 available for D17.2 anchoring; the seal/stamp tests are monkeypatched to stay network-free.
+
+## Session 18 — project audit (read-only)
+
+### D18.0 — The honest state of Schelling, audited
+A read-only audit (built/fixed/refactored nothing) recorded in
+[docs/AUDIT-2026-07.md](docs/AUDIT-2026-07.md), every claim cited to an artifact. Headlines: 279
+tests pass fresh (0 skipped, 41 s); 11 of 13 CLI surfaces exercised working (analyze/formalize need a
+live API key, not run); all seven pre-registered gates restated with verdicts (replication passes;
+Session-9, fair-fight, and both R1 candidates fail; oracle gap −0.84), pre-registration git-proven
+(`3294081` before `8ea92b0`); every manuscript science number regenerates byte-identically (only the
+live test count 267→279 and four provenance hashes drift, so `paper/EVIDENCE.md` is mildly stale).
+**Two integrity headlines:** the v1-challenge sealed record **fails `schelling verify`** (stored
+`inputs_hash` drifted from its embedded game; bytes + forecast still reproduce), and the real
+`FORECASTS.md` ledger **has no OpenTimestamps proof** (`ledger-proofs/` holds only its README; the
+seals predate the OTS feature). Grading rubric confirmed committed, schema-valid, band-tiling
+complete, and dated pre-resolution. Overall grade 7.5/10; top three fixes: clean the integrity
+apparatus (verify 4/4 + real proof), build the coercive library to 8 cases, grade the ledger at
+2026-09-01 and regenerate EVIDENCE.md. Nothing else changed.
