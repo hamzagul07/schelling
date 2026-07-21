@@ -20,9 +20,13 @@
 | E-SS-TEST | 3. Fair fight | Split-sample: tuned test MAE vs weighted mean | 26.07 vs 23.32 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | q=0.7 tuned on 176 train (MAE 27.58), scored on 175 held-out |
 | E-ORACLE-MAE | 5. Ceiling | Noise-floor oracle MAE vs compromise mean | 23.84 vs 22.99 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | linear-ridge:l=10, 5-fold CV over 351 issues (D11.0) |
 | E-ORACLE-GAP | 5. Ceiling | Ceiling gap (compromise - oracle) | -0.84 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | <= 0 => mean at/near the extractable-signal ceiling (COOPERATIVE domain only) |
+| E-METHOD-capabilities | 3. Fair fight | Actor capability source | treaty-regime Council power (pre-Nice / Nice / Lisbon), rescaled strongest=100 | `src/schelling/backtest/capability.py` | `e4192d2` | Commission/EP = largest member-state power (D10.1/D10.3); feeds solver AND baseline |
+| E-WORST | 9. Limitations | Worst-issue errors (primary solver) | 10 issues at abs error up to 100.00 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | 0/100-pole coding coarseness — pole-to-pole misses |
 | E-WORST-d00067i2 | 9. Limitations | Worst issue — tankers | err 100.00 (forecast 0.00, actual 100.00) | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | 0/100-pole coding coarseness |
 | E-WORST-d04209i2 | 9. Limitations | Worst issue — worktime | err 100.00 (forecast 100.00, actual 0.00) | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | 0/100-pole coding coarseness |
 | E-WORST-d04287i3 | 9. Limitations | Worst issue — vis | err 100.00 (forecast 100.00, actual 0.00) | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | 0/100-pole coding coarseness |
+| E-DEU-MAE-r1 | 3. Fair fight | Round-1 challenge MAE (equal capability) | 28.31 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | handicapped run: equal capability, no reference point (Session 9, D9.2) |
+| E-BASE-WMEAN-r1 | 3. Fair fight | Round-1 weighted-mean MAE (equal capability) | 23.64 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | = salience-weighted mean under equal capability; the baseline round 1 loses to |
 | E-R1-SPLIT | 4. Successor | Pre-registered split (train / dev / TEST) | 140 / 105 / 106 | `src/schelling/backtest/deu3_split.json` | `3294081` | seed 20260721; committed before any candidate code (git order = prereg) |
 | E-R1-gravity | 4. Successor | Candidate A — status-quo gravity: TEST MAE vs compromise | 22.09 vs 21.26 | `src/schelling/backtest/deu3_split.json` | `sha256:0d75f0d2f3a9` | Δ +0.83 [95% CI -0.15, +1.91] (boot seed 20260721) — does NOT beat compromise, on TEST rp-issues |
 | E-R1-regime | 4. Successor | Candidate B — regime-aware settlement: TEST MAE vs compromise | 21.57 vs 21.09 | `src/schelling/backtest/deu3_split.json` | `sha256:0d75f0d2f3a9` | Δ +0.48 [95% CI -0.69, +1.76] (boot seed 20260721) — does NOT beat compromise, on TEST (all) |
@@ -36,10 +40,12 @@
 | E-CTX-4 | 3. Fair fight (context) | Published: Old Model (expected-utility / challenge) | 28.2 | `BACKTEST.md` | `578beb2` | issues w/o recursion point — BdM 2011, Table 3 (regime/ordering only, NOT like-for-like) |
 | E-CTX-5 | 3. Fair fight (context) | Published: Weighted mean, round 1 | 19.4 | `BACKTEST.md` | `578beb2` | issues w/o recursion point — BdM 2011, Table 3 (regime/ordering only, NOT like-for-like) |
 | E-CTX-6 | 3. Fair fight (context) | Published: Weighted median, round 1 | 19.8 | `BACKTEST.md` | `578beb2` | issues w/o recursion point — BdM 2011, Table 3 (regime/ordering only, NOT like-for-like) |
+| E-CTX-bdm2011 | 3. Fair fight (context) | BdM (2011): Old Model vs weighted mean MAE | Old Model 21.5/28.2 vs weighted mean 11.8/19.4 | `BACKTEST.md` | `578beb2` | BdM 2011 Tables 1 & 3 — same regime & ordering, NOT like-for-like (diff DEU version) |
+| E-CTX-achen2006 | 3. Fair fight (context) | Achen (2006) finding | weighted mean does as well or better than complex models | `BACKTEST.md` | `578beb2` | canonical DEU finding cited in BACKTEST.md (qualitative) |
 | E-CHINA-ROWS | 7. Case library | China Tables 2+3 rows verified (blind dual entry) | 60/60 (26 + 34) | `data/coercive-cases/ktab-china-2014.json` | `6c24b91` | two independent blind transcriptions agree; every Exercised-Power checksum reproduces |
-| E-CHINA-VERIFIED | 7. Case library | China transcription.verified | True | `data/coercive-cases/ktab-china-2014.json` | `6c24b91` | flipped true only on human ratification of judgments (D13.0) |
+| E-CHINA-VERIFIED | 7. Case library | China transcription.verified | True | `data/coercive-cases/ktab-china-2014.json` | `6c24b91` | flipped true only on human ratification (D13.0) |
 | E-DOMAIN-VERDICT | 7. Case library | Domain verdicts | cooperative: compromise mean wins; coercive: PENDING | `BACKTEST.md` | `578beb2` | coercive classics paywalled (D11.1); domestic cases out-of-domain, never counted |
-| E-TESTS | Repro | Test count (pytest --collect-only) | 259 | `tests/` | `6c24b91` | regenerated live; green gate is the acceptance bar |
+| E-TESTS | Repro | Test count (pytest --collect-only) | 267 | `tests/` | `fcfb13e` | regenerated live; green gate is the acceptance bar |
 
 ## Open questions — numbers no artifact could source
 - (none — every cited number resolved to an artifact)
