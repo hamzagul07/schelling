@@ -1,0 +1,55 @@
+{
+  "library_version": "draft-1",
+  "transcription": {
+    "status": "SCAFFOLD — the source PDF is form-gated (KAPSARC) and ResearchGate rate-limited the fetch; this file holds everything recoverable without it. Hassan: download the PDF (2-minute form, 'Download without subscribing') at https://www.kapsarc.org/research/publications/the-policymaking-process-to-restart-japanese-nuclear-power-plants/ then complete every TO_TRANSCRIBE block and verify the known rows.",
+    "verified": false
+  },
+  "cases": [
+    {
+      "case_id": "KTAB-JAPAN-2017-RESTART",
+      "title": "Political will to restart Japanese nuclear power plants",
+      "domain": "domestic_elite_bargaining",
+      "ex_ante": true,
+      "data_collected": "2017 (figures in the paper reference May/June 2017 — VERIFY exact collection window in the Data section)",
+      "source": "Efird, Al Muhanna, Al-Mubarak, Turkistani & Al-Ghamdi (2018), 'The Policymaking Process to Restart Japanese Nuclear Power Plants', KAPSARC Discussion Paper KS-2018-DP47, doi:10.30573/KS--2018-DP47, Table 1 (baseline expert data)",
+      "table_column_order_note": "Table 1 prints: Actor | Group | Influence | Position | Salience | Exercised Power. NOTE the order differs from the China paper (Influence BEFORE Position here). Exercised Power = Influence x Salience / 100 — use it as a checksum on every row while transcribing. Verified on five rows already (e.g. Abe 98 x 32 / 100 = 31).",
+      "continuum": {
+        "label": "Advocacy opposed to or supportive of restarting nuclear power (paper's Figure 3)",
+        "anchor_0": "TO_TRANSCRIBE — copy the paper's exact wording for Position 0",
+        "anchor_100": "TO_TRANSCRIBE — copy the paper's exact wording for Position 100",
+        "markers": "TO_TRANSCRIBE — copy any intermediate position descriptions Figure 3 defines"
+      },
+      "actors_known_UNVERIFIED": [
+        {"id": "abe", "name": "Prime Minister Abe (Central Govt)", "position": 90, "capability": 98, "salience": 32},
+        {"id": "suga", "name": "Chief Cabinet Secretary Suga (Central Govt)", "position": 72, "capability": 84, "salience": 37},
+        {"id": "imai", "name": "Imai (Central Govt)", "position": 77, "capability": 58, "salience": 40},
+        {"id": "aso", "name": "Aso (Central Govt)", "position": 80, "capability": 25, "salience": 26},
+        {"id": "seko", "name": "Seko (Central Govt)", "position": 90, "capability": 60, "salience": 58}
+      ],
+      "actors_TO_TRANSCRIBE": "Table 1 has many more rows (NRA, METI, local/prefectural leaders, utilities, Keidanren, opposition parties, courts, public blocs...). Transcribe every row as {id, name, position, capability (= the paper's Influence), salience}, double-enter, and check each against the Exercised Power checksum.",
+      "scenario_note": "Table 4 is a post-Cabinet-reshuffle SCENARIO dataset (e.g. Kono 18 infl / 0 pos / 50 sal) — do NOT mix it into the baseline; optionally store it as a second dataset variant.",
+      "published_model_forecast": {
+        "model": "KTAB SMP",
+        "value_note": "Qualitative (from the paper's findings): slowly growing political will in favor of restarts over several years; municipal/prefectural leaders are the pivotal opponents and are projected to come around; the NRA is a credible acceptance-builder given time; the 2017 political turbulence leaves the trend largely unchanged. TRANSCRIBE any numeric end-state the simulation section reports."
+      },
+      "outcome_fact_timeline_PROPOSED": {
+        "note": "Numeric outcome coding is DEFERRED until the continuum anchors are transcribed — do not invent values against an undefined scale. Dated facts to code against once anchors exist (VERIFY each):",
+        "facts": [
+          "Mid-2017 (data vintage): ~5 reactors back online out of ~40 operable; restarts proceeding slowly against local and legal resistance",
+          "By 2020: 9 reactors had restarted; national policy still cautious",
+          "2022-2023: major national pivot (GX policy under PM Kishida) — reactor lifetime extensions beyond 60 years, government support for restarts, openness to next-generation new builds",
+          "By late 2024-2025: ~14 reactors restarted incl. Onagawa-2 and Shimane-2 (both in prefectures once seen as resistant); public opinion majority-favorable to restarts for the first time post-Fukushima",
+          "Directional read: the paper's core forecast — slow multi-year growth of political will, with local acceptance arriving — was borne out and arguably exceeded by the 2023 national pivot"
+        ]
+      },
+      "horizons_PROPOSED": {
+        "near_term_by_2020": "code once anchors exist",
+        "long_run_by_2025": "code once anchors exist"
+      }
+    }
+  ],
+  "notes": [
+    "DOMAIN: domestic-elite bargaining (cooperative regime) — third out-of-domain case; still not coercive. The coercive classics remain the separate quest.",
+    "WORKFLOW: after downloading the PDF, either (a) paste Table 1's text into the chat and Claude drafts the full JSON live, or (b) put the PDF in the project and have Claude Code transcribe against this scaffold — in BOTH paths Hassan eye-verifies every row before verified flips to true."
+  ]
+}
