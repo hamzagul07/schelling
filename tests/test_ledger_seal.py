@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from schelling.backtest.ledger import (
@@ -76,25 +77,24 @@ def test_seal_row_format() -> None:
 
 
 # --------------------------------------------------------------- the `schelling seal` command
-def test_seal_command_appends_then_is_idempotent(tmp_path: Path) -> None:
+def _noop_stamp(_ledger: Path, _proofs: Path) -> tuple[None, str]:
+    """Stand-in for stamp_ledger so the seal tests never touch the network."""
+    return None, "external anchoring skipped (test stub)"
+
+
+def test_seal_command_appends_then_is_idempotent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("schelling.cli.stamp_ledger", _noop_stamp)  # no OpenTimestamps network call
     record = _rubric_record(tmp_path)
     ledger = tmp_path / "FORECASTS.md"
-    proofs = tmp_path / "proofs"
     sha = record_sha256(record)
 
-    args = [
-        "seal",
-        str(record),
-        "--vintage",
-        "test",
-        "-o",
-        str(ledger),
-        "--proofs-dir",
-        str(proofs),
-    ]
+    args = ["seal", str(record), "--vintage", "test", "-o", str(ledger)]
     first = runner.invoke(app, args)
     assert first.exit_code == 0, first.output
     assert "Sealed" in first.output and sha in first.output
+    assert "external anchoring skipped (test stub)" in first.output  # anchoring is wired in
     text = ledger.read_text()
     assert sha in text and text.count(f"`{sha}`") == 1
 
@@ -105,25 +105,16 @@ def test_seal_command_appends_then_is_idempotent(tmp_path: Path) -> None:
     assert ledger.read_text() == text  # byte-identical, no duplicate row
 
 
-def test_seal_refuses_forecast_without_resolution_rubric(tmp_path: Path) -> None:
+def test_seal_refuses_forecast_without_resolution_rubric(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("schelling.cli.stamp_ledger", _noop_stamp)
     record = FIXTURES / "forecast_record.json"  # a game with no resolution_rubric
     ledger = tmp_path / "FORECASTS.md"
     result = runner.invoke(app, ["seal", str(record), "-o", str(ledger)])
     assert result.exit_code == 2
     assert "resolution_rubric" in result.output and "Refusing to seal" in result.output
     assert not ledger.exists() or record_sha256(record) not in ledger.read_text()
-
-
-def test_seal_external_anchoring_is_a_soft_noop_without_ots(tmp_path: Path) -> None:
-    record = _rubric_record(tmp_path)
-    ledger = tmp_path / "FORECASTS.md"
-    proofs = tmp_path / "proofs"
-    result = runner.invoke(
-        app, ["seal", str(record), "-o", str(ledger), "--proofs-dir", str(proofs)]
-    )
-    # ots is typically absent in CI: the seal still succeeds and reports the anchoring outcome.
-    assert result.exit_code == 0, result.output
-    assert "OpenTimestamps" in result.output or "timestamped" in result.output
 
 
 def test_seal_missing_record_is_friendly(tmp_path: Path) -> None:

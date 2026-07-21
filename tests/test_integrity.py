@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import subprocess
+
+import pytest
 from typer.testing import CliRunner
 
 from schelling.backtest.ledger import record_sha256, stamp_ledger
@@ -96,12 +99,34 @@ def test_verify_cli_exits_nonzero_on_failure(tmp_path: Path) -> None:
 
 
 # --------------------------------------------------------------- external anchoring (D17.2)
-def test_stamp_ledger_is_a_soft_noop_when_ots_absent(tmp_path: Path) -> None:
+def test_stamp_ledger_is_a_soft_noop_when_ots_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _absent(*_a: object, **_k: object) -> object:
+        raise FileNotFoundError("ots")
+
+    monkeypatch.setattr("schelling.backtest.ledger.subprocess.run", _absent)
     ledger = tmp_path / "FORECASTS.md"
     ledger.write_text("ledger content\n")
     proof, message = stamp_ledger(ledger, tmp_path / "proofs")
-    # `ots` is typically absent in CI -> graceful no-op with a warning; never raises.
-    if proof is None:
-        assert "OpenTimestamps" in message or "skipped" in message
-    else:
-        assert Path(proof).exists()
+    assert proof is None and "OpenTimestamps" in message  # graceful, never raises
+
+
+def test_stamp_ledger_stores_and_is_idempotent_on_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _fake_ots(cmd: list[str], **_k: object) -> subprocess.CompletedProcess[str]:
+        Path(cmd[2] + ".ots").write_bytes(b"fake-proof")  # `ots stamp <file>` writes <file>.ots
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr("schelling.backtest.ledger.subprocess.run", _fake_ots)
+    ledger = tmp_path / "FORECASTS.md"
+    ledger.write_text("ledger content\n")
+    proofs = tmp_path / "proofs"
+
+    proof, _msg = stamp_ledger(ledger, proofs)
+    assert proof is not None and Path(proof).exists() and Path(proof).parent == proofs
+    assert not (tmp_path / "FORECASTS.md.ots").exists()  # moved into proofs/, not left beside ledger
+
+    again, msg2 = stamp_ledger(ledger, proofs)  # same ledger bytes -> idempotent
+    assert again == proof and "already timestamped" in msg2

@@ -1033,3 +1033,21 @@ and the SHA-256 commitment stands. Proofs are committed as the audit trail; veri
 **determinism** (re-solving the embedded game with the record's own config + seed reproduces the
 ensemble byte-for-byte, rule 2). Exits non-zero if any check fails — the audit an outsider runs
 without trusting us.
+
+### D17.4 — Grading rubric ratified with edits (final pre-registration)
+Hassan ratified the Q-2026-USIRAN-STAGE2 rubric with edits (2026-07-22, pre-resolution), applied to
+`GRADING-Q-2026-USIRAN-STAGE2.md` and its embedded machine-readable `resolution_rubric` JSON block:
+the mapping bands now **tile 0–100 completely** (seven bands, adding explicit largely-US-terms 31–44
+and largely-Iranian-leaning 61–69 interim tiers between the balanced 45–60 and the poles); a
+**midpoint-default** rule (within a band the grade is the band midpoint unless the justification cites
+specific settlement terms); a **canonical-text precedence** clause (the sealed game's continuum text
+governs where the summary anchors differ); the binary criterion now pins the phase "as defined by the
+17 June MOU's staged structure"; and the grading formula's final sentence now reads "The comparison
+metric is |median − actual| per record; the grade integer, its justification, and all cited sources
+are published in FORECASTS.md at grading." **This is the canonical embedded rubric** for the four
+already-sealed US-Iran records: embedding it in the sealed game itself would change the record bytes
+and break the seal (the rubric is part of the record's game but excluded from `inputs_hash`), so it
+lives in this committed pre-registration and validates against `ResolutionRubric`. The bands were
+checked to tile [0,100] with no gaps or overlaps. **Final — no edits under any circumstances after
+2026-08-31.** `opentimestamps-client` was added as a project dependency (`uv add`) so `ots` is
+available for D17.2 anchoring; the seal/stamp tests are monkeypatched to stay network-free.
