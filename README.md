@@ -58,8 +58,11 @@ HTML (D6.x).
 ## CLI
 
 ```sh
-# Solve a game: Monte Carlo forecast + tornado, writes the ForecastRecord to runs/
+# Solve a game (a bare GameSpec or a formalizer DraftGameSpec): Monte Carlo forecast +
+# tornado, writes the ForecastRecord to runs/. A draft's assumptions and formalize
+# provenance are carried through into the record and the report.
 schelling solve tests/fixtures/emission_standards.json --draws 10000 --seed 42
+schelling solve game.draft.json --draws 10000        # solve a formalizer draft end-to-end
 
 # Build the transcript index (bge-m3; downloads the model on first run), then search it
 schelling knowledge build --embedder bge-m3
