@@ -281,6 +281,65 @@ def test_formalize_search_prints_sources_and_marks_live(
     assert draft.metadata.searches_used == 2
 
 
+def test_analyze_no_review_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    draft_text = (FIXTURES / "formalize_replay.json").read_text()
+    monkeypatch.setattr("schelling.cli.AnthropicClient", _fake_anthropic_factory(draft_text))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    result = runner.invoke(
+        app,
+        [
+            "analyze",
+            "Aland, Belland and Cesta negotiate a coal phase-out year.",
+            "--no-review",
+            "--no-knowledge",
+            "--draws",
+            "30",
+            "-o",
+            str(tmp_path / "d.json"),
+            "--out-dir",
+            str(tmp_path),
+            "--report",
+            str(tmp_path / "r.html"),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Draft written" in result.output and "Report:" in result.output
+    assert "1. medians:" in result.output
+    assert "challenge median" in result.output and "compromise median" in result.output
+    assert "4. top lever:" in result.output and "5. assumptions flagged:" in result.output
+    assert (tmp_path / "d.json").exists() and (tmp_path / "r.html").exists()
+    models = {
+        ForecastRecord.model_validate_json(p.read_text()).model for p in tmp_path.glob("*mc*.json")
+    }
+    assert {"challenge", "compromise"} <= models  # both models solved and written
+
+
+def test_analyze_review_gate_default_on_aborts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    draft_text = (FIXTURES / "formalize_replay.json").read_text()
+    monkeypatch.setattr("schelling.cli.AnthropicClient", _fake_anthropic_factory(draft_text))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    # review is default-on; declining at the prompt stops before solving
+    result = runner.invoke(
+        app,
+        [
+            "analyze",
+            "Aland Belland Cesta coal.",
+            "--no-knowledge",
+            "-o",
+            str(tmp_path / "d.json"),
+            "--out-dir",
+            str(tmp_path),
+        ],
+        input="n\n",
+    )
+    assert result.exit_code == 0, result.output
+    assert "Stopped before solving" in result.output
+    assert (tmp_path / "d.json").exists()  # the draft was written
+    assert not list(tmp_path.glob("*mc*.json"))  # but nothing was solved
+
+
 def test_formalize_missing_situation_errors(tmp_path: Path) -> None:
     result = runner.invoke(app, ["formalize", str(tmp_path / "nope.txt")])
     assert result.exit_code == 2
