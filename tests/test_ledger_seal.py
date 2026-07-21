@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -20,6 +21,22 @@ from schelling.schemas.forecast import SensitivityEntry
 
 runner = CliRunner()
 FIXTURES = Path(__file__).parent / "fixtures" / "report"
+
+_RUBRIC = {
+    "resolution_criteria": "did the event occur by the deadline (binary)",
+    "adjudicating_sources": ["official statements", "wire services of record"],
+    "outcome_mapping": "map the settlement terms onto the 0-100 continuum by anchor bands",
+    "grading_formula": "score = |forecast_median - actual| on the 0-100 continuum",
+}
+
+
+def _rubric_record(tmp_path: Path, src: Path = FIXTURES / "forecast_record.json") -> Path:
+    """A copy of a fixture record with a resolution_rubric injected into its game (D17.1)."""
+    data = json.loads(src.read_text())
+    data["game"]["resolution_rubric"] = _RUBRIC
+    out = tmp_path / "record_with_rubric.json"
+    out.write_text(json.dumps(data, indent=2) + "\n")
+    return out
 
 
 # --------------------------------------------------------------- the SHA-256 seal (D12.0)
@@ -60,21 +77,53 @@ def test_seal_row_format() -> None:
 
 # --------------------------------------------------------------- the `schelling seal` command
 def test_seal_command_appends_then_is_idempotent(tmp_path: Path) -> None:
-    record = FIXTURES / "forecast_record.json"
+    record = _rubric_record(tmp_path)
     ledger = tmp_path / "FORECASTS.md"
+    proofs = tmp_path / "proofs"
     sha = record_sha256(record)
 
-    first = runner.invoke(app, ["seal", str(record), "--vintage", "test", "-o", str(ledger)])
+    args = [
+        "seal",
+        str(record),
+        "--vintage",
+        "test",
+        "-o",
+        str(ledger),
+        "--proofs-dir",
+        str(proofs),
+    ]
+    first = runner.invoke(app, args)
     assert first.exit_code == 0, first.output
     assert "Sealed" in first.output and sha in first.output
     text = ledger.read_text()
     assert sha in text and text.count(f"`{sha}`") == 1
 
     # sealing the same record again changes nothing (idempotent)
-    second = runner.invoke(app, ["seal", str(record), "--vintage", "test", "-o", str(ledger)])
+    second = runner.invoke(app, args)
     assert second.exit_code == 0
     assert "Already sealed" in second.output
     assert ledger.read_text() == text  # byte-identical, no duplicate row
+
+
+def test_seal_refuses_forecast_without_resolution_rubric(tmp_path: Path) -> None:
+    record = FIXTURES / "forecast_record.json"  # a game with no resolution_rubric
+    ledger = tmp_path / "FORECASTS.md"
+    result = runner.invoke(app, ["seal", str(record), "-o", str(ledger)])
+    assert result.exit_code == 2
+    assert "resolution_rubric" in result.output and "Refusing to seal" in result.output
+    assert not ledger.exists() or record_sha256(record) not in ledger.read_text()
+
+
+def test_seal_external_anchoring_is_a_soft_noop_without_ots(tmp_path: Path) -> None:
+    record = _rubric_record(tmp_path)
+    ledger = tmp_path / "FORECASTS.md"
+    proofs = tmp_path / "proofs"
+    result = runner.invoke(
+        app, ["seal", str(record), "-o", str(ledger), "--proofs-dir", str(proofs)]
+    )
+    # ots is typically absent in CI: the seal still succeeds and reports the anchoring outcome.
+    assert result.exit_code == 0, result.output
+    assert "OpenTimestamps" in result.output or "timestamped" in result.output
 
 
 def test_seal_missing_record_is_friendly(tmp_path: Path) -> None:

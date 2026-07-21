@@ -29,6 +29,7 @@ from schelling.backtest.ledger import (
     insert_seal_row,
     record_sha256,
     seal_row,
+    stamp_ledger,
 )
 from schelling.backtest.oracle import oracle_summary
 from schelling.backtest.successor import forecast_candidate as run_forecast_candidate
@@ -774,8 +775,16 @@ def seal(
     record: Path = typer.Argument(..., help="A ForecastRecord JSON in runs/ to seal."),
     vintage: str = typer.Option("—", "--vintage", help="A vintage label for the ledger line."),
     out: Path = typer.Option(Path("FORECASTS.md"), "-o", "--out", help="The ledger file."),
+    proofs_dir: Path = typer.Option(
+        Path("ledger-proofs"), "--proofs-dir", help="Where OpenTimestamps proofs are stored."
+    ),
 ) -> None:
-    """Seal a forecast record into FORECASTS.md by its SHA-256 (idempotent — one command)."""
+    """Seal a forecast record into FORECASTS.md by its SHA-256 (idempotent), then timestamp it.
+
+    Refuses to seal a forecast whose question carries no ``resolution_rubric`` (D17.1): a prediction
+    that cannot be graded by a pre-registered rule has no business being sealed. On success the
+    ledger is anchored with OpenTimestamps (D17.2; a soft no-op if `ots` is absent).
+    """
     if not record.exists():
         typer.echo(f"record not found: {record}", err=True)
         raise typer.Exit(code=2)
@@ -791,6 +800,20 @@ def seal(
         raise typer.Exit(code=2) from exc
 
     sha = record_sha256(record)
+    existing = out.read_text() if out.exists() else empty_seal_ledger(_SEAL_HEADER)
+    if sha in existing:
+        typer.echo(f"Already sealed (sha256 {sha[:12]}… present in {out}); nothing changed.")
+        return
+    # A new seal requires a pre-registered grading rubric on the question (D17.1).
+    if not game.get("resolution_rubric"):
+        typer.echo(
+            f"Refusing to seal: {record}'s question has no resolution_rubric. A sealed forecast "
+            f"must be gradable by a rule fixed before resolution — add a ResolutionRubric to the "
+            f"game (schemas/question.py) and write GRADING-{question_id}.md, then re-seal.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
     row = seal_row(
         model=model,
         vintage=vintage,
@@ -799,14 +822,44 @@ def seal(
         median=median,
         sha=sha,
     )
-    existing = out.read_text() if out.exists() else empty_seal_ledger(_SEAL_HEADER)
-    updated, changed = insert_seal_row(existing, row, sha)
-    if not changed:
-        typer.echo(f"Already sealed (sha256 {sha[:12]}… present in {out}); nothing changed.")
-        return
+    updated, _changed = insert_seal_row(existing, row, sha)
     out.write_text(updated if updated.endswith("\n") else updated + "\n")
     typer.echo(f"Sealed {question_id} [{model}, {vintage}] median {median:.3f} into {out}")
     typer.echo(f"  sha256 {sha}")
+    _proof, message = stamp_ledger(out, proofs_dir)
+    typer.echo(f"  {message}")
+
+
+@app.command()
+def verify(
+    record: Path = typer.Argument(..., help="A sealed ForecastRecord JSON to audit."),
+    ledger: Path = typer.Option(Path("FORECASTS.md"), "--ledger", help="The sealed ledger file."),
+) -> None:
+    """Audit a sealed forecast: hash-in-ledger, inputs-hash, and re-solve determinism (D17.3).
+
+    The one command an outsider runs to check a prediction: it recomputes the record's SHA-256 and
+    matches it against the ledger, recomputes the inputs hash, and re-solves the embedded game to
+    confirm the forecast reproduces byte-for-byte. Exits non-zero if any check fails.
+    """
+    from schelling.backtest.verify import verify_record
+
+    if not record.exists():
+        typer.echo(f"record not found: {record}", err=True)
+        raise typer.Exit(code=2)
+    try:
+        report = verify_record(record, ledger)
+    except (ValidationError, ValueError) as exc:
+        typer.echo(f"{record} is not a readable ForecastRecord ({exc}).", err=True)
+        raise typer.Exit(code=2) from exc
+
+    for check in report.checks:
+        mark = "PASS" if check.passed else "FAIL"
+        typer.echo(f"  [{mark}] {check.name}: {check.detail}")
+    if report.ok:
+        typer.echo("VERIFIED — every check passed.")
+    else:
+        typer.echo("FAILED — one or more checks did not pass.", err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command("paper-evidence")
