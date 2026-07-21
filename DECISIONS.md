@@ -357,3 +357,37 @@ continuum anchors shown in the header rather than pinned to axis ends — so bot
 and the year-scale replication record render correctly. Dot area ∝ capability×salience (radius ∝
 √weight), whiskers span the position low-high range, and the settlement marker (ForecastRecord
 only) is a dashed amber line at the ensemble median.
+
+---
+
+## Session 6.5 — firewall calibration + env loading (hotfix)
+
+### D6.5 — `.env` auto-loaded at CLI startup; a missing key is a sentence, not a traceback
+A typer `@app.callback()` runs `load_dotenv(find_dotenv(usecwd=True))` at startup, so a project
+`.env` (holding `ANTHROPIC_API_KEY`) is found automatically. `usecwd=True` is deliberate:
+python-dotenv's default searches upward from the *calling module's* directory (which would find
+the package's own tree), whereas we want the directory the user runs `schelling` from. When the
+**live** client is used (`type(client).__name__ == "AnthropicClient"`, so a test-injected replay
+client is exempt) and no key is present, `formalize` prints one friendly sentence pointing at the
+env var / `.env` and exits 2 — never a stack trace.
+
+### D6.6 — Firewall recalibrated: 4-grams + stopword/theory-vocab distinctiveness (fixes false positives)
+The first real run flagged the generic trigrams `'of the future'` and `'shadow of the'` — repeated
+-games *analysis vocabulary*, not facts. Fix, without weakening true-positive detection: (a) phrase
+shingles are now **4-grams**; (b) a shingle is a leak candidate only if it has **≥2 tokens that are
+neither stopwords nor canonical theory terms**; (c) the theory whitelist is built from
+`templates.yaml` (card names + `solution_concept` text), so terms like `future`/`cooperation`/
+`bargaining` are treated as analysis language. Under this rule "shadow of the future" has only one
+distinctive token (`shadow`; `future` is whitelisted, `of`/`the` are stopwords) → not flagged;
+the planted fact "Zorbian Federation fields nine hundred hypersonic interceptors" keeps four
+distinctive tokens per shingle → still flagged. The alphanumeric-code check (letter *and* digit)
+is retained. Regression-tested both directions.
+
+### D6.7 — Leak ergonomics: located leaks, a rephrase retry, and a quarantine file
+`IndexLeakageError` now carries structured `Leak(phrase, location)` entries and the rejected
+`DraftExtraction`; `find_leaks` attributes each leak to its actor and field (e.g.
+`actor 'aland' evidence[0].note`). On a leak, `formalize` retries **once** (`max_leak_retries=1`),
+feeding the flagged phrases back to the model ("rephrase without these phrases in factual
+fields"), then **fails closed**. `DraftMetadata.leak_retries` counts these (distinct from
+validation `retries`). The CLI writes the rejected draft to `<output>.quarantine.json` and prints
+the located leaks, so a human can inspect exactly what was blocked.
