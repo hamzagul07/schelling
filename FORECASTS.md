@@ -67,3 +67,30 @@ Anyone can audit a sealed forecast without trusting us:
    `ots upgrade` once the Bitcoin attestation has confirmed). A Bitcoin-anchored timestamp cannot be
    backdated — not even by us. When the `ots` client is absent at seal time, anchoring is a logged
    no-op and the SHA-256 commitment still stands.
+
+## External anchoring — correction-on-top (D18.2, dated 2026-07-22)
+
+Stated plainly, both facts at once, in the same spirit as the hash-basis correction above:
+
+- The four rows were **sealed on 2026-07-21** (their `frozen_at` dates), recorded in git before the
+  event resolves. Those seal *dates* rest on **git history** — the commits that published these
+  SHA-256 digests ahead of resolution.
+- The OpenTimestamps feature did not exist until 2026-07-22, so the **external Bitcoin anchor on this
+  file dates from 2026-07-22, not from the original seal.** The proof in `ledger-proofs/` proves this
+  ledger's exact bytes existed by 2026-07-22 — still well before the 2026-08-31 resolution — but it
+  does **not** back-date to 2026-07-21.
+
+Neither fact is hidden. Re-anchor at any time with `schelling stamp` (no new seal required); each
+distinct ledger state gets its own content-addressed proof.
+
+## Canonicalization epochs and the v1-challenge record (D18.1)
+
+A record's internal content-address (`inputs_hash`) has two epochs. **v1** predates the
+`SolverConfig.reference_point` field (added Session 10, D10.4); **v2** (current) includes it. The
+v1-challenge record was created under v1, so its stored `inputs_hash` is **`45d931c6cd91…`**;
+recomputed under current v2 rules the same game hashes to **`2cbb0bc624f3…`**. The difference is
+*exactly* the reference-point field — bisected and confirmed (the v1-challenge record's stored
+`solver_config` has no `reference_point` key; dropping that key from the v2 recompute reproduces
+`45d931c6cd91` byte-for-byte). **No sealed byte was ever changed.** `schelling verify` is epoch-aware:
+it reproduces the stored hash under v1 rules and reports PASS, so all four records verify. Mapping,
+for the record: **v1-challenge `45d931c6cd91` (v1) → `2cbb0bc624f3` (v2).**
