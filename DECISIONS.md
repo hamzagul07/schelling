@@ -768,3 +768,17 @@ compromise 30%, defeat 20%, stalemate 7%.
 fully equipped, and the oracle shows the mean is at the ceiling; **coercive (interstate crises)** —
 **PENDING**, harness built, blocked on paywalled inputs (D11.1). The ICB analog layer is a separate
 base-rate tool, not a head-to-head benchmark.
+
+### D11.4 — Coercive library schema + first KTAB registration (follow-up)
+The coercive library is now a **directory** of hand-transcribed case files (`data/coercive-cases/`)
+with a documented schema (`data/coercive-cases/README.md`): per case a nested `continuum`, a flat
+0-100 `actors` table (position/salience/capability), `source`/`ex_ante`/`domain` metadata, a
+`transcription.verified` flag, and one or more dated `outcomes` (the `primary`-flagged, or
+first-listed, reading is scored; others are secondary — the horizon rule). `coercive.py` was
+upgraded to this richer schema (building a `GameSpec` per case) and its loader now reads a directory.
+**Registered `ktab-china-2014.json`** — two domestic-elite-bargaining cases from Efird, Lester & Wise
+(2016)'s KTAB study (doi:10.1017/jea.2015.4). The harness smoke-runs it (`schelling coercive`), but
+it claims **no verdict**: the note fires all three guards — N=2 is tiny, transcriptions are
+`verified: false` (draft-1; Claude-proposed outcomes pending Hassan's check against the source), and
+the cases are out of the coercive domain (domestic, not interstate). The coercive interstate classics
+remain the quest (D11.1); this entry is out-of-domain validation scaffolding, not a coercive verdict.
