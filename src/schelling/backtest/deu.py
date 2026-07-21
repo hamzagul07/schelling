@@ -14,6 +14,7 @@ import csv
 import hashlib
 from pathlib import Path
 
+from schelling.backtest.capability import capabilities_for_issue, regime_for_year
 from schelling.schemas.backtest import DEUIssue
 from schelling.schemas.question import Continuum, GameSpec
 from schelling.schemas.stakeholders import Actor, TriangularEstimate
@@ -110,14 +111,29 @@ def _num(cell: str) -> float | None:
     return value
 
 
+def _year(datestr: str) -> int | None:
+    """Parse a DEU DD-MM-YY date to a 4-digit year (YY >= 90 -> 19YY, else 20YY)."""
+    parts = datestr.strip().split("-")
+    if len(parts) != 3 or not parts[-1].isdigit():
+        return None
+    yy = int(parts[-1])
+    return 1900 + yy if yy >= 90 else 2000 + yy
+
+
 def load_deu_issues(
-    csv_path: Path = DEFAULT_CSV, *, capability: float = 100.0, min_actors: int = 3
+    csv_path: Path = DEFAULT_CSV,
+    *,
+    capability: float = 100.0,
+    sourced_capability: bool = False,
+    min_actors: int = 3,
 ) -> list[DEUIssue]:
     """Parse the DEU CSV into normalized issues (solver-ready games + actual outcomes).
 
     Each actor with both a position and a salience present becomes a point-estimate
-    :class:`Actor` (capability fixed at ``capability`` — D9.2). Issues without a valid outcome, or
-    with fewer than ``min_actors`` participating actors, are dropped.
+    :class:`Actor`. Capability is either a fixed constant (``capability``, the Session-9 default,
+    D9.2) or, when ``sourced_capability=True``, the treaty-regime Council power for that issue's
+    decision year (Session-10, D10.1). Issues without a valid outcome, or with fewer than
+    ``min_actors`` participating actors, are dropped.
     """
     with csv_path.open(newline="") as fh:
         rows = list(csv.reader(fh, delimiter=";"))
@@ -130,26 +146,36 @@ def load_deu_issues(
         if outcome is None:  # missing / sentinel outcome -> not scoreable
             continue
 
-        actors: list[Actor] = []
-        for code in ACTOR_CODES:
-            pos = _num(row[col["p" + code]])
-            sal = _num(row[col["s" + code]])
-            if pos is None or sal is None:
-                continue
-            actors.append(
-                Actor(
-                    id=code,
-                    name=ACTOR_NAMES[code],
-                    position=TriangularEstimate.point(pos),
-                    salience=TriangularEstimate.point(sal),
-                    capability=TriangularEstimate.point(capability),
-                )
-            )
-        if len(actors) < min_actors:
+        frozen = row[col["finact"]].strip() or row[col["intro"]].strip() or "unknown"
+        present = [
+            (code, pos, sal)
+            for code in ACTOR_CODES
+            if (pos := _num(row[col["p" + code]])) is not None
+            and (sal := _num(row[col["s" + code]])) is not None
+        ]
+        if len(present) < min_actors:
             continue
 
+        if sourced_capability:
+            year = _year(frozen) or 2007  # a Nice-era fallback; every real row parses
+            caps = capabilities_for_issue([c for c, _, _ in present], year)
+            cap_note = f"sourced capability ({regime_for_year(year)} regime, D10.1)"
+        else:
+            caps = {c: capability for c, _, _ in present}
+            cap_note = f"capability fixed at {capability:g} (DEU records none)"
+
+        actors = [
+            Actor(
+                id=code,
+                name=ACTOR_NAMES[code],
+                position=TriangularEstimate.point(pos),
+                salience=TriangularEstimate.point(sal),
+                capability=TriangularEstimate.point(caps[code]),
+            )
+            for code, pos, sal in present
+        ]
+
         issue_id = row[col["isnr"]]
-        frozen = row[col["finact"]].strip() or row[col["intro"]].strip() or "unknown"
         game = GameSpec(
             question_id=issue_id,
             frozen_at=frozen,
@@ -161,7 +187,7 @@ def load_deu_issues(
             actors=actors,
             template="multilateral_bargaining",
             horizon="one_shot",
-            notes=f"DEU issue {issue_id}; capability fixed at {capability:g} (DEU records none).",
+            notes=f"DEU issue {issue_id}; {cap_note}.",
         )
         issues.append(
             DEUIssue(
