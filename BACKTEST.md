@@ -70,9 +70,21 @@ These are **not** directly comparable to our numbers (different DEU version, iss
 
 - **Capability (sourced, D10.1).** DEU records no capability, so each member state takes its Council power in the treaty regime in force at the issue's decision date (pre-Nice / Nice weighted votes; Lisbon-era population), rescaled so the strongest actor = 100; Commission/EP each take the largest member-state power (D10.3). The same table feeds the challenge solver AND the weighted-mean baseline — a fair fight.
 - **Point estimates.** Each issue is point estimates, so Monte Carlo is degenerate (zero variance, D3.1); the harness solves each issue once deterministically. `--draws` (2000) is recorded for interface parity but does not affect the result (D9.3).
-- **Determinism.** Dataset pinned by SHA-256 `0d75f0d2f3a96982…`; engine `6bc3459576c9`; seed 42. Same inputs → byte-identical record.
+- **Determinism.** Dataset pinned by SHA-256 `0d75f0d2f3a96982…`; engine `1a16d5e3506a`; seed 42. Same inputs → byte-identical record.
 
 ## Scheduled next: the ICB coercive benchmark
 
 EU legislative bargaining is a highly cooperative, consensual setting — the one BdM (2011) notes his model handles *worst*. The challenge model is built for competitive, coercive politics. So regardless of this verdict, the next benchmark is the International Crisis Behavior (ICB) dataset — coercive interstate crises — where the mechanism should have its best shot. Whether it clears there decides far more than this cooperative case.
 
+<!-- LEADERBOARD:START -->
+## Successor search — the leaderboard (Session R1)
+
+Pre-registered 40/30/30 split (seed 20260721: train 140, dev 105, TEST 106), committed before any fitting; **TEST scored once**. Each candidate must beat the compromise weighted mean on the untouched TEST split; MAE deltas carry a paired bootstrap 95% CI (seed 20260721).
+
+| Candidate | Scored on | dev MAE (comp.) | TEST MAE | comp. MAE | Δ (95% CI) | beats? |
+|---|---|---|---:|---:|---|:--:|
+| Candidate A — status-quo gravity | TEST rp-issues | 24.96 (23.87) | 22.09 | 21.26 | +0.83 [-0.15, +1.91] | no |
+| Candidate B — regime-aware settlement | TEST (all) | 24.86 (24.10) | 21.57 | 21.09 | +0.48 [-0.69, +1.76] | no |
+
+**No candidate beats the compromise weighted mean on TEST.** Both point estimates are worse and both bootstrap CIs straddle zero — statistically indistinguishable from, but not better than, the mean. The compromise model remains the settlement model for DEU; nothing was sealed against the live US-Iran game. A negative result, pre-registered and honest.
+<!-- LEADERBOARD:END -->

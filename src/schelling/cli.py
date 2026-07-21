@@ -23,6 +23,8 @@ from schelling.advise.search import advise as run_advise
 from schelling.backtest.deu import load_deu_issues
 from schelling.backtest.harness import run_backtest
 from schelling.backtest.ledger import append_entry, ledger_entry, new_ledger
+from schelling.backtest.successor import forecast_candidate as run_forecast_candidate
+from schelling.backtest.successor import leaderboard_markdown, run_successor_search
 from schelling.backtest.writeup import backtest_markdown
 from schelling.formalizer.client import AnthropicClient, WebSearchUnavailableError
 from schelling.formalizer.firewall import IndexLeakageError
@@ -113,7 +115,14 @@ def solve(
     apply_risk: bool = typer.Option(True, "--apply-risk/--no-apply-risk"),
     max_rounds: int = typer.Option(20, "--max-rounds", min=1),
     solver: str = typer.Option(
-        "both", "--solver", help="'challenge' (BDM), 'compromise' (weighted mean), or 'both'."
+        "both",
+        "--solver",
+        help="challenge|compromise|both, or a successor: gravity|regime (R1).",
+    ),
+    reference_point: float | None = typer.Option(
+        None,
+        "--reference-point",
+        help="Status-quo point (used by gravity/regime and rp challenge).",
     ),
     out_dir: Path = typer.Option(Path("runs"), "--out-dir", help="Where the record is written."),
 ) -> None:
@@ -121,8 +130,9 @@ def solve(
     if not fixture.exists():
         typer.echo(f"input not found: {fixture}", err=True)
         raise typer.Exit(code=2)
-    if solver not in ("challenge", "compromise", "both"):
-        typer.echo("--solver must be 'challenge', 'compromise', or 'both'.", err=True)
+    valid = ("challenge", "compromise", "both", "gravity", "regime")
+    if solver not in valid:
+        typer.echo(f"--solver must be one of {', '.join(valid)}.", err=True)
         raise typer.Exit(code=2)
     try:
         game, assumptions, formalizer_metadata, live_searched = _load_solve_input(fixture)
@@ -136,23 +146,29 @@ def solve(
         conflict_resolves=conflict_resolves,
         apply_risk=apply_risk,
         max_rounds=max_rounds,
+        reference_point=reference_point,
         seed=seed,
     )
     models = ["challenge", "compromise"] if solver == "both" else [solver]
     typer.echo(f"Question:  {game.question_id}")
     records = []
     for model in models:
-        record = forecast(
-            game,
-            config,
-            n_draws=draws,
-            seed=seed,
-            out_dir=out_dir,
-            assumptions=assumptions,
-            formalizer_metadata=formalizer_metadata,
-            live_searched=live_searched,
-            model=model,
-        )
+        if model in ("gravity", "regime"):
+            record = run_forecast_candidate(
+                game, model, n_draws=draws, seed=seed, rp=reference_point, out_dir=out_dir
+            )
+        else:
+            record = forecast(
+                game,
+                config,
+                n_draws=draws,
+                seed=seed,
+                out_dir=out_dir,
+                assumptions=assumptions,
+                formalizer_metadata=formalizer_metadata,
+                live_searched=live_searched,
+                model=model,
+            )
         records.append(record)
         e = record.ensemble
         typer.echo(
@@ -160,8 +176,9 @@ def solve(
             f"CI80 [{e.p10:.3f}, {e.p90:.3f}]   (n={e.n_draws}, seed {seed})"
         )
     typer.echo("")
-    typer.echo(format_tornado(records[0].sensitivity))
-    typer.echo("")
+    if records[0].sensitivity:
+        typer.echo(format_tornado(records[0].sensitivity))
+        typer.echo("")
     for record in records:
         typer.echo(f"Record written: {out_dir / (record.run_id + '.json')}")
 
@@ -455,6 +472,50 @@ def backtest(
     verdict = "PASSED" if record.gate_passed else "FAILED"
     typer.echo(f"Gate {verdict}: primary must beat both {record.baseline_methods}.")
     typer.echo(f"Record: {record_path}   BACKTEST.md: {md_out}")
+
+
+_LEADERBOARD_START = "<!-- LEADERBOARD:START -->"
+_LEADERBOARD_END = "<!-- LEADERBOARD:END -->"
+
+
+@app.command()
+def successor(
+    data_dir: Path = typer.Argument(..., help="Directory holding the DEU CSV (e.g. data/deu/)."),
+    md_out: Path = typer.Option(Path("BACKTEST.md"), "--md", help="Living leaderboard document."),
+) -> None:
+    """Run the successor search (fit train, tune dev, score TEST once); update the leaderboard."""
+    csv_path = data_dir / _DEU_CSV_NAME if data_dir.is_dir() else data_dir
+    if not csv_path.exists():
+        typer.echo(f"DEU CSV not found at {csv_path}. See BACKTEST.md / README.", err=True)
+        raise typer.Exit(code=2)
+
+    report, _a, _b = run_successor_search(csv_path)
+    board = f"{_LEADERBOARD_START}\n{leaderboard_markdown(report)}{_LEADERBOARD_END}\n"
+    if md_out.exists():
+        text = md_out.read_text()
+        if _LEADERBOARD_START in text and _LEADERBOARD_END in text:
+            head, _, rest = text.partition(_LEADERBOARD_START)
+            _, _, tail = rest.partition(_LEADERBOARD_END)
+            text = head.rstrip() + "\n\n" + board + tail.lstrip()
+        else:
+            text = text.rstrip() + "\n\n" + board
+        md_out.write_text(text)
+    else:
+        md_out.write_text(board)
+
+    typer.echo("Successor search — TEST scored once:")
+    for c in report.candidates:
+        verdict = "beats compromise" if c.beats_compromise else "does NOT beat compromise"
+        typer.echo(
+            f"  {c.name}: TEST MAE {c.test_mae:.2f} vs {c.test_compromise_mae:.2f}  "
+            f"(Δ {c.delta:+.2f} CI [{c.ci_lo:+.2f}, {c.ci_hi:+.2f}]) — {verdict}"
+        )
+    typer.echo(
+        "A survivor is sealed to the ledger."
+        if report.any_survivor
+        else "No survivor — nothing sealed. The compromise model stands."
+    )
+    typer.echo(f"Leaderboard written to {md_out}.")
 
 
 @app.command()
