@@ -782,3 +782,50 @@ it claims **no verdict**: the note fires all three guards — N=2 is tiny, trans
 `verified: false` (draft-1; Claude-proposed outcomes pending Hassan's check against the source), and
 the cases are out of the coercive domain (domestic, not interstate). The coercive interstate classics
 remain the quest (D11.1); this entry is out-of-domain validation scaffolding, not a coercive verdict.
+
+---
+
+## Session 12 — ledger sealing, retirements, diagnostics (wrap-up)
+
+### D12.0 — FORECASTS.md now seals by SHA-256 of the record file (correction to the old ledger)
+The ledger line for a forecast is now pinned by the **SHA-256 of the exact `runs/` record file**
+(`ledger.record_sha256` = `sha256(path.read_bytes())`), so a reader can `sha256sum runs/<file>` and
+verify. This **supersedes and corrects** the Session-10 ledger, which pinned its two v1 rows by a
+*partial* `forecast_commitment` hash (question + model + inputs_hash + seed + ensemble, excluding the
+engine SHA/timestamps) and recorded only v1. The correction, stated explicitly in FORECASTS.md: the
+hash basis changed from that partial commitment to the record-file SHA-256, and the recomputed
+SHA-256s are the source of truth. The forecast **medians were verified unchanged** against the
+recomputed records (v1 challenge 34.576, v1 compromise 41.636); only the hash basis moved and v2 was
+added. The four sealed records: v1 challenge `…45d931c6cd91` (aece91bd…), v1 compromise
+`…2cbb0bc624f3` (c87d91ae…), v2 challenge `…d4441652019a` (3bc97cd4…), v2 compromise
+`…d4441652019a` (d55ffc3e…). `forecast_commitment` is kept as a historical utility (still tested) but
+is no longer the ledger's hash.
+
+### D12.1 — `schelling seal <record.json>` (one-command, idempotent sealing)
+Replaces the old `ledger` command. It reads a `runs/` record, computes its SHA-256, and appends one
+markdown row inside the `<!-- LEDGER:START/END -->` block of FORECASTS.md (creating the block/header
+if absent). **Idempotent:** if that SHA-256 already appears anywhere in the file, it reports and
+changes nothing — re-sealing is safe. `--vintage` sets the vintage label (the record can't carry it).
+Records are never committed (`runs/` gitignored); `analyses/` is never touched.
+
+### D12.2 — The Iran-faction-split experiment is formally retired
+An earlier US-Iran vintage explored modelling Iran as competing factions. **v2 retired that split:**
+it runs a **single `iran` actor**, **adds the IAEA** as an actor, and **renames the Gulf blocs**
+(`gulf_hawks` → `uae_hawkish_gulf`, `gulf_moderates` → `moderate_gulf`). The split is retired — not
+left dangling — because it added actors whose positions/saliences the sources could not pin down
+(inventing them would violate rule 6), and because the single-actor v2 is the cleaner, defensible
+specification. Both vintages are sealed in FORECASTS.md for the 2026-09-01 grading, so the choice is
+auditable rather than silently dropped: v2 challenge forecasts **29.407** (vs v1's 34.576), v2
+compromise **39.443** (vs v1's 41.636) — the revision pulled both models modestly toward the US pole.
+
+### D12.3 — Tornado diagnostics: degenerate-median-lock warning + mode-game median surfaced
+Two related transparency fixes prompted by the v2 challenge run (whose deterministic mode game locks
+at 22.0 while its Monte-Carlo median is 29.4, and whose tornado is 18/27 zero-swing):
+- **`zero_swing_warning`** flags a sensitivity table where ≥ half of (and ≥ 2) the ranged parameters
+  leave the forecast unchanged — a "degenerate median lock" where the weighted median is pinned and
+  single-parameter moves don't shift it. Printed in `solve` output and shown as a caveat box in the
+  report.
+- **The deterministic mode-game median** (`median_trajectory[-1]`) is now shown **alongside the MC
+  median** in `solve` output and the report headline, with the signed gap, so the reader sees when
+  the point-estimate solve and the ensemble diverge sharply (e.g. v1: mode 53.8 vs MC 34.6, gap
+  −19.2). The compromise model has no round trajectory, so its mode-game cell reads "—".
