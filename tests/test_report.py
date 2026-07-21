@@ -195,6 +195,30 @@ def test_forecast_report_shows_model() -> None:
     assert "challenge model" in html  # the model is named in the header
 
 
+def test_forecast_report_renders_analog_panel() -> None:
+    data = _load("forecast_record.json")
+    data["analog_panel"] = {
+        "source": "ICB v16 (test)",
+        "n": 30,
+        "query": {"gravity": 6.0, "violence": 3.0, "n_actors": 8.0},
+        "outcome_distribution": {
+            "victory": 0.4,
+            "compromise": 0.3,
+            "defeat": 0.2,
+            "stalemate": 0.1,
+        },
+        "examples": [
+            {"crisname": "TEST CRISIS", "year": 1999, "actor": "XYZ", "outcome": "compromise"}
+        ],
+        "blend_weight": 0.0,
+    }
+    html = render(data)
+    assert "Historical base rates" in html and "not blended" in html
+    assert "TEST CRISIS" in html and "ICB v16" in html
+    for token in ("<script", "<link", "src=", "@import", "url("):  # still offline-clean
+        assert token not in html.lower()
+
+
 def test_backtest_report_rejects_bad_schema() -> None:
     bad = {"methods": [], "gate_passed": True, "primary_method": "x"}  # backtest-shaped but invalid
     with pytest.raises(ValueError, match="BacktestRecord"):

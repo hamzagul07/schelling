@@ -20,6 +20,7 @@ import numpy.typing as npt
 from schelling.mc.sampling import derive_rng, sample_game
 from schelling.mc.sensitivity import tornado
 from schelling.schemas.forecast import (
+    AnalogPanel,
     Assumption,
     DraftMetadata,
     Ensemble,
@@ -161,6 +162,7 @@ def build_forecast_record(
     formalizer_metadata: DraftMetadata | None = None,
     live_searched: bool = False,
     model: str = MODEL_CHALLENGE,
+    analog_panel: AnalogPanel | None = None,
 ) -> ForecastRecord:
     """Assemble the complete :class:`ForecastRecord` from a Monte Carlo run.
 
@@ -203,6 +205,7 @@ def build_forecast_record(
         assumptions=list(assumptions or []),
         formalizer_metadata=formalizer_metadata,
         live_searched=live_searched,
+        analog_panel=analog_panel,
         outcome_distribution=[float(v) for v in dist],
         convergence_stats=convergence_stats(mc),
         sensitivity=sensitivity,
@@ -230,6 +233,7 @@ def forecast(
     formalizer_metadata: DraftMetadata | None = None,
     live_searched: bool = False,
     model: str = MODEL_CHALLENGE,
+    analog_panel: AnalogPanel | None = None,
 ) -> ForecastRecord:
     """Run Monte Carlo + sensitivity, build the ForecastRecord, and (by default) persist it.
 
@@ -251,6 +255,7 @@ def forecast(
         formalizer_metadata=formalizer_metadata,
         live_searched=live_searched,
         model=model,
+        analog_panel=analog_panel,
     )
     if write:
         write_record(record, out_dir)
