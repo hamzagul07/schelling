@@ -227,8 +227,14 @@ def analyze(
 
     # 1-2. Formalize the question into a reviewable draft and write it.
     draft = _formalize_or_exit(
-        question, source_texts, model=llm_model, max_retries=max_retries, search=search,
-        max_searches=max_searches, db_path=db_path, no_knowledge=no_knowledge,
+        question,
+        source_texts,
+        model=llm_model,
+        max_retries=max_retries,
+        search=search,
+        max_searches=max_searches,
+        db_path=db_path,
+        no_knowledge=no_knowledge,
         quarantine_path=draft_out.with_suffix(".quarantine.json"),
     )
     draft_out.write_text(draft.model_dump_json(indent=2) + "\n")
@@ -247,9 +253,15 @@ def analyze(
     models = ["challenge", "compromise"] if solver == "both" else [solver]
     records = [
         forecast(
-            draft.game, SolverConfig(seed=seed), n_draws=draws, seed=seed, out_dir=out_dir,
-            assumptions=draft.assumptions, formalizer_metadata=draft.metadata,
-            live_searched=draft.live_searched, model=m,
+            draft.game,
+            SolverConfig(seed=seed),
+            n_draws=draws,
+            seed=seed,
+            out_dir=out_dir,
+            assumptions=draft.assumptions,
+            formalizer_metadata=draft.metadata,
+            live_searched=draft.live_searched,
+            model=m,
         )
         for m in models
     ]
@@ -676,7 +688,11 @@ def backtest(
     out_dir.mkdir(parents=True, exist_ok=True)
     record_path = out_dir / f"backtest-{record.dataset_sha256[:12]}.json"
     record_path.write_text(record.model_dump_json(indent=2) + "\n")
-    md_out.write_text(backtest_markdown(record))
+    # Section ownership (D18.4): `backtest` owns the report body; the LEADERBOARD block belongs to
+    # `successor`. Preserve any existing leaderboard so regenerating one section never strips the
+    # other (before this fix, a bare `backtest` deleted the R1 leaderboard).
+    body = backtest_markdown(record)
+    md_out.write_text(_preserve_leaderboard(body, md_out.read_text()) if md_out.exists() else body)
     if html_out is not None:
         html_out.write_text(render_report(json.loads(record.model_dump_json())))
 
@@ -694,6 +710,15 @@ def backtest(
 
 _LEADERBOARD_START = "<!-- LEADERBOARD:START -->"
 _LEADERBOARD_END = "<!-- LEADERBOARD:END -->"
+
+
+def _preserve_leaderboard(body: str, existing: str) -> str:
+    """Re-attach an existing LEADERBOARD block (owned by `successor`) to a fresh `backtest` body."""
+    if _LEADERBOARD_START in existing and _LEADERBOARD_END in existing:
+        _, _, rest = existing.partition(_LEADERBOARD_START)
+        block, _, _ = rest.partition(_LEADERBOARD_END)
+        return body.rstrip() + f"\n\n{_LEADERBOARD_START}{block}{_LEADERBOARD_END}\n"
+    return body
 
 
 @app.command()
@@ -831,6 +856,29 @@ def seal(
 
 
 @app.command()
+def stamp(
+    ledger: Path = typer.Option(Path("FORECASTS.md"), "--ledger", help="Ledger file to anchor."),
+    proofs_dir: Path = typer.Option(
+        Path("ledger-proofs"), "--proofs-dir", help="Where OpenTimestamps proofs are stored."
+    ),
+) -> None:
+    """Anchor the ledger with OpenTimestamps without sealing anything new (D18.0).
+
+    Re-timestamps the current ledger file and stores the proof in ``ledger-proofs/`` (content-
+    addressed by the ledger's SHA-256, so re-stamping the same bytes is idempotent). Use this to
+    externally anchor a ledger that was sealed before the timestamping feature existed, or after any
+    correction-on-top edit. A soft no-op with a warning if the `ots` client is unavailable.
+    """
+    if not ledger.exists():
+        typer.echo(f"ledger not found: {ledger}", err=True)
+        raise typer.Exit(code=2)
+    proof, message = stamp_ledger(ledger, proofs_dir)
+    typer.echo(message)
+    if proof is None:  # the `ots` client was unavailable or failed — nothing was anchored
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def verify(
     record: Path = typer.Argument(..., help="A sealed ForecastRecord JSON to audit."),
     ledger: Path = typer.Option(Path("FORECASTS.md"), "--ledger", help="The sealed ledger file."),
@@ -862,17 +910,81 @@ def verify(
         raise typer.Exit(code=1)
 
 
+def _check_evidence_drift(repo_root: Path, out_dir: Path) -> int:
+    """Compare committed EVIDENCE.md to a fresh regeneration (D18.3). Returns a process exit code.
+
+    Fails (1) if any **science** number drifted; warns (0) on provenance-only or test-count drift.
+    """
+    from schelling.paper.assemble import parse_evidence
+    from schelling.paper.evidence import build_evidence, evidence_markdown
+
+    committed_path = out_dir / "EVIDENCE.md"
+    if not committed_path.exists():
+        typer.echo(f"no committed {committed_path} to check; run without --check.", err=True)
+        return 2
+    bundle = build_evidence(repo_root)
+    data_absent = (
+        bundle.record is None
+    )  # DEU data not present -> its tags can't be regenerated here
+    fresh = parse_evidence(evidence_markdown(bundle))
+    committed = parse_evidence(committed_path.read_text())
+    science: list[str] = []
+    provenance: list[str] = []
+    skipped = 0
+    for tag in sorted(set(fresh) | set(committed)):
+        f, c = fresh.get(tag), committed.get(tag)
+        if c is None:
+            provenance.append(f"{tag}: new ({f['value']})")  # type: ignore[index]
+        elif f is None:
+            # Absent from the fresh regen: a real drop only if the data was actually present.
+            if data_absent:
+                skipped += 1
+            else:
+                science.append(f"{tag}: DROPPED (was {c['value']})")
+        elif f["value"] != c["value"]:
+            (provenance if tag == "E-TESTS" else science).append(
+                f"{tag}: {c['value']} -> {f['value']}"
+            )
+        elif f["prov"] != c["prov"]:
+            provenance.append(f"{tag}: provenance {c['prov']} -> {f['prov']}")
+    if skipped:
+        typer.echo(
+            f"({skipped} data-derived tags not regenerable here — DEU data absent — skipped)"
+        )
+    if science:
+        typer.echo(f"SCIENCE DRIFT — build fails ({len(science)}):", err=True)
+        for s in science:
+            typer.echo(f"  ✗ {s}", err=True)
+        typer.echo("Regenerate with `schelling paper-evidence` and re-commit.", err=True)
+        return 1
+    if provenance:
+        typer.echo(f"provenance/repro drift only — warning, not a failure ({len(provenance)}):")
+        for p in provenance:
+            typer.echo(f"  ~ {p}")
+    else:
+        typer.echo("EVIDENCE.md is in sync with HEAD — no drift.")
+    return 0
+
+
 @app.command("paper-evidence")
 def paper_evidence(
     repo_root: Path = typer.Option(Path("."), "--repo-root", help="Repository root."),
     out_dir: Path = typer.Option(Path("paper"), "--out-dir", help="Where paper/ artifacts go."),
+    check: bool = typer.Option(
+        False, "--check", help="Verify committed EVIDENCE.md vs HEAD; fail on science-number drift."
+    ),
 ) -> None:
     """Regenerate paper/EVIDENCE.md + paper/figures/ deterministically from artifacts (D14.1/2).
 
     Every number is computed from the repo's own artifacts (fixtures, DEU data pinned by SHA-256,
     the sealed ledger) — never hand-typed — so the evidence table and figures can be regenerated and
-    diffed forever. Numbers no artifact can source are listed as open questions, never guessed.
+    diffed forever. Numbers no artifact can source are listed as open questions, never guessed. With
+    ``--check`` it writes nothing: it fails the build if any science number drifted from the
+    committed EVIDENCE.md, and only warns on provenance-hash or test-count drift (D18.3).
     """
+    if check:
+        raise typer.Exit(code=_check_evidence_drift(repo_root, out_dir))
+
     from schelling.paper.evidence import build_evidence, evidence_markdown
     from schelling.paper.figures import write_figures
 

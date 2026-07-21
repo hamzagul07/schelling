@@ -219,3 +219,55 @@ def test_round1_and_context_tags_present(tmp_path: Path) -> None:
     assert "| E-DEU-MAE-r1 |" in text and "| 28.31 |" in text  # handicapped round-1 challenge
     assert "| E-BASE-WMEAN-r1 |" in text and "| 23.64 |" in text  # round-1 weighted mean
     assert "| E-CTX-bdm2011 |" in text and "| E-WORST |" in text
+
+
+# --------------------------------------------------------------- paper-evidence --check (D18.3)
+def _bundle(items: list[EvidenceItem]) -> EvidenceBundle:
+    return EvidenceBundle(items=items, open_questions=[])  # record=None -> data_absent path
+
+
+def _mk(tag: str, value: str, prov: str = "abc123") -> EvidenceItem:
+    return EvidenceItem(tag, "S", "metric", value, "src", prov, "note")
+
+
+def test_check_in_sync_exits_zero(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    items = [_mk("E-REPL-MEDIAN", "9.530"), _mk("E-TESTS", "279")]
+    monkeypatch.setattr("schelling.paper.evidence.build_evidence", lambda repo_root: _bundle(items))
+    (tmp_path / "EVIDENCE.md").write_text(evidence_markdown(_bundle(items)))
+    r = runner.invoke(app, ["paper-evidence", "--check", "--out-dir", str(tmp_path)])
+    assert r.exit_code == 0 and "in sync" in r.output
+
+
+def test_check_science_drift_fails_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fresh = [_mk("E-REPL-MEDIAN", "9.530")]
+    stale = [_mk("E-REPL-MEDIAN", "9.999")]  # committed carries a different science number
+    monkeypatch.setattr("schelling.paper.evidence.build_evidence", lambda repo_root: _bundle(fresh))
+    (tmp_path / "EVIDENCE.md").write_text(evidence_markdown(_bundle(stale)))
+    r = runner.invoke(app, ["paper-evidence", "--check", "--out-dir", str(tmp_path)])
+    assert r.exit_code == 1 and "SCIENCE DRIFT" in r.output and "E-REPL-MEDIAN" in r.output
+
+
+def test_check_provenance_only_drift_warns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fresh = [_mk("E-REPL-MEDIAN", "9.530", prov="newhash")]
+    stale = [_mk("E-REPL-MEDIAN", "9.530", prov="oldhash")]  # same value, different provenance
+    monkeypatch.setattr("schelling.paper.evidence.build_evidence", lambda repo_root: _bundle(fresh))
+    (tmp_path / "EVIDENCE.md").write_text(evidence_markdown(_bundle(stale)))
+    r = runner.invoke(app, ["paper-evidence", "--check", "--out-dir", str(tmp_path)])
+    assert r.exit_code == 0 and "provenance" in r.output.lower()
+
+
+def test_check_test_count_is_not_science(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fresh = [_mk("E-TESTS", "279")]
+    stale = [_mk("E-TESTS", "267")]  # 267 -> 279 is a repro stat, not a manuscript science number
+    monkeypatch.setattr("schelling.paper.evidence.build_evidence", lambda repo_root: _bundle(fresh))
+    (tmp_path / "EVIDENCE.md").write_text(evidence_markdown(_bundle(stale)))
+    r = runner.invoke(app, ["paper-evidence", "--check", "--out-dir", str(tmp_path)])
+    assert r.exit_code == 0 and "E-TESTS" in r.output
+
+
+def test_check_without_committed_file_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("schelling.paper.evidence.build_evidence", lambda repo_root: _bundle([]))
+    r = runner.invoke(app, ["paper-evidence", "--check", "--out-dir", str(tmp_path)])
+    assert r.exit_code == 2 and "no committed" in r.output

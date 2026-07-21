@@ -35,8 +35,10 @@ the next plan section unasked. Commit at the end of each milestone.
 
 ## 5. Green before commit
 
-Run `ruff`, `mypy`, and `pytest` — all green — before every commit. `mypy` is `--strict` on
-`src/schelling/solver`. CI enforces the same three on every push; do not push red.
+Run `ruff`, `mypy`, and `pytest` — all green — before every commit. `mypy` runs in `--strict` mode
+**globally** across the whole package (the codebase is small enough to hold that line from commit
+one; see `pyproject.toml`), not only on `src/schelling/solver`. CI enforces the same three on every
+push; do not push red.
 
 ## 6. The knowledge index is a concepts library ONLY
 
