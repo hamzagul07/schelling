@@ -469,3 +469,61 @@ report` renders it: baseline actor map with the settlement marker, an own-moves 
 scatter, a persuasion-target bar ranking, and — printed on **every** advise output (CLI and
 report) — the standing caveat: *"One-sided search: opponents are held to the model's fixed
 behavior; real adversaries adapt. Treat as lever-finding, not a playbook."*
+
+---
+
+## Session 8 — live search in the formalizer
+
+### D8.0 — Advise refinements: adaptive position grid + energize/defuse labels
+(a) The position sweep's default step is now **adaptive**: the realized continuum span / 20, so a
+year-scale game (~2–12) and a 0-100 game both get ~20 candidate points without hand-tuning.
+`--grid-step` still overrides (and, when given, applies to both the position and salience sweeps,
+as before). Salience keeps a fixed default step of 5 (it always lives on the 0-100 scale). The
+*effective* steps are recorded in `advise_config` (`grid_step`, `salience_step`) so the record
+stays self-describing and reproducible. (b) Each persuasion-target row is labeled **energize**
+(raise an actor's salience, or pull its position toward the advisor's ideal) vs **defuse** (lower
+an actor's salience). Position targets are always `energize`; a salience target is `energize` when
+the chosen edge raises salience and `defuse` when it lowers it. The label surfaces in the CLI,
+the report table (new "play" column), and the persuasion bar labels.
+
+### D8.1 — `formalize --search`: server-side web search, fetched pages are evidence
+`schelling formalize --search [--max-searches 5]` enables Anthropic's server-side web-search tool
+(`web_search_20260209`, `max_uses = max_searches`) in the formalize call, so the model may fetch
+current sources *before* drafting. Everything it fetches is **evidence-river material**, on the
+same footing as a supplied source file: each fetched page becomes a `FetchedSource`
+`{url, title, retrieved_at, snippet}` in `draft.sources_fetched`, and an evidence note may cite a
+fetched page exactly like a supplied file. Cost: the search is billed at $10 / 1,000 searches
+(Anthropic list price); `searches_used` and the combined token+search `cost_usd` are logged in
+`DraftMetadata`. Search is **off by default** — the deterministic, offline pipeline is unchanged
+unless the flag is passed.
+
+### D8.2 — The thin client parses multi-block responses; `retrieved_at` is evidence metadata
+`AnthropicClient` now assembles a completion from a *multi-block* response: `text` blocks (joined),
+`server_tool_use` (the query, ignored), and `web_search_tool_result` (a list of `web_search_result`
+items → `WebSource(url, title, snippet)`, snippet taken from the text blocks' citations — the
+passage Claude actually quoted). `searches_used` is read from `usage.server_tool_use.
+web_search_requests`. A rejected tool (account not enabled / bad type) is mapped to a friendly
+`WebSearchUnavailableError` ("re-run without --search"), never a raw traceback. `retrieved_at` is
+stamped from the run date (`today`, injected by the CLI; fixed in tests): it is **data about the
+evidence**, deliberately kept out of any hash and out of report layout, so determinism (rule 2) is
+untouched — a live-searched draft is byte-identical given the same `today` and replayed sources.
+
+### D8.3 — Freeze discipline: a live-searched draft is stamped today, and backtests forbid search
+With `--search` on, `game.frozen_at` is forced to `today` and `DraftGameSpec.live_searched` is set
+— a live search returns today's web and cannot honestly be frozen in the past. CLAUDE.md gains
+**rule 7**: historical backtests (the Phase 2 ICB harness, any calibration on resolved cases) must
+run with search OFF, or they leak the future. The firewall is unchanged in spirit: fetched title +
+snippet text joins `allowed_text`, so a fact that arrives via a fetched source is allowed in a
+factual field (it *is* evidence), while concept-library content that is *not* in any fetched source
+stays blocked. Tested both directions: the same distinctive fact is a leak when it exists only in
+the concept index, and legitimate evidence once it also appears in a fetched snippet.
+
+### D8.4 — Report renders `sources_fetched` as a linked source list; still offline-clean
+`render_draft` adds a "Sources fetched — live web search" section (and a `live-searched` badge in
+the header) listing each source as a clickable link with its `retrieved_at`. This introduces
+`https://` hyperlinks into the report, which the strict Session-6 offline test banned outright. The
+guarantee that matters is "opens offline, loads nothing": a hyperlink to a cited source loads
+nothing until clicked, whereas the real risks are *resource-loading* tokens. So the searched-draft
+report is tested to contain **no** `<script`, `<link`, `src=`, `@import`, or `url(` while allowing
+`href="https://…"`; the three source-less goldens keep the original strict no-URL assertion. Source
+rows render in a deterministic order (by URL), independent of fetch order.

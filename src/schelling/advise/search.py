@@ -87,13 +87,17 @@ def advise(
     draws_per_candidate: int = 2000,
     target_draws: int = 10000,
     seed: int = 42,
-    grid_step: float = 5.0,
+    grid_step: float | None = None,
     salience_floor: float = 20.0,
     created_at: str | None = None,
 ) -> tuple[AdviseRecord, ForecastRecord]:
     """Run the advise search and return ``(AdviseRecord, baseline ForecastRecord)``.
 
     Raises ``ValueError`` if ``advising_actor`` is not an actor in the game.
+
+    ``grid_step`` sets the position sweep resolution; when ``None`` (the default) it is adaptive —
+    the realized continuum span / 20 — so a year-scale game and a 0-100 game both get ~20 points
+    (D8.0a). Salience is always swept at a fixed step of 5 (it lives on the 0-100 scale).
     """
     cfg = solver_config or SolverConfig()
     index = {a.id: i for i, a in enumerate(game.actors)}
@@ -117,7 +121,10 @@ def advise(
     # Position sweep across the realized continuum (span of all actors' position ranges).
     pos_lo = min(a.position.low for a in game.actors)
     pos_hi = max(a.position.high for a in game.actors)
-    for v in _grid(pos_lo, pos_hi, grid_step):
+    # Adaptive default: ~20 points across the realized span; explicit --grid-step overrides (D8.0a).
+    pos_step = grid_step if grid_step is not None else max(round((pos_hi - pos_lo) / 20.0, 6), _EPS)
+    sal_step = grid_step if grid_step is not None else 5.0
+    for v in _grid(pos_lo, pos_hi, pos_step):
         m = _candidate_median(game, cfg, advisor_idx, "position", v, draws_per_candidate, seed)
         own_moves.append(
             OwnMove(
@@ -130,7 +137,7 @@ def advise(
             )
         )
     # Salience sweep: down to the floor and up to 100 (salience is on a 0-100 scale).
-    for v in _grid(salience_floor, 100.0, grid_step):
+    for v in _grid(salience_floor, 100.0, sal_step):
         m = _candidate_median(game, cfg, advisor_idx, "salience", v, draws_per_candidate, seed)
         own_moves.append(
             OwnMove(
@@ -175,6 +182,7 @@ def advise(
                 to_value=to_pos,
                 settlement_median=m_pos,
                 benefit=benefit(m_pos),
+                kind="energize",  # pulling a position toward the advisor's ideal (D8.0b)
             )
         )
         # Salience: the feasible edge (within the actor's range) that most helps the advisor.
@@ -188,6 +196,8 @@ def advise(
                 to_value=to_sal,
                 settlement_median=m_sal,
                 benefit=benefit(m_sal),
+                # raising an actor's salience energizes them; lowering it defuses them (D8.0b)
+                kind="energize" if to_sal >= a.salience.mode else "defuse",
             )
             if best is None or cand.benefit > best.benefit:
                 best = cand
@@ -198,7 +208,8 @@ def advise(
     advise_cfg: dict[str, str | float | int | bool] = {
         "draws_per_candidate": draws_per_candidate,
         "target_draws": target_draws,
-        "grid_step": grid_step,
+        "grid_step": pos_step,  # effective position step (adaptive unless overridden)
+        "salience_step": sal_step,
         "salience_floor": salience_floor,
     }
     hashed = _inputs_hash(game, cfg, advise_cfg, advising_actor)

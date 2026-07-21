@@ -13,6 +13,9 @@ from typing import Protocol
 
 DEFAULT_MODEL = "claude-opus-4-8"
 
+# The current server-side web-search tool type (Anthropic API, Opus 4.8 era). See CLAUDE-API drift.
+WEB_SEARCH_TOOL_TYPE = "web_search_20260209"
+
 # USD per 1M tokens: (input, output). Used to log cost into the draft metadata.
 PRICING: dict[str, tuple[float, float]] = {
     "claude-opus-4-8": (5.0, 25.0),
@@ -21,13 +24,25 @@ PRICING: dict[str, tuple[float, float]] = {
     "claude-haiku-4-5": (1.0, 5.0),
 }
 
+# Server-side web search is billed per 1,000 searches (Anthropic list price).
+WEB_SEARCH_USD_PER_1K = 10.0
+
 
 def cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
-    """Cost in USD for a call, or 0.0 if the model's pricing is unknown."""
+    """Token cost in USD for a call, or 0.0 if the model's pricing is unknown."""
     rate = PRICING.get(model)
     if rate is None:
         return 0.0
     return input_tokens / 1e6 * rate[0] + output_tokens / 1e6 * rate[1]
+
+
+def search_cost_usd(searches: int) -> float:
+    """USD cost of ``searches`` server-side web searches."""
+    return searches / 1000.0 * WEB_SEARCH_USD_PER_1K
+
+
+class WebSearchUnavailableError(RuntimeError):
+    """The account/API rejected the server-side web-search tool."""
 
 
 @dataclass(frozen=True)
@@ -39,12 +54,23 @@ class Message:
 
 
 @dataclass(frozen=True)
+class WebSource:
+    """One source Claude fetched via server-side web search (evidence-river material)."""
+
+    url: str
+    title: str
+    snippet: str = ""
+
+
+@dataclass(frozen=True)
 class LLMResult:
-    """One model completion plus its token usage."""
+    """One model completion: text, token usage, and (when search ran) the fetched sources."""
 
     text: str
     input_tokens: int
     output_tokens: int
+    searches_used: int = 0
+    sources: tuple[WebSource, ...] = ()
 
 
 class LLMClient(Protocol):
@@ -53,7 +79,15 @@ class LLMClient(Protocol):
     @property
     def model(self) -> str: ...
 
-    def complete(self, system: str, messages: list[Message], max_tokens: int) -> LLMResult: ...
+    def complete(
+        self,
+        system: str,
+        messages: list[Message],
+        max_tokens: int,
+        *,
+        search: bool = False,
+        max_searches: int = 5,
+    ) -> LLMResult: ...
 
 
 class AnthropicClient:
@@ -81,21 +115,95 @@ class AnthropicClient:
             self._client = anthropic.Anthropic()
         return self._client
 
-    def complete(self, system: str, messages: list[Message], max_tokens: int) -> LLMResult:
+    def complete(
+        self,
+        system: str,
+        messages: list[Message],
+        max_tokens: int,
+        *,
+        search: bool = False,
+        max_searches: int = 5,
+    ) -> LLMResult:
         client = self._ensure_client()
-        response = client.messages.create(  # type: ignore[attr-defined]
-            model=self._model,
-            max_tokens=max_tokens,
-            system=system,
-            thinking={"type": "adaptive"},
-            messages=[{"role": m.role, "content": m.content} for m in messages],
-        )
-        text = "".join(b.text for b in response.content if b.type == "text")
-        return LLMResult(
-            text=text,
-            input_tokens=response.usage.input_tokens,
-            output_tokens=response.usage.output_tokens,
-        )
+        kwargs: dict[str, object] = {
+            "model": self._model,
+            "max_tokens": max_tokens,
+            "system": system,
+            "thinking": {"type": "adaptive"},
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
+        }
+        if search:
+            kwargs["tools"] = [
+                {"type": WEB_SEARCH_TOOL_TYPE, "name": "web_search", "max_uses": max_searches}
+            ]
+        try:
+            response = client.messages.create(**kwargs)  # type: ignore[attr-defined]
+        except Exception as exc:  # map a tool rejection to a friendly error, re-raise otherwise
+            if search and _looks_like_tool_rejection(exc):
+                raise WebSearchUnavailableError(
+                    "web search was rejected by the API for this account; re-run without --search."
+                ) from exc
+            raise
+        return _parse_response(response)
+
+
+def _looks_like_tool_rejection(exc: Exception) -> bool:
+    """Heuristic: an API 4xx that names the web-search tool (account not enabled / bad type)."""
+    msg = str(exc).lower()
+    return "web_search" in msg or ("tool" in msg and ("not " in msg or "unsupported" in msg))
+
+
+def _parse_response(response: object) -> LLMResult:
+    """Assemble text + fetched sources + search count from a (possibly multi-block) response.
+
+    Blocks: ``text`` (with optional ``citations``), ``server_tool_use`` (the query, ignored), and
+    ``web_search_tool_result`` (a list of ``web_search_result`` items). Snippets are taken from the
+    text blocks' citations (the passages Claude actually quoted) when available.
+    """
+    content = getattr(response, "content", []) or []
+    # url -> the passage Claude cited from it, used as the source snippet.
+    snippets: dict[str, str] = {}
+    for block in content:
+        if getattr(block, "type", None) == "text":
+            for cite in getattr(block, "citations", None) or []:
+                url = getattr(cite, "url", None)
+                cited = getattr(cite, "cited_text", None)
+                if url and cited and url not in snippets:
+                    snippets[url] = " ".join(str(cited).split())[:300]
+
+    text = "".join(
+        b.text for b in content if getattr(b, "type", None) == "text" and getattr(b, "text", None)
+    )
+    sources: list[WebSource] = []
+    seen: set[str] = set()
+    for block in content:
+        if getattr(block, "type", None) != "web_search_tool_result":
+            continue
+        for item in getattr(block, "content", None) or []:
+            if getattr(item, "type", None) != "web_search_result":
+                continue
+            url = getattr(item, "url", None)
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            sources.append(
+                WebSource(
+                    url=url,
+                    title=getattr(item, "title", "") or "",
+                    snippet=snippets.get(url, ""),
+                )
+            )
+
+    usage = response.usage  # type: ignore[attr-defined]
+    stu = getattr(usage, "server_tool_use", None)
+    searches_used = int(getattr(stu, "web_search_requests", 0) or 0) if stu is not None else 0
+    return LLMResult(
+        text=text,
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        searches_used=searches_used,
+        sources=tuple(sources),
+    )
 
 
 @dataclass
@@ -115,7 +223,15 @@ class ReplayClient:
     def model(self) -> str:
         return self.model_name
 
-    def complete(self, system: str, messages: list[Message], max_tokens: int) -> LLMResult:
+    def complete(
+        self,
+        system: str,
+        messages: list[Message],
+        max_tokens: int,
+        *,
+        search: bool = False,
+        max_searches: int = 5,
+    ) -> LLMResult:
         self.calls.append((system, list(messages)))
         if self._index >= len(self.responses):
             raise AssertionError("ReplayClient ran out of queued responses")

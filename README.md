@@ -59,7 +59,17 @@ artifact → byte-identical HTML (D6.x).
 search — the actor's own position/salience moves (benefit and cost reported separately) and
 a ranked "who to work on" list of feasible shifts of other actors toward the advisor's ideal.
 Writes a deterministic `AdviseRecord`; the report carries a standing caveat that opponents are
-held to the model's fixed behaviour — lever-finding, not a playbook (D7.x).
+held to the model's fixed behaviour — lever-finding, not a playbook (D7.x). The position grid is
+adaptive (span/20) and persuasion rows are labeled **energize** vs **defuse** (D8.0).
+
+**Session 8 (done) — live search in the formalizer:** `schelling formalize --search` lets the
+model run Anthropic's server-side web search before drafting. Everything it fetches is evidence:
+each page is recorded in `sources_fetched` `{url, title, retrieved_at, snippet}` and may be cited
+in an evidence note like a supplied source, while the concepts index stays banned from factual
+fields. A live-searched draft is stamped `frozen_at = today` and marked `live_searched` (it can't
+be frozen in the past — so backtests always run with search OFF, CLAUDE.md rule 7). The report
+renders the fetched sources as a linked list. Off by default; CI stays offline via replay
+fixtures (D8.x).
 
 ## CLI
 
@@ -78,6 +88,10 @@ schelling knowledge search "war of attrition" -k 5
 # ANTHROPIC_API_KEY, auto-loaded from a project .env). Prints a stakeholder table; NEVER
 # auto-solves — review, then solve. On a concepts-library leak it quarantines the draft.
 schelling formalize situation.txt --sources ./sources -o game.draft.json
+
+# ...or let the model search the web first for current sources (recorded in sources_fetched;
+# stamps frozen_at = today and marks the draft live-searched). Never use --search for backtests.
+schelling formalize situation.txt --search --max-searches 5 -o game.draft.json
 
 # Find levers for one actor: own moves (position/salience) + who to persuade. Writes an
 # AdviseRecord to runs/. One-sided search — lever-finding, not a playbook.

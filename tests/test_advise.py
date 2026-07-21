@@ -82,3 +82,44 @@ def test_advise_unknown_actor_raises() -> None:
     game = _game("emission_standards_widened.json")
     with pytest.raises(ValueError, match="not in this game"):
         advise(game, "atlantis", draws_per_candidate=10, target_draws=10)
+
+
+# --------------------------------------------------------------- D8.0 refinements
+def test_advise_adaptive_grid_gives_about_twenty_position_points() -> None:
+    # grid_step=None -> position step = realized span / 20, so ~21 position candidates regardless
+    # of the continuum's units (here the year-scale widened fixture).
+    record, _ = advise(
+        _game("emission_standards_widened.json"),
+        "germany",
+        draws_per_candidate=20,
+        target_draws=20,
+        seed=1,
+    )
+    positions = [m for m in record.own_moves if m.dimension == "position"]
+    assert 20 <= len(positions) <= 22
+    # the effective step is recorded in advise_config (not the literal None)
+    assert isinstance(record.advise_config["grid_step"], float)
+    assert record.advise_config["salience_step"] == 5.0
+
+
+def test_advise_explicit_grid_step_overrides_adaptive() -> None:
+    a, _ = advise(
+        _game("emission_standards_widened.json"),
+        "germany",
+        draws_per_candidate=20,
+        target_draws=20,
+        seed=1,
+        grid_step=10.0,
+    )
+    assert a.advise_config["grid_step"] == 10.0
+    assert a.advise_config["salience_step"] == 10.0  # explicit step applies to both sweeps
+
+
+def test_advise_persuasion_targets_labeled_energize_or_defuse() -> None:
+    record = _advise_widened()
+    for t in record.persuasion_targets:  # type: ignore[attr-defined]
+        assert t.kind in ("energize", "defuse")
+        if t.dimension == "position":
+            assert t.kind == "energize"  # pulling a position toward the ideal always energizes
+        else:  # salience: raising energizes, lowering defuses
+            assert t.kind == ("energize" if t.to_value >= t.from_value else "defuse")
