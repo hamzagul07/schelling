@@ -1,0 +1,48 @@
+{
+  "content": [
+    {
+      "type": "server_tool_use",
+      "id": "srvtoolu_01",
+      "name": "web_search",
+      "input": {"query": "Aland Belland Cesta coal phase-out year"}
+    },
+    {
+      "type": "web_search_tool_result",
+      "tool_use_id": "srvtoolu_01",
+      "content": [
+        {
+          "type": "web_search_result",
+          "url": "https://example.org/aland-coal-policy",
+          "title": "Aland sets 2030 coal exit target",
+          "page_age": "3 days ago",
+          "encrypted_content": "OPAQUE_BLOB_1"
+        },
+        {
+          "type": "web_search_result",
+          "url": "https://example.net/belland-energy-review",
+          "title": "Belland energy review favours 2040",
+          "page_age": "1 week ago",
+          "encrypted_content": "OPAQUE_BLOB_2"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "text": "{\"game\": \"...draft json goes here...\"}",
+      "citations": [
+        {
+          "type": "web_search_result_location",
+          "url": "https://example.org/aland-coal-policy",
+          "title": "Aland sets 2030 coal exit target",
+          "cited_text": "Aland's cabinet reaffirmed a 2030 phase-out, citing its industrial capacity.",
+          "encrypted_index": "IDX_1"
+        }
+      ]
+    }
+  ],
+  "usage": {
+    "input_tokens": 4200,
+    "output_tokens": 900,
+    "server_tool_use": {"web_search_requests": 2}
+  }
+}

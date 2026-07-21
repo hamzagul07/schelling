@@ -43,4 +43,14 @@ Run `ruff`, `mypy`, and `pytest` — all green — before every commit. `mypy` i
 The knowledge index is a concepts library ONLY. Retrieval may inform which game template
 applies and how to reason about structure; it is NEVER a source of facts, actors, payoffs,
 capabilities, or evidence about the real world. Every real-world claim in a GameSpec must
-trace to user-supplied situation text or sources.
+trace to user-supplied situation text or sources — or, when `formalize --search` is used, to a
+source the model fetched live (recorded in `sources_fetched`). Fetched pages are evidence;
+the concepts index never is.
+
+## 7. Backtests always run with live search OFF
+
+A live web search cannot be frozen in the past: it returns today's web, so a `--search` draft
+is stamped `frozen_at = today` and marked `live_searched`. Historical backtests (the Phase 2
+ICB harness and any calibration on resolved cases) MUST run `formalize` with search OFF, so the
+model sees only situation text and sources as of the freeze date. Never backtest a live-searched
+draft — it leaks the future.
