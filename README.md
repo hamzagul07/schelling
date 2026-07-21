@@ -66,7 +66,8 @@ schelling knowledge build --embedder bge-m3
 schelling knowledge search "war of attrition" -k 5
 
 # Formalize a described situation into a reviewable draft (needs the `formalize` extra +
-# ANTHROPIC_API_KEY). Prints a stakeholder table; NEVER auto-solves — review, then solve.
+# ANTHROPIC_API_KEY, auto-loaded from a project .env). Prints a stakeholder table; NEVER
+# auto-solves — review, then solve. On a concepts-library leak it quarantines the draft.
 schelling formalize situation.txt --sources ./sources -o game.draft.json
 
 # Render any artifact (a draft or a ForecastRecord) to a self-contained HTML report

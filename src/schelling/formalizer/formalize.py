@@ -22,7 +22,7 @@ from schelling.formalizer.client import (
     Message,
     cost_usd,
 )
-from schelling.formalizer.firewall import assert_no_leakage
+from schelling.formalizer.firewall import IndexLeakageError, Leak, find_leaks
 from schelling.formalizer.prompt import build_system_prompt, build_user_prompt
 from schelling.formalizer.schemas import DraftExtraction, DraftGameSpec, DraftMetadata
 from schelling.knowledge.index import KnowledgeIndex
@@ -77,6 +77,7 @@ def formalize(
     index: KnowledgeIndex | None = None,
     model: str = DEFAULT_MODEL,
     max_retries: int = 2,
+    max_leak_retries: int = 1,
     max_tokens: int = 16_000,
     top_k_chunks: int = 6,
     created_at: str | None = None,
@@ -86,7 +87,9 @@ def formalize(
     ``client`` defaults to a live :class:`AnthropicClient`; tests inject a record/replay client.
     ``index`` (optional) supplies concept-library grounding for the template choice — never
     facts. On validation failure the model is re-prompted with the error, up to ``max_retries``
-    extra attempts. A firewall then rejects any concept-library leakage into factual fields.
+    extra attempts. A firewall then checks for concept-library leakage into factual fields; on a
+    leak it re-prompts once (``max_leak_retries``) with the flagged phrases, then fails closed
+    with :class:`IndexLeakageError`. Validation and leak retries are counted in the metadata.
     """
     sources = sources or {}
     llm = client or AnthropicClient(model=model)
@@ -99,20 +102,63 @@ def formalize(
     user = build_user_prompt(situation_text, sources, card_lines, chunk_lines)
     messages: list[Message] = [Message("user", user)]
 
-    total_in = 0
-    total_out = 0
-    extraction: DraftExtraction | None = None
-    last_error = ""
+    allowed_text = "\n".join([situation_text, *sources.values()])
+    concepts_text = "\n".join([*card_lines, chunk_concepts])
+
+    totals = {"in": 0, "out": 0}
+    validation_retries = 0
+    leak_retries = 0
+    extraction: DraftExtraction
+    while True:
+        extraction, raw_text, vr = _generate_valid(
+            llm, system, messages, max_tokens, max_retries, totals
+        )
+        validation_retries += vr
+        # Firewall: no concept-library content may reach a factual field (CLAUDE.md rule 6).
+        leaks = find_leaks(extraction, allowed_text, concepts_text)
+        if not leaks:
+            break
+        if leak_retries >= max_leak_retries:
+            raise IndexLeakageError(leaks, extraction)  # fail closed
+        leak_retries += 1
+        messages.append(Message("assistant", raw_text))
+        messages.append(Message("user", _rephrase_prompt(leaks)))
+
+    metadata = DraftMetadata(
+        model=llm.model,
+        input_tokens=totals["in"],
+        output_tokens=totals["out"],
+        cost_usd=round(cost_usd(llm.model, totals["in"], totals["out"]), 6),
+        retries=validation_retries,
+        leak_retries=leak_retries,
+        created_at=created_at,
+    )
+    return DraftGameSpec(
+        game=extraction.game,
+        assumptions=extraction.assumptions,
+        template_classification=extraction.template_classification,
+        metadata=metadata,
+    )
+
+
+def _generate_valid(
+    llm: LLMClient,
+    system: str,
+    messages: list[Message],
+    max_tokens: int,
+    max_retries: int,
+    totals: dict[str, int],
+) -> tuple[DraftExtraction, str, int]:
+    """Call the model until it returns schema-valid JSON; returns (extraction, text, retries)."""
     attempts = max_retries + 1
+    last_error = ""
     for attempt in range(attempts):
         result = llm.complete(system, messages, max_tokens)
-        total_in += result.input_tokens
-        total_out += result.output_tokens
+        totals["in"] += result.input_tokens
+        totals["out"] += result.output_tokens
         try:
             data = json.loads(_extract_json(result.text))
-            extraction = DraftExtraction.model_validate(data)
-            retries = attempt
-            break
+            return DraftExtraction.model_validate(data), result.text, attempt
         except (ValueError, ValidationError) as exc:
             last_error = str(exc)
             if attempt == attempts - 1:
@@ -128,24 +174,23 @@ def formalize(
                     "Return ONLY the corrected JSON object.",
                 )
             )
-    assert extraction is not None  # loop either breaks with a value or raises
+    raise FormalizeError("unreachable")  # pragma: no cover
 
-    # Firewall: no concept-library content may reach a factual field (CLAUDE.md rule 6).
-    allowed_text = "\n".join([situation_text, *sources.values()])
-    concepts_text = "\n".join([*card_lines, chunk_concepts])
-    assert_no_leakage(extraction, allowed_text, concepts_text)
 
-    metadata = DraftMetadata(
-        model=llm.model,
-        input_tokens=total_in,
-        output_tokens=total_out,
-        cost_usd=round(cost_usd(llm.model, total_in, total_out), 6),
-        retries=retries,
-        created_at=created_at,
+def _rephrase_prompt(leaks: list[Leak]) -> str:
+    """Ask the model to rephrase factual fields to drop the flagged concept-library phrases."""
+    phrases = "; ".join(f'"{p}"' for p in _distinct_phrases(leaks))
+    return (
+        "Some phrases in the factual fields (actor names, evidence notes, assumptions) were copied "
+        "from the concepts library, not from the situation or sources. Rephrase so that NONE of "
+        f"these phrases appear in any factual field: {phrases}. Keep the same actors and analysis; "
+        "only fix the factual wording, and add an assumption if a claim lacks supplied evidence. "
+        "Return ONLY the corrected JSON object."
     )
-    return DraftGameSpec(
-        game=extraction.game,
-        assumptions=extraction.assumptions,
-        template_classification=extraction.template_classification,
-        metadata=metadata,
-    )
+
+
+def _distinct_phrases(leaks: list[Leak]) -> list[str]:
+    seen: dict[str, None] = {}
+    for leak in leaks:
+        seen.setdefault(leak.phrase, None)
+    return list(seen)
