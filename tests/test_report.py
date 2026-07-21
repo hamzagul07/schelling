@@ -93,3 +93,38 @@ def test_forecast_report_without_game_is_graceful() -> None:
     assert "Outcome distribution" in html
     assert "Actor map" not in html
     assert "Inputs" not in html
+
+
+# --------------------------------------------------------------- draft provenance end-to-end (D6.8)
+def test_forecast_report_renders_carried_assumptions_and_provenance() -> None:
+    from schelling.formalizer.schemas import DraftGameSpec
+    from schelling.mc.monte_carlo import forecast
+    from schelling.solver.config import SolverConfig
+
+    draft = DraftGameSpec.model_validate(_load("draft.json"))
+    record = forecast(
+        draft.game,
+        SolverConfig(),
+        n_draws=40,
+        seed=1,
+        write=False,
+        assumptions=draft.assumptions,
+        formalizer_metadata=draft.metadata,
+    )
+    html = render(json.loads(record.model_dump_json()))
+    assert "Assumptions carried from the draft" in html
+    assert draft.assumptions[0].statement in html  # the assumption text is rendered
+    assert "formalizer</dt>" in html and draft.metadata.model in html  # provenance chain
+
+
+# --------------------------------------------------------------- named-reason detection (D6.9)
+def test_render_old_schema_record_names_the_reason() -> None:
+    old = {"run_id": "x", "question_id": "Q", "forecast_median": 9.5}  # pre-ensemble schema
+    with pytest.raises(ValueError, match="older schema"):
+        render(old)
+
+
+def test_render_malformed_forecast_names_the_reason() -> None:
+    bad = {"run_id": "x", "question_id": "Q", "ensemble": {"median": "not-a-number"}}
+    with pytest.raises(ValueError, match="does not match the current schema"):
+        render(bad)
