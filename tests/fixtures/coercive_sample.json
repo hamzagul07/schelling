@@ -1,0 +1,189 @@
+{
+  "note": "SYNTHETIC fixture for testing the coercive harness only \u2014 NOT real expert-coded data.",
+  "cases": [
+    {
+      "case_id": "SYN-1",
+      "source": "synthetic (test only)",
+      "ex_ante": true,
+      "continuum": "0-100",
+      "outcome": 40.0,
+      "reference_point": 20.0,
+      "game": {
+        "question_id": "SYN-1",
+        "frozen_at": "2020-01-01",
+        "continuum": {
+          "label": "synthetic coercive scale",
+          "anchor_0": "side A max",
+          "anchor_100": "side B max"
+        },
+        "actors": [
+          {
+            "id": "a",
+            "name": "A",
+            "position": {
+              "low": 10,
+              "mode": 10,
+              "high": 10
+            },
+            "salience": {
+              "low": 90,
+              "mode": 90,
+              "high": 90
+            },
+            "capability": {
+              "low": 100,
+              "mode": 100,
+              "high": 100
+            },
+            "evidence": []
+          },
+          {
+            "id": "b",
+            "name": "B",
+            "position": {
+              "low": 80,
+              "mode": 80,
+              "high": 80
+            },
+            "salience": {
+              "low": 70,
+              "mode": 70,
+              "high": 70
+            },
+            "capability": {
+              "low": 60,
+              "mode": 60,
+              "high": 60
+            },
+            "evidence": []
+          },
+          {
+            "id": "c",
+            "name": "C",
+            "position": {
+              "low": 50,
+              "mode": 50,
+              "high": 50
+            },
+            "salience": {
+              "low": 50,
+              "mode": 50,
+              "high": 50
+            },
+            "capability": {
+              "low": 40,
+              "mode": 40,
+              "high": 40
+            },
+            "evidence": []
+          },
+          {
+            "id": "d",
+            "name": "D",
+            "position": {
+              "low": 30,
+              "mode": 30,
+              "high": 30
+            },
+            "salience": {
+              "low": 60,
+              "mode": 60,
+              "high": 60
+            },
+            "capability": {
+              "low": 50,
+              "mode": 50,
+              "high": 50
+            },
+            "evidence": []
+          }
+        ],
+        "template": "multilateral_bargaining",
+        "horizon": "one_shot",
+        "notes": "SYNTHETIC test fixture"
+      }
+    },
+    {
+      "case_id": "SYN-2",
+      "source": "synthetic (test only)",
+      "ex_ante": true,
+      "continuum": "0-100",
+      "outcome": 70.0,
+      "reference_point": null,
+      "game": {
+        "question_id": "SYN-2",
+        "frozen_at": "2020-01-01",
+        "continuum": {
+          "label": "synthetic coercive scale",
+          "anchor_0": "side A max",
+          "anchor_100": "side B max"
+        },
+        "actors": [
+          {
+            "id": "a",
+            "name": "A",
+            "position": {
+              "low": 90,
+              "mode": 90,
+              "high": 90
+            },
+            "salience": {
+              "low": 95,
+              "mode": 95,
+              "high": 95
+            },
+            "capability": {
+              "low": 100,
+              "mode": 100,
+              "high": 100
+            },
+            "evidence": []
+          },
+          {
+            "id": "b",
+            "name": "B",
+            "position": {
+              "low": 40,
+              "mode": 40,
+              "high": 40
+            },
+            "salience": {
+              "low": 60,
+              "mode": 60,
+              "high": 60
+            },
+            "capability": {
+              "low": 50,
+              "mode": 50,
+              "high": 50
+            },
+            "evidence": []
+          },
+          {
+            "id": "c",
+            "name": "C",
+            "position": {
+              "low": 60,
+              "mode": 60,
+              "high": 60
+            },
+            "salience": {
+              "low": 50,
+              "mode": 50,
+              "high": 50
+            },
+            "capability": {
+              "low": 45,
+              "mode": 45,
+              "high": 45
+            },
+            "evidence": []
+          }
+        ],
+        "template": "multilateral_bargaining",
+        "horizon": "one_shot",
+        "notes": "SYNTHETIC test fixture"
+      }
+    }
+  ]
+}

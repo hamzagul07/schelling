@@ -156,10 +156,42 @@ class ForecastRecord(BaseModel):
     # True when the source draft was grounded on a live web search (carried from the draft, D9.0a):
     # the report then prints a caveat that the inputs rest on a live search, not a frozen snapshot.
     live_searched: bool = False
+    # Optional ICB base-rate panel (Session 11, D11.2): historical outcome frequencies for
+    # structurally similar crises. Off by default; never blended into the solver line.
+    analog_panel: AnalogPanel | None = None
 
     outcome_distribution: list[float] = Field(default_factory=list)  # raw draws (cache, D4.1)
     convergence_stats: dict[str, float] = Field(default_factory=dict)
     sensitivity: list[SensitivityEntry] = Field(default_factory=list)
+
+
+class AnalogExample(BaseModel):
+    """One historical ICB crisis-actor shown alongside the base-rate panel."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    crisname: str
+    year: int
+    actor: str
+    outcome: str
+
+
+class AnalogPanel(BaseModel):
+    """A base-rate panel from the ICB analog layer (Session 11, D11.2).
+
+    Historical outcome frequencies among the N structurally most similar crises. It is a base rate,
+    NOT a forecast: ``blend_weight`` is disclosed and defaults to 0 — the distribution is never
+    mixed into the deterministic solver settlement line. Rendered as a clearly separated panel.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    source: str
+    n: int
+    query: dict[str, float]  # the structural tags used (gravity, violence, n_actors)
+    outcome_distribution: dict[str, float]  # outcome label -> fraction, most frequent first
+    examples: list[AnalogExample] = Field(default_factory=list)
+    blend_weight: float = 0.0  # disclosed: base rate is NOT blended into the solver forecast
 
 
 # Printed on every advise output (CLI + report): advise mode is a one-sided lever search.

@@ -20,6 +20,7 @@ from schelling.schemas.backtest import BacktestRecord
 from schelling.schemas.forecast import (
     ADVISE_CAVEAT,
     AdviseRecord,
+    AnalogPanel,
     Assumption,
     ForecastRecord,
     OwnMove,
@@ -294,8 +295,33 @@ def render_forecast(record: ForecastRecord) -> str:
             "<h2>Assumptions carried from the draft — review</h2>",
             _assumptions_html(list(record.assumptions)),
         ]
+    if record.analog_panel is not None:
+        parts += [
+            "<h2>Historical base rates — ICB analogs</h2>",
+            _analog_panel(record.analog_panel),
+        ]
     parts.append(_forecast_provenance(record))
     return _page(record.question_id, "".join(parts))
+
+
+def _analog_panel(panel: AnalogPanel) -> str:
+    """A base-rate panel, clearly separated from the solver line (blend weight disclosed, D11.2)."""
+    q = ", ".join(f"{k} {v:g}" for k, v in panel.query.items())
+    bars = [BarRow(f"{label}", frac) for label, frac in panel.outcome_distribution.items()]
+    rows = "".join(
+        f"<tr><td>{_esc(e.crisname)}</td><td class='num'>{e.year}</td>"
+        f"<td>{_esc(e.actor)}</td><td>{_esc(e.outcome)}</td></tr>"
+        for e in panel.examples
+    )
+    return (
+        f'<p class="sub">Base rate over the <strong>{panel.n}</strong> most structurally similar '
+        f"ICB crises ({_esc(q)}). A historical frequency, <strong>not</strong> a forecast — "
+        f"<strong>not blended</strong> into the forecast (weight {panel.blend_weight:g}).</p>"
+        f"<figure>{svg.hbars(bars)}</figure>"
+        "<table><thead><tr><th>analog crisis</th><th>year</th><th>actor</th><th>outcome</th></tr>"
+        f"</thead><tbody>{rows}</tbody></table>"
+        f'<p class="cite">Source: {_esc(panel.source)}</p>'
+    )
 
 
 def _tornado(record: ForecastRecord) -> str:
@@ -502,6 +528,17 @@ def render_backtest(record: BacktestRecord) -> str:
         f"<figure>{_mae_bars(record)}</figure>",
         _method_table(record),
     ]
+    if record.oracle is not None:
+        o = record.oracle
+        near = "at/near the ceiling" if o.gap <= 1.0 else f"below the ceiling by {o.gap:.2f}"
+        parts += [
+            "<h2>Noise-floor oracle — DIAGNOSTIC</h2>",
+            f'<p class="sub">A flexible cross-validated model ({_esc(o.best_model)}, '
+            f"{o.folds}-fold, rich features incl. positions) scores MAE "
+            f"<strong>{o.oracle_mae:.2f}</strong> — the "
+            f"extractable-signal ceiling. The compromise mean scores <strong>{o.compromise_mae:.2f}"
+            f"</strong> (gap {o.gap:+.2f}): the mean is <strong>{near}</strong>.</p>",
+        ]
     if record.split_sample is not None:
         parts += [
             "<h2>Split-sample validation of the rp-anchored tuning</h2>",

@@ -718,3 +718,53 @@ the living leaderboard. **No candidate survived, so nothing was sealed against t
 set is deferred to Session 11 (when that data lands), as specified. Note the out-of-domain fragility
 already visible: on US-Iran (features far outside DEU's range) both candidates' softmax/logistic
 saturate onto the compromise mean.
+
+---
+
+## Session 11 — the decisive test (Phase 2)
+
+### D11.0 — Noise-floor oracle: the compromise mean is AT the extractable-signal ceiling
+A DIAGNOSTIC (`oracle.py`): a deliberately flexible model — the best of linear ridge and RBF kernel
+ridge over a RICH 18-feature set that includes position summaries (min/max/std, salience-weighted
+quantiles) — fit under seeded 5-fold cross-validation with in-CV hyperparameter selection (an
+*optimistic* ceiling estimate). Result on the 351 sourced-capability DEU issues: oracle CV MAE
+**23.84** vs the compromise mean **22.99**, gap **−0.84**. The flexible model does not just fail to
+beat the mean — it does slightly *worse*. So the mean is at (not merely near) the extractable-signal
+ceiling: there is essentially no exploitable signal beyond the influence-weighted average. This
+explains why Sessions 9, 10, and R1 all failed to beat it — there was nothing to extract. Reported in
+`BACKTEST.md` and the backtest report. Pure numpy, deterministic (rule 2).
+
+### D11.1 — Coercive case library: STOP (paywalled/unfindable); harness built, library deferred
+The crown-jewel coercive library (Hong Kong 1985, Iran 1984, Feder's examples, KTAB/Senturion) could
+not be assembled: (a) the in-repo Feder (1987) report prints resources (capability) and *diagram*
+positions but **no numeric salience** and only qualitative outcomes — incomplete for a real game
+without assuming inputs (violating rules 3/6 and "expert-coded"); (b) the named coercive classics are
+in **paywalled books/journals** (*Red Flag over Hong Kong*; BDM's Iran article); (c) open replications
+(Preana, the umich appendix) cover cooperative/economic or *ex-post election* cases (Iran 2013), not
+ex-ante coercive interstate crises. Per the STOP instruction and Hassan's decision ("defer; you'll
+provide tables"), the **head-to-head harness is built and validated on a synthetic fixture**
+(`coercive.py`: `load_library` + `head_to_head` scoring challenge/compromise/gravity/regime with
+paired bootstrap CIs and small-N honesty; `schelling coercive`) and runs the moment real tables land
+at `data/coercive/library.json`. **What Hassan should provide:** for each coercive case, the printed
+per-actor position/salience/capability (0-100) + the historical outcome on a stated 0-100 continuum +
+citation + whether coding was ex-ante — hand-transcribed from the paywalled sources he can access.
+
+### D11.2 — ICB analog / base-rate layer (built; off by default, never blended)
+`analog/icb.py`: a feature-tagged, KnowledgeIndex-style retrieval over the **ICB (International Crisis
+Behavior) Version 16** actor-level dataset (1,131 crisis-actors, 1918-2021; downloaded from Duke,
+`data/icb/` gitignored). A compact table of the used fields (crisis, actor, year, outcome, gravity,
+violence, n_actors, power, protracted) is committed as package data (`icb_analogs.json`, cited to
+ICB) so the layer ships self-contained. `ICBAnalogIndex.search(gravity, violence, n_actors, k)`
+returns the k structurally nearest crises + their historical **outcome distribution** (victory /
+compromise / stalemate / defeat) — a base rate. Surfaced as a report panel via
+`schelling solve --analog "gravity=6,violence=3,actors=8"`: **off by default**, rendered in a
+clearly separated section, and **never blended into the solver settlement line** (`blend_weight` = 0,
+disclosed). It is a historical frequency shown alongside — not mixed into — the deterministic
+forecast. On a US-Iran-shaped query (gravity 6, serious clashes, 8 actors): 30 analogs → victory 43%,
+compromise 30%, defeat 20%, stalemate 7%.
+
+### D11.3 — Domain verdicts, side by side
+`BACKTEST.md` now states both: **cooperative (DEU)** — compromise mean wins, challenge loses even
+fully equipped, and the oracle shows the mean is at the ceiling; **coercive (interstate crises)** —
+**PENDING**, harness built, blocked on paywalled inputs (D11.1). The ICB analog layer is a separate
+base-rate tool, not a head-to-head benchmark.
