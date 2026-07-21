@@ -15,7 +15,7 @@ from schelling.formalizer.client import LLMResult, ReplayClient
 from schelling.knowledge.chunker import Chunk
 from schelling.knowledge.embed import HashingEmbedder
 from schelling.knowledge.index import KnowledgeIndex
-from schelling.schemas.forecast import ForecastRecord
+from schelling.schemas.forecast import AdviseRecord, ForecastRecord
 from schelling.schemas.question import GameSpec
 
 runner = CliRunner()
@@ -141,6 +141,61 @@ def test_knowledge_search_without_index_errors(tmp_path: Path) -> None:
     assert "no index" in result.output
 
 
+def test_knowledge_build_missing_extra_is_friendly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(_name: str) -> object:
+        raise ImportError("no sentence_transformers")
+
+    monkeypatch.setattr("schelling.cli.make_embedder", boom)
+    result = runner.invoke(
+        app,
+        [
+            "knowledge",
+            "build",
+            "--embedder",
+            "bge-m3",
+            "--transcripts",
+            str(TRANSCRIPTS),
+            "--db",
+            str(tmp_path / "k.db"),
+        ],
+    )
+    assert result.exit_code == 2
+    assert "knowledge" in result.output.lower() and "uv sync" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_formalize_no_knowledge_skips_index(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Even with an index present, --no-knowledge formalizes ungrounded (no embedder needed).
+    db = tmp_path / "k.db"
+    KnowledgeIndex.build(
+        [Chunk("x", "p.txt", "Game Theory #9: P", 9, 0, 0, 1)], HashingEmbedder(), db_path=db
+    ).close()
+    monkeypatch.setattr(
+        "schelling.cli.AnthropicClient",
+        _fake_anthropic_factory((FIXTURES / "formalize_replay.json").read_text()),
+    )
+    situation = tmp_path / "s.txt"
+    situation.write_text("Aland, Belland and Cesta negotiate a coal phase-out year.")
+    result = runner.invoke(
+        app,
+        [
+            "formalize",
+            str(situation),
+            "-o",
+            str(tmp_path / "d.json"),
+            "--db",
+            str(db),
+            "--no-knowledge",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Draft written" in result.output
+
+
 def test_formalize_writes_draft_and_never_solves(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -207,6 +262,78 @@ def test_report_bad_artifact_errors(tmp_path: Path) -> None:
     result = runner.invoke(app, ["report", str(bad)])
     assert result.exit_code == 2
     assert "could not render" in result.output
+
+
+# --------------------------------------------------------------- advise (Session 7)
+_WIDENED = str(FIXTURES / "emission_standards_widened.json")
+
+
+def test_advise_writes_records_and_prints_caveat(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "advise",
+            _WIDENED,
+            "--actor",
+            "germany",
+            "--draws-per-candidate",
+            "20",
+            "--target-draws",
+            "40",
+            "--seed",
+            "7",
+            "--grid-step",
+            "10",
+            "--out-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Top own moves" in result.output and "persuasion targets" in result.output
+    assert "One-sided search" in result.output  # standing caveat printed
+    advise_files = list(tmp_path.glob("*-advise-*.json"))
+    assert len(advise_files) == 1
+    record = AdviseRecord.model_validate_json(advise_files[0].read_text())
+    assert record.advising_actor == "germany"
+    assert (tmp_path / f"{record.baseline_run_id}.json").exists()  # baseline reference written
+
+
+def test_advise_report_renders(tmp_path: Path) -> None:
+    adv = runner.invoke(
+        app,
+        [
+            "advise",
+            _WIDENED,
+            "--actor",
+            "germany",
+            "--draws-per-candidate",
+            "20",
+            "--target-draws",
+            "40",
+            "--seed",
+            "7",
+            "--grid-step",
+            "10",
+            "--out-dir",
+            str(tmp_path),
+        ],
+    )
+    assert adv.exit_code == 0, adv.output
+    advise_json = next(tmp_path.glob("*-advise-*.json"))
+    out = tmp_path / "advise.html"
+    result = runner.invoke(app, ["report", str(advise_json), "-o", str(out)])
+    assert result.exit_code == 0, result.output
+    html = out.read_text()
+    assert "One-sided search" in html and "Who to work on" in html
+
+
+def test_advise_unknown_actor_is_friendly(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app, ["advise", _WIDENED, "--actor", "nobody", "--out-dir", str(tmp_path)]
+    )
+    assert result.exit_code == 2
+    assert "not in this game" in result.output
+    assert "Traceback" not in result.output
 
 
 # --------------------------------------------------------------- env loading (D6.5)
