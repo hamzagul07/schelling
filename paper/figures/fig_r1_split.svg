@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" font-family="Helvetica,Arial,sans-serif">
+<text x="320" y="26" text-anchor="middle" font-size="17" font-weight="bold" fill="#1a1a2e">Pre-registered 40/30/30 split — committed before any fitting</text>
+<rect x="40" y="150" width="223" height="70" fill="#2471a3"/>
+<text x="151" y="190" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">train</text>
+<text x="151" y="240" text-anchor="middle" font-size="12" fill="#1a1a2e">140</text>
+<rect x="263" y="150" width="168" height="70" fill="#7f8c8d"/>
+<text x="347" y="190" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">dev</text>
+<text x="347" y="240" text-anchor="middle" font-size="12" fill="#1a1a2e">105</text>
+<rect x="431" y="150" width="169" height="70" fill="#c0392b"/>
+<text x="515" y="190" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">TEST</text>
+<text x="515" y="240" text-anchor="middle" font-size="12" fill="#1a1a2e">106</text>
+<text x="320" y="134" text-anchor="middle" font-size="12" fill="#1a1a2e">n=351 DEU issues · seed 20260721 · git commit order = pre-registration · TEST scored once</text>
+</svg>
