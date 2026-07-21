@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from schelling.backtest.context import CITATIONS, CONTEXT_PROSE, PUBLISHED_RESULTS
 from schelling.formalizer.schemas import DraftGameSpec, FetchedSource
+from schelling.mc.sensitivity import zero_swing_warning
 from schelling.report import svg
 from schelling.report.svg import ActorPoint, BarRow, ScatterPoint, TornadoRow
 from schelling.schemas.backtest import BacktestRecord
@@ -263,14 +264,20 @@ def render_forecast(record: ForecastRecord) -> str:
             "with live web search on, so its inputs reflect the web as of the freeze date — not a "
             "record frozen in the past. Do not treat this as a clean historical backtest.</div>"
         )
+    mode = record.median_trajectory[-1] if record.median_trajectory else None
+    mode_metric = (
+        _metric(f"{mode:.3f}", f"mode-game (gap {e.median - mode:+.2f})")
+        if mode is not None
+        else _metric("—", "mode-game median")
+    )
     parts += [
         "<h2>Headline</h2>",
         '<div class="metrics">'
-        + _metric(f"{e.median:.3f}", "settlement median")
+        + _metric(f"{e.median:.3f}", "MC median")
+        + mode_metric
         + _metric(f"[{e.p10:.2f}, {e.p90:.2f}]", "CI80")
         + _metric(f"{e.mean:.3f}", "expected (mean)")
         + _metric(f"{cv.get('converged_fraction', 0.0) * 100:.0f}%", "converged")
-        + _metric(f"{cv.get('rounds_mean', 0.0):.1f}", "mean rounds")
         + "</div>",
     ]
     if record.game is not None:
@@ -284,6 +291,7 @@ def render_forecast(record: ForecastRecord) -> str:
         + svg.histogram(record.outcome_distribution, p10=e.p10, p90=e.p90, median=e.median)
         + "</figure>",
         "<h2>Sensitivity — what to watch</h2>",
+        _sensitivity_warning(record),
         f"<figure>{_tornado(record)}</figure>",
         "<h2>Median trajectory (deterministic mode game)</h2>",
         f"<figure>{svg.trajectory(record.median_trajectory)}</figure>",
@@ -322,6 +330,12 @@ def _analog_panel(panel: AnalogPanel) -> str:
         f"</thead><tbody>{rows}</tbody></table>"
         f'<p class="cite">Source: {_esc(panel.source)}</p>'
     )
+
+
+def _sensitivity_warning(record: ForecastRecord) -> str:
+    """A caveat box when the tornado is dominated by zero-swing rows (degenerate lock, D12.3)."""
+    warning = zero_swing_warning(record.sensitivity)
+    return f'<div class="caveat">{_esc(warning)}</div>' if warning else ""
 
 
 def _tornado(record: ForecastRecord) -> str:

@@ -24,7 +24,12 @@ from schelling.analog.icb import ICBAnalogIndex, to_panel
 from schelling.backtest.coercive import DEFAULT_LIBRARY
 from schelling.backtest.deu import load_deu_issues
 from schelling.backtest.harness import run_backtest
-from schelling.backtest.ledger import append_entry, ledger_entry, new_ledger
+from schelling.backtest.ledger import (
+    empty_seal_ledger,
+    insert_seal_row,
+    record_sha256,
+    seal_row,
+)
 from schelling.backtest.oracle import oracle_summary
 from schelling.backtest.successor import forecast_candidate as run_forecast_candidate
 from schelling.backtest.successor import leaderboard_markdown, run_successor_search
@@ -36,7 +41,7 @@ from schelling.formalizer.schemas import DraftGameSpec
 from schelling.knowledge.embed import make_embedder
 from schelling.knowledge.index import DEFAULT_DB_PATH, DEFAULT_TRANSCRIPTS, KnowledgeIndex
 from schelling.mc.monte_carlo import forecast, write_record
-from schelling.mc.sensitivity import format_tornado
+from schelling.mc.sensitivity import format_tornado, zero_swing_warning
 from schelling.report.render import render as render_report
 from schelling.schemas.forecast import ADVISE_CAVEAT, AnalogPanel, Assumption, DraftMetadata
 from schelling.schemas.question import GameSpec
@@ -206,13 +211,21 @@ def solve(
         write_record(record, out_dir)
         records.append(record)
         e = record.ensemble
+        mode = record.median_trajectory[-1] if record.median_trajectory else None
+        if mode is None:  # the compromise model has no deterministic round trajectory
+            mode_str = "mode-game —"
+        else:
+            mode_str = f"mode-game {mode:.3f} (gap {e.median - mode:+.2f})"
         typer.echo(
-            f"{model:<11} median {e.median:.3f}   mean {e.mean:.3f}   "
+            f"{model:<11} MC-median {e.median:.3f}   {mode_str}   mean {e.mean:.3f}   "
             f"CI80 [{e.p10:.3f}, {e.p90:.3f}]   (n={e.n_draws}, seed {seed})"
         )
     typer.echo("")
     if records[0].sensitivity:
         typer.echo(format_tornado(records[0].sensitivity))
+        warning = zero_swing_warning(records[0].sensitivity)
+        if warning is not None:
+            typer.echo(warning)
         typer.echo("")
     if panel is not None:
         dist = "  ".join(f"{k} {v * 100:.0f}%" for k, v in panel.outcome_distribution.items())
@@ -586,52 +599,51 @@ def coercive(
     typer.echo(report.note)
 
 
+_SEAL_HEADER = """# FORECASTS.md — the sealed forecast ledger
+
+**Commit-reveal.** Each forecast is sealed by the SHA-256 of its `runs/` record file — a commitment
+that cannot be retrofitted once the outcome is known. The record files are never committed (`runs/`
+is gitignored). To verify a line, run `sha256sum runs/<file>` locally and compare the digest."""
+
+
 @app.command()
-def ledger(
-    game_json: Path = typer.Argument(
-        ..., help="A GameSpec or DraftGameSpec to seal a forecast on."
-    ),
-    grade_date: str = typer.Option(..., "--grade-date", help="ISO date to grade the outcome."),
-    note: str = typer.Option("", "--note", help="A one-line note (what is being forecast)."),
-    continuum: str = typer.Option("", "--continuum", help="Continuum description for the ledger."),
-    seed: int = typer.Option(42, "--seed"),
-    draws: int = typer.Option(10_000, "--draws"),
+def seal(
+    record: Path = typer.Argument(..., help="A ForecastRecord JSON in runs/ to seal."),
+    vintage: str = typer.Option("—", "--vintage", help="A vintage label for the ledger line."),
     out: Path = typer.Option(Path("FORECASTS.md"), "-o", "--out", help="The ledger file."),
-    out_dir: Path = typer.Option(Path("runs"), "--out-dir", help="Where the records are written."),
 ) -> None:
-    """Seal both models' forecasts for a game into the ledger (FORECASTS.md), graded later."""
-    if not game_json.exists():
-        typer.echo(f"game not found: {game_json}", err=True)
+    """Seal a forecast record into FORECASTS.md by its SHA-256 (idempotent — one command)."""
+    if not record.exists():
+        typer.echo(f"record not found: {record}", err=True)
         raise typer.Exit(code=2)
     try:
-        game, assumptions, fm, live_searched = _load_solve_input(game_json)
-    except ValueError as exc:
-        typer.echo(str(exc), err=True)
+        data = json.loads(record.read_text())
+        median = float(data["ensemble"]["median"])
+        question_id = str(data["question_id"])
+        model = str(data.get("model", "challenge"))
+        game = data.get("game") or {}
+        frozen_at = str(game.get("frozen_at", "unknown"))
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        typer.echo(f"{record} is not a readable ForecastRecord ({exc}).", err=True)
         raise typer.Exit(code=2) from exc
 
-    records = [
-        forecast(
-            game,
-            SolverConfig(seed=seed),
-            n_draws=draws,
-            seed=seed,
-            out_dir=out_dir,
-            assumptions=assumptions,
-            formalizer_metadata=fm,
-            live_searched=live_searched,
-            model=model,
-        )
-        for model in ("challenge", "compromise")
-    ]
-    entry = ledger_entry(
-        records, continuum=continuum or "(see sealed game)", grade_date=grade_date, note=note
+    sha = record_sha256(record)
+    row = seal_row(
+        model=model,
+        vintage=vintage,
+        question_id=question_id,
+        frozen_at=frozen_at,
+        median=median,
+        sha=sha,
     )
-    text = append_entry(out.read_text(), entry) if out.exists() else new_ledger(entry)
-    out.write_text(text if text.endswith("\n") else text + "\n")
-
-    typer.echo(f"Sealed {game.question_id} into {out}:")
-    for r in records:
-        typer.echo(f"  {r.model:<11} median {r.ensemble.median:.3f}   (grade {grade_date})")
+    existing = out.read_text() if out.exists() else empty_seal_ledger(_SEAL_HEADER)
+    updated, changed = insert_seal_row(existing, row, sha)
+    if not changed:
+        typer.echo(f"Already sealed (sha256 {sha[:12]}… present in {out}); nothing changed.")
+        return
+    out.write_text(updated if updated.endswith("\n") else updated + "\n")
+    typer.echo(f"Sealed {question_id} [{model}, {vintage}] median {median:.3f} into {out}")
+    typer.echo(f"  sha256 {sha}")
 
 
 @knowledge_app.command("search")
