@@ -766,17 +766,49 @@ def successor(
     typer.echo(f"Leaderboard written to {md_out}.")
 
 
+_READING_N = 8  # the pre-registered coercive reading fires at 8 verified cases (specs/MT-1.0.md)
+
+
 @app.command()
 def coercive(
     library: Path = typer.Argument(
         DEFAULT_LIBRARY,
         help="Coercive case library (a directory of *.json case files, or one file).",
     ),
+    solver: str = typer.Option(
+        "standing",
+        "--solver",
+        help="'standing' (challenge/compromise/successors) or 'model-three' to add MT-1.0 "
+        "AT THE 8-VERIFIED-CASE READING ONLY.",
+    ),
 ) -> None:
     """Run the pre-registered coercive head-to-head (challenge vs compromise vs successors)."""
-    from schelling.backtest.coercive import head_to_head, load_library
+    from schelling.backtest.coercive import MODEL_THREE, _METHODS, head_to_head, load_library
 
-    report = head_to_head(load_library(library))
+    cases = load_library(library)
+    methods: tuple[str, ...] = _METHODS
+    if solver == MODEL_THREE:
+        # MT-1.0 is scored ONCE, at the pre-registered reading, and never before (specs/MT-1.0.md §3,
+        # §6). Refuse until the library holds the reading's worth of verified, coded coercive cases.
+        ready = [
+            c
+            for c in cases
+            if c.verified and c.domain.startswith("coercive") and c.coding is not None
+        ]
+        if len(ready) < _READING_N or len(ready) != len(cases):
+            typer.echo(
+                f"Refusing to run model-three: it is scored once, at the {_READING_N}-verified-case "
+                f"coercive reading, never before (specs/MT-1.0.md). The library has {len(ready)} "
+                f"ready (verified, coercive, coded) of {len(cases)} — the reading has not arrived.",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+        methods = (*_METHODS, MODEL_THREE)
+    elif solver != "standing":
+        typer.echo("--solver must be 'standing' or 'model-three'.", err=True)
+        raise typer.Exit(code=2)
+
+    report = head_to_head(cases, methods=methods)
     if report.n_cases == 0:
         typer.echo(report.note)
         typer.echo(
