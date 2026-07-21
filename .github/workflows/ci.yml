@@ -20,7 +20,9 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        # The one documented install command — installs every extra so partial syncs can never
+        # silently remove each other (D7.0). Cached across runs.
+        run: uv sync --all-extras
 
       - name: Ruff (lint + format check)
         run: |
