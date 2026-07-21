@@ -10,10 +10,12 @@ from __future__ import annotations
 import html
 from typing import Any
 
+from pydantic import ValidationError
+
 from schelling.formalizer.schemas import DraftGameSpec
 from schelling.report import svg
 from schelling.report.svg import ActorPoint, TornadoRow
-from schelling.schemas.forecast import ForecastRecord
+from schelling.schemas.forecast import Assumption, ForecastRecord
 from schelling.schemas.question import GameSpec
 
 _CSS = """
@@ -158,14 +160,18 @@ def render_draft(draft: DraftGameSpec) -> str:
     return _page(g.question_id, "".join(parts))
 
 
-def _assumptions(draft: DraftGameSpec) -> str:
-    if not draft.assumptions:
+def _assumptions_html(items: list[Assumption]) -> str:
+    if not items:
         return "<p class='sub'>(none)</p>"
-    items = "".join(
+    li = "".join(
         f'<li><span class="box"></span>{_esc(a.statement)}<div class="why">{_esc(a.why)}</div></li>'
-        for a in draft.assumptions
+        for a in items
     )
-    return f'<ul class="checklist">{items}</ul>'
+    return f'<ul class="checklist">{li}</ul>'
+
+
+def _assumptions(draft: DraftGameSpec) -> str:
+    return _assumptions_html(list(draft.assumptions))
 
 
 def _metric(value: str, label: str) -> str:
@@ -217,6 +223,11 @@ def render_forecast(record: ForecastRecord) -> str:
     ]
     if record.game is not None:
         parts += ["<h2>Inputs</h2>", _actor_table(record.game, with_evidence=False)]
+    if record.assumptions:
+        parts += [
+            "<h2>Assumptions carried from the draft — review</h2>",
+            _assumptions_html(list(record.assumptions)),
+        ]
     parts.append(_forecast_provenance(record))
     return _page(record.question_id, "".join(parts))
 
@@ -239,13 +250,52 @@ def _forecast_provenance(record: ForecastRecord) -> str:
         "engine": record.engine_version,
         "solver_config": cfg,
     }
+    fm = record.formalizer_metadata
+    if fm is not None:  # provenance chain: the formalize call that produced the game
+        pairs["formalizer"] = (
+            f"{fm.model}  in {fm.input_tokens} · out {fm.output_tokens} tok  "
+            f"${fm.cost_usd:.4f}  (retries {fm.retries}, leak {fm.leak_retries})"
+        )
     return f'<div class="prov">Provenance{_dl(pairs)}</div>'
 
 
+def _fmt_err(exc: ValidationError) -> str:
+    err = exc.errors()[0]
+    loc = ".".join(str(p) for p in err.get("loc", ())) or "(root)"
+    return f"{loc}: {err.get('msg', 'invalid')}"
+
+
+def _looks_like_forecast(data: dict[str, Any]) -> bool:
+    return "run_id" in data and any(
+        k in data for k in ("ensemble", "forecast_median", "outcome_distribution")
+    )
+
+
+def _looks_like_draft(data: dict[str, Any]) -> bool:
+    return {"game", "assumptions", "template_classification"} <= set(data)
+
+
 def render(data: dict[str, Any]) -> str:
-    """Detect the artifact type and render it. Raises on an unrecognized artifact."""
-    if "ensemble" in data and "run_id" in data:
-        return render_forecast(ForecastRecord.model_validate(data))
-    if "assumptions" in data and "template_classification" in data and "game" in data:
-        return render_draft(DraftGameSpec.model_validate(data))
+    """Detect the artifact type and render it. Raises ValueError with a named reason otherwise."""
+    if _looks_like_forecast(data):
+        try:
+            return render_forecast(ForecastRecord.model_validate(data))
+        except ValidationError as exc:
+            if "ensemble" not in data and "forecast_median" in data:
+                raise ValueError(
+                    "this is a ForecastRecord from an older schema (pre-`ensemble`, ~Session 3); "
+                    "re-run `schelling solve` to regenerate it."
+                ) from exc
+            raise ValueError(
+                f"this looks like a ForecastRecord but does not match the current schema "
+                f"({_fmt_err(exc)}); re-run `schelling solve` to regenerate it."
+            ) from exc
+    if _looks_like_draft(data):
+        try:
+            return render_draft(DraftGameSpec.model_validate(data))
+        except ValidationError as exc:
+            raise ValueError(
+                f"this looks like a DraftGameSpec but does not match the schema ({_fmt_err(exc)}); "
+                "re-run `schelling formalize` to regenerate it."
+            ) from exc
     raise ValueError("unrecognized artifact: expected a DraftGameSpec or a ForecastRecord JSON")
