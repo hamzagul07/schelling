@@ -234,6 +234,24 @@ class PersuasionTarget(BaseModel):
     kind: str = "energize"
 
 
+class AdviseLens(BaseModel):
+    """One advice lens (Session 12, D12.4): a full lever search under a single model.
+
+    ``exact`` marks the compromise (weighted-mean) lens, whose settlement shifts are closed-form —
+    each actor's marginal effect is its weight share — as opposed to the challenge lens, whose
+    settlements come from a Monte-Carlo simulated search.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    model: str  # "challenge" | "compromise"
+    exact: bool  # True = closed-form (compromise); False = simulated (challenge)
+    baseline_median: float
+    own_moves: list[OwnMove] = Field(default_factory=list)
+    top_moves: list[OwnMove] = Field(default_factory=list)
+    persuasion_targets: list[PersuasionTarget] = Field(default_factory=list)
+
+
 class AdviseRecord(BaseModel):
     """The advise-mode audit artifact — deterministic under ``seed`` like everything else.
 
@@ -263,5 +281,12 @@ class AdviseRecord(BaseModel):
     own_moves: list[OwnMove] = Field(default_factory=list)
     top_moves: list[OwnMove] = Field(default_factory=list)  # re-solved at target_draws
     persuasion_targets: list[PersuasionTarget] = Field(default_factory=list)  # ranked
+
+    # Which model the primary (top-level) lever tables came from, and whether they are closed-form
+    # (D12.4). ``second_lens`` carries the other model's lens when ``--solver both`` — e.g. the
+    # exact compromise lens alongside the simulated challenge lens, rendered side by side.
+    model: str = "challenge"
+    exact: bool = False
+    second_lens: AdviseLens | None = None
 
     game: GameSpec | None = None  # for the report's baseline actor map
