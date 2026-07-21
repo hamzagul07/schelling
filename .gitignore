@@ -74,3 +74,5 @@ runs/
 analyses/
 # DEU benchmark dataset (CC BY 4.0; downloaded locally, not redistributed here).
 data/deu/
+# ICB benchmark data (public, research use; compact table committed under src/).
+data/icb/

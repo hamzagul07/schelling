@@ -14,6 +14,10 @@ The primary challenge model (rp-anchored, Q=0.7 (tuned split-sample)) has MAE **
 
 The rp-anchored challenge's **q** was tuned on 176 training issues (candidates 0.3, 0.5, 0.7, 0.9) → selected **0.7** (train MAE 27.58), then scored on 175 held-out issues: test MAE **26.07** vs the equally-equipped weighted mean **23.32**. On the held-out half the tuned model does NOT beat the weighted mean — the reference point is a real, non-overfit improvement, but still insufficient.
 
+## Noise-floor oracle (DIAGNOSTIC, D11.0)
+
+A deliberately flexible cross-validated model (linear-ridge:l=10, 5-fold, rich features incl. positions) scores MAE **23.84** — an estimate of the extractable-signal ceiling. The compromise mean scores **22.99**, so the gap is **-0.84**: the mean is **at/near the ceiling**. Even an optimistic flexible model does not beat the mean — there is essentially no signal beyond the influence-weighted average, which is why every model we have tried fails to beat it.
+
 ## Per-method error (full issue set)
 
 | Method | Kind | MAE | RMSE | Median AE | Max AE |
@@ -70,7 +74,14 @@ These are **not** directly comparable to our numbers (different DEU version, iss
 
 - **Capability (sourced, D10.1).** DEU records no capability, so each member state takes its Council power in the treaty regime in force at the issue's decision date (pre-Nice / Nice weighted votes; Lisbon-era population), rescaled so the strongest actor = 100; Commission/EP each take the largest member-state power (D10.3). The same table feeds the challenge solver AND the weighted-mean baseline — a fair fight.
 - **Point estimates.** Each issue is point estimates, so Monte Carlo is degenerate (zero variance, D3.1); the harness solves each issue once deterministically. `--draws` (2000) is recorded for interface parity but does not affect the result (D9.3).
-- **Determinism.** Dataset pinned by SHA-256 `0d75f0d2f3a96982…`; engine `1a16d5e3506a`; seed 42. Same inputs → byte-identical record.
+- **Determinism.** Dataset pinned by SHA-256 `0d75f0d2f3a96982…`; engine `0b979564c190`; seed 42. Same inputs → byte-identical record.
+
+## Domain verdicts, side by side
+
+| Domain | Benchmark | Verdict |
+|---|---|---|
+| Cooperative (EU legislative) | DEU III, 351 issues | **Compromise mean wins.** The challenge solver loses even fully equipped; the noise-floor oracle shows the mean is at the extractable-signal ceiling. |
+| Coercive (interstate crises) | Coercive library | **PENDING.** The expert-coded coercive tables (Hong Kong 1985, Iran 1984, ...) are in paywalled books; the harness is built and waits on the printed inputs (D11.1). |
 
 ## Scheduled next: the ICB coercive benchmark
 

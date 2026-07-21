@@ -99,8 +99,17 @@ model that beats the compromise mean. Two candidates — **A: status-quo gravity
 were fit on train, tuned on dev, and scored on the untouched TEST split exactly once, with paired
 bootstrap CIs. **Both FAIL the gate** (A 22.09 vs 21.26; B 21.57 vs 21.09; CIs straddle zero). The
 compromise model stands; nothing was sealed. Both ship as `solve --solver gravity|regime`, and
-`schelling successor` writes the living leaderboard in [`BACKTEST.md`](BACKTEST.md) (R1.x). ICB
-out-of-domain check deferred to Session 11.
+`schelling successor` writes the living leaderboard in [`BACKTEST.md`](BACKTEST.md) (R1.x).
+
+**Session 11 (done) — the decisive test (Phase 2):** a **noise-floor oracle** (a flexible
+cross-validated model over rich features incl. positions) shows the compromise mean is *at* the
+extractable-signal ceiling on DEU (oracle MAE 23.84 vs mean 22.99 — the flexible model doesn't even
+beat it), which explains why every model failed to (D11.0). The **coercive head-to-head** (the
+challenge model's best shot) is **built but PENDING** — the expert-coded coercive tables (Hong Kong
+1985, Iran 1984) are paywalled, so the library is deferred until they're supplied (D11.1). An **ICB
+analog / base-rate layer** ships: `solve --analog "gravity=6,violence=3,actors=8"` retrieves the N
+most structurally similar historical crises and their outcome distribution as a report panel — off
+by default, clearly separated from the solver line, never blended (D11.2).
 
 ## CLI
 
@@ -144,6 +153,12 @@ schelling ledger game.json --grade-date 2026-09-01 --note "what is being forecas
 # Successor search: fit train / tune dev / score TEST once; update the BACKTEST.md leaderboard
 schelling successor data/deu/
 schelling solve game.json --solver regime      # a fitted successor model (R1); also --solver gravity
+
+# Attach an ICB historical base-rate panel to a forecast (off by default; never blended)
+schelling solve game.json --analog "gravity=6,violence=3,actors=8"
+
+# Coercive head-to-head (PENDING real tables; runs when data/coercive/library.json is supplied)
+schelling coercive
 ```
 
 The DEU dataset is not redistributed here; download the four open-access DEU III files
