@@ -1,0 +1,227 @@
+{
+  "dataset": "DEU sample (test fixture)",
+  "dataset_sha256": "61c04281887b7af17d11571526787c7def85b537a0d3cdf290ab635676e557cb",
+  "n_issues": 3,
+  "seed": 7,
+  "draws": 40,
+  "capability": 100.0,
+  "engine_version": "0000000000000000000000000000000000000000",
+  "created_at": null,
+  "methods": [
+    {
+      "key": "solver_paper",
+      "label": "Solver — paper-faithful (dynamic R, Q=1, risk on)",
+      "kind": "solver",
+      "config": {
+        "range_mode": "dynamic",
+        "fixed_range": 100.0,
+        "q": 1.0,
+        "apply_risk": true,
+        "conflict_resolves": false,
+        "security_mode": "adversary",
+        "max_rounds": 20,
+        "convergence_epsilon": 0.5,
+        "convergence_patience": 2,
+        "seed": 0
+      },
+      "mae": 16.666666666666668,
+      "rmse": 19.148542155126762,
+      "median_error": 10.0,
+      "max_error": 30.0,
+      "errors": [
+        10.0,
+        10.0,
+        30.0
+      ]
+    },
+    {
+      "key": "solver_risk_off",
+      "label": "Solver — risk off",
+      "kind": "solver",
+      "config": {
+        "range_mode": "dynamic",
+        "fixed_range": 100.0,
+        "q": 1.0,
+        "apply_risk": false,
+        "conflict_resolves": false,
+        "security_mode": "adversary",
+        "max_rounds": 20,
+        "convergence_epsilon": 0.5,
+        "convergence_patience": 2,
+        "seed": 0
+      },
+      "mae": 23.333333333333332,
+      "rmse": 25.166114784235834,
+      "median_error": 30.0,
+      "max_error": 30.0,
+      "errors": [
+        30.0,
+        10.0,
+        30.0
+      ]
+    },
+    {
+      "key": "baseline_wmean",
+      "label": "Baseline — capability x salience weighted mean",
+      "kind": "baseline",
+      "config": {},
+      "mae": 10.714285714285715,
+      "rmse": 11.195540900484522,
+      "median_error": 10.0,
+      "max_error": 15.0,
+      "errors": [
+        7.142857142857146,
+        10.0,
+        15.0
+      ]
+    },
+    {
+      "key": "baseline_median",
+      "label": "Baseline — median actor position",
+      "kind": "baseline",
+      "config": {},
+      "mae": 16.666666666666668,
+      "rmse": 19.148542155126762,
+      "median_error": 10.0,
+      "max_error": 30.0,
+      "errors": [
+        10.0,
+        10.0,
+        30.0
+      ]
+    },
+    {
+      "key": "sweep_dynamic_q1.0",
+      "label": "R=dynamic, Q=1",
+      "kind": "sweep",
+      "config": {
+        "range_mode": "dynamic",
+        "fixed_range": 100.0,
+        "q": 1.0,
+        "apply_risk": true,
+        "conflict_resolves": false,
+        "security_mode": "adversary",
+        "max_rounds": 20,
+        "convergence_epsilon": 0.5,
+        "convergence_patience": 2,
+        "seed": 0
+      },
+      "mae": 16.666666666666668,
+      "rmse": 19.148542155126762,
+      "median_error": 10.0,
+      "max_error": 30.0,
+      "errors": [
+        10.0,
+        10.0,
+        30.0
+      ]
+    },
+    {
+      "key": "sweep_dynamic_q0.5",
+      "label": "R=dynamic, Q=0.5",
+      "kind": "sweep",
+      "config": {
+        "range_mode": "dynamic",
+        "fixed_range": 100.0,
+        "q": 0.5,
+        "apply_risk": true,
+        "conflict_resolves": false,
+        "security_mode": "adversary",
+        "max_rounds": 20,
+        "convergence_epsilon": 0.5,
+        "convergence_patience": 2,
+        "seed": 0
+      },
+      "mae": 23.333333333333332,
+      "rmse": 25.166114784235834,
+      "median_error": 30.0,
+      "max_error": 30.0,
+      "errors": [
+        30.0,
+        10.0,
+        30.0
+      ]
+    },
+    {
+      "key": "sweep_fixed_q1.0",
+      "label": "R=fixed, Q=1",
+      "kind": "sweep",
+      "config": {
+        "range_mode": "fixed",
+        "fixed_range": 100.0,
+        "q": 1.0,
+        "apply_risk": true,
+        "conflict_resolves": false,
+        "security_mode": "adversary",
+        "max_rounds": 20,
+        "convergence_epsilon": 0.5,
+        "convergence_patience": 2,
+        "seed": 0
+      },
+      "mae": 16.666666666666668,
+      "rmse": 19.148542155126762,
+      "median_error": 10.0,
+      "max_error": 30.0,
+      "errors": [
+        10.0,
+        10.0,
+        30.0
+      ]
+    },
+    {
+      "key": "sweep_fixed_q0.5",
+      "label": "R=fixed, Q=0.5",
+      "kind": "sweep",
+      "config": {
+        "range_mode": "fixed",
+        "fixed_range": 100.0,
+        "q": 0.5,
+        "apply_risk": true,
+        "conflict_resolves": false,
+        "security_mode": "adversary",
+        "max_rounds": 20,
+        "convergence_epsilon": 0.5,
+        "convergence_patience": 2,
+        "seed": 0
+      },
+      "mae": 23.333333333333332,
+      "rmse": 25.166114784235834,
+      "median_error": 30.0,
+      "max_error": 30.0,
+      "errors": [
+        30.0,
+        10.0,
+        30.0
+      ]
+    }
+  ],
+  "primary_method": "solver_paper",
+  "baseline_methods": [
+    "baseline_wmean",
+    "baseline_median"
+  ],
+  "gate_passed": false,
+  "worst_issues": [
+    {
+      "issue_id": "t02i1",
+      "proposal_name": "sample beta",
+      "forecast": 50.0,
+      "actual": 80.0,
+      "error": 30.0
+    },
+    {
+      "issue_id": "t01i1",
+      "proposal_name": "sample alpha",
+      "forecast": 40.0,
+      "actual": 50.0,
+      "error": 10.0
+    },
+    {
+      "issue_id": "t01i2",
+      "proposal_name": "sample alpha",
+      "forecast": 50.0,
+      "actual": 40.0,
+      "error": 10.0
+    }
+  ]
+}
