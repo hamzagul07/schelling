@@ -44,7 +44,7 @@ def test_ktab_library_loads_and_builds_valid_games() -> None:
     assert len(a.game.actors) == 26 and len(b.game.actors) == 34
     # rich schema adapted: continuum label, primary + secondary outcomes, metadata carried
     assert a.outcome == 25.0 and a.outcome_secondary == [55.0]
-    assert a.ex_ante is True and a.verified is False  # draft-1, unverified
+    assert a.ex_ante is True and a.verified is True  # D13.0: numbers verified + judgments ratified
     assert "private participation" in a.continuum.lower()
 
 
@@ -52,9 +52,10 @@ def test_ktab_smoke_run_claims_no_verdict() -> None:
     rep = head_to_head(load_library(KTAB))
     assert rep.n_cases == 2
     assert {m.key for m in rep.methods} == {"challenge", "compromise", "gravity", "regime"}
-    # all three guards fire: tiny N, unverified, out of the coercive domain
+    # two guards still fire: tiny N + out of the coercive domain (transcription now verified, D13.0)
     assert "no verdict" in rep.note.lower()
-    assert "UNVERIFIED" in rep.note and "coercive domain" in rep.note
+    assert "tiny" in rep.note and "coercive domain" in rep.note
+    assert "UNVERIFIED" not in rep.note  # numbers exact + judgments ratified
 
 
 def test_head_to_head_is_deterministic() -> None:

@@ -885,11 +885,16 @@ continua are faithful — case 1 to Figure 1 (p.129), case 2 to **Figure 6 (p.13
 markers (0 status quo, 10 end-of-patronage, 30 transparent tendering, **60 divest major assets e.g.
 pipelines on open access**, 100 break up CNPC) match the JSON, so the Position-60 marker the long-run
 coding leans on is genuinely in the paper. Both `published_model_forecast` notes match the paper's
-results. **`verified` stays `false`**: the four outcome codings (25/25 near-term, 55/60 long-run) are
-Claude-proposed real-world codings, and — a substantive finding — **the paper states no calendar
-horizon** (its 10 "turns" are bargaining rounds, not years; the only temporal phrase is "in the near
-term"), so the `by_2017 / by_2020 / 5-year` framing is an imposed convention, not the paper's own.
-These three are the ratification questions for Hassan (D13 item 2).
+results. The three interpretive judgments — the outcome codings (25/25 near-term, 55/60 long-run) and
+the horizon rule — were put to Hassan as explicit yes/no questions; a substantive finding is that
+**the paper states no calendar horizon** (its 10 "turns" are bargaining rounds, not years; the only
+temporal phrase is "in the near term"), so the `by_2017 / by_2020 / 5-year` framing is a convention we
+impose, not the paper's own. **Hassan ratified (2026-07-21):** (a) 25/25 accepted; (b) 55/60 accepted,
+with Dec-2019 PipeChina confirmed as the paper's printed Figure-6 Position-60 marker; (c) keep the
+2017/2020 readings but **relabel them as our scoring convention**. On that ratification
+`transcription.verified` was flipped to `true` and his answers quoted in `verification_note` (the
+protocol: numbers alone never flip the flag). The case still claims no coercive verdict — it stays
+out-of-domain (domestic bargaining) and N is tiny.
 
 **Japan (KAPSARC KS-2018-DP47) — BLOCKED.** The PDF is not in `docs/papers/`; the scaffold
 (`drafts/ktab-japan-2017-scaffold.json`) records the differing column order (Influence | Position |
