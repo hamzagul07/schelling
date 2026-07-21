@@ -527,3 +527,71 @@ nothing until clicked, whereas the real risks are *resource-loading* tokens. So 
 report is tested to contain **no** `<script`, `<link`, `src=`, `@import`, or `url(` while allowing
 `href="https://…"`; the three source-less goldens keep the original strict no-URL assertion. Source
 rows render in a deterministic order (by URL), independent of fetch order.
+
+---
+
+## Session 9 — the DEU backtest (Phase 2)
+
+### D9.0 — Session-8 carry-overs
+(a) `live_searched` is now carried draft → `ForecastRecord` → report, exactly as `assumptions`
+are (D6.8): `_load_solve_input` returns it, `forecast()`/`build_forecast_record()` thread it, and
+`render_forecast` prints a caveat that the inputs rest on a live search, not a frozen snapshot.
+(b) A fetched source with no snippet (Claude retrieved but never quoted it) is labeled "retrieved,
+not cited" in the report, so a reviewer sees the citation is weaker than a quoted one. (c) The
+search prompt gained one line preferring a few authoritative **primary** sources over many
+secondary ones, and citing the passage actually relied on.
+
+### D9.1 — DEU III dataset located, ingested; no manual step needed
+The benchmark is the **DEU III** dataset (Arregui & Perarnaud 2021, *A new dataset on legislative
+decision-making in the EU*), the current open-access successor to Thomson/Stokman/Achen/König's DEU
+I/II. It is **CC BY 4.0, direct-download, no registration** from the CORA/CSUC Dataverse
+(`doi:10.34810/data53`), so no manual step was required — the four files were fetched into
+`data/deu/` (gitignored; not redistributed here). The CSV is semicolon-delimited, one row per
+issue, with each actor's position and salience on a 0-100 scale, a reference point `rp`, and the
+actual outcome `out`. `deu.py` normalizes it: values outside [0,100] are missing-data sentinels
+(e.g. `999`); rows without a valid outcome or with fewer than 3 participating actors are dropped,
+leaving **351 scoreable issues** of 364. The exact CSV is pinned by SHA-256 in every record.
+
+### D9.2 — Capability: DEU records none, so every actor gets an equal fixed value (100)
+DEU provides position and salience per issue but **no capability**. Rather than import external
+Council voting-weights (which vary by enlargement period and procedure and would themselves need
+sourcing), every actor is assigned a fixed capability of 100. This is the assumption-light choice:
+with equal capability the "capability×salience weighted mean" baseline is the salience-weighted
+mean — a classic DEU 'compromise' model — and the solver's added value must come from its
+position+salience **bargaining mechanism**, which is exactly what the backtest is meant to test.
+Limitation logged: a voting-weight capability could change the absolute MAEs (of both the solver and
+that baseline); the published comparisons that used influence weights show the same *ordering* we
+find, so the negative result is not an artifact of this choice. `--capability` overrides it.
+
+### D9.3 — Point estimates → one deterministic solve per issue (`--draws` is nominal)
+Each DEU issue is point estimates, so Monte Carlo is degenerate (every draw identical, zero
+variance — D3.1). The harness therefore solves each issue **once** with the deterministic solver
+(`run(game, cfg).forecast_median`) instead of repeating 2000 identical draws (which would be
+~2000× slower for no change). `--draws` is accepted and recorded for interface parity but does not
+affect a point-estimate result. Search is never involved (CLAUDE.md rule 7). Same inputs + seed →
+byte-identical `BacktestRecord`.
+
+### D9.4 — The gate (fixed in advance) and the verdict: FAILED — a negative finding, honestly
+**Gate (stated before running):** the solver's paper-faithful config must beat **both** naive
+baselines — the capability×salience weighted mean and the median actor position — on MAE across all
+351 issues. **Verdict: FAILED.** On the full set: solver (paper-faithful) MAE **28.31**; median
+baseline **28.37** (solver narrowly beats it); capability×salience weighted mean **23.64** (solver
+**loses**). Risk-off is worse (29.08); the R×Q sweep moves MAE only within 28.3–28.7. This is not a
+surprise — it **reproduces the canonical DEU finding**: Achen (2006, in Thomson et al.) showed the
+influence-and-salience-weighted mean predicts EU outcomes as well as or better than the more complex
+bargaining/procedural models, and Bueno de Mesquita's own tests (2011, CMPS 28(1)) put his "Old
+Model" (the expected-utility/challenge model our solver reconstructs) at MAE ≈ 21–28, losing to the
+weighted mean (≈ 12–19). Our numbers sit squarely in that regime with the same ordering. Per the
+brief, the negative result is written up plainly in `BACKTEST.md` rather than papered over — the
+mechanism does not (yet) earn its keep on legislative EU bargaining under equal capability.
+
+### D9.5 — Deterministic write-up + report; published context cited, not fabricated
+`schelling backtest data/deu/` writes a `BacktestRecord` (per-method MAE/RMSE/median/max + full
+per-issue error lists + worst-N + gate verdict; `created_at` defaults None, dataset pinned by
+SHA-256 → byte-identical under a fixed seed), a `BACKTEST.md`, and (optionally) an HTML report
+(error histogram, per-method MAE bars/table, worst-10, published-context table). The published DEU
+error rates are taken from the sources fetched this session (BdM 2011 Tables 1 & 3 via the paper
+PDF; Achen 2006; the DEU III data paper) and are clearly flagged as **not directly comparable**
+(different DEU version, issue subset, capability/resolve handling) — cited to show the regime and
+the known ordering, not as a like-for-like benchmark. The report is a new artifact type in
+`render()`; four goldens were refreshed for the added CSS.
