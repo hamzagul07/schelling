@@ -53,12 +53,33 @@ class MethodResult(BaseModel):
     key: str  # stable id, e.g. "solver_paper", "baseline_wmean"
     label: str  # human label
     kind: str  # "solver" | "baseline" | "sweep"
-    config: dict[str, str | float | int | bool] = Field(default_factory=dict)
+    config: dict[str, str | float | int | bool | None] = Field(default_factory=dict)
     mae: float  # mean absolute error (the headline)
     rmse: float
     median_error: float
     max_error: float
     errors: list[float] = Field(default_factory=list)  # per issue, in issue order (for the report)
+
+
+class SplitSample(BaseModel):
+    """A split-sample validation of a tuned model choice (Session 10, D10.4/item 4).
+
+    Any model modification beyond restoring inputs is tuned on a training half and scored on a
+    held-out test half, so an improvement can't be an artifact of tuning on the same data.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    objective: str  # what was tuned, e.g. "rp-anchored challenge: Q"
+    tuned_param: str  # e.g. "q"
+    candidates: list[float]  # the values swept on the train half
+    selected: float  # the value that minimized train MAE
+    train_n: int
+    test_n: int
+    train_mae: float  # tuned model, train half
+    test_mae: float  # tuned model, test half (the honest number)
+    test_baseline_mae: float  # the equally-equipped weighted mean on the test half
+    passed: bool  # test_mae < test_baseline_mae (no overfit to the tuning half)
 
 
 class BacktestRecord(BaseModel):
@@ -71,12 +92,17 @@ class BacktestRecord(BaseModel):
     n_issues: int
     seed: int
     draws: int  # nominal MC draws (point estimates -> degenerate; recorded for parity, D9.3)
-    capability: float  # the fixed capability assigned to every actor (D9.2)
+    capability: float  # the fixed capability (equal mode), else 0.0 when sourced (D9.2/D10.1)
     engine_version: str
     created_at: str | None = None  # ISO-8601; None keeps runs byte-identical (rule 2)
 
+    # Session-10 fair-fight context (defaults keep Session-9 records valid).
+    capability_mode: str = "equal"  # "equal" (D9.2) or "sourced" (treaty regime, D10.1)
+    reference_point_used: bool = False  # whether an rp-anchored challenge variant is included
+    split_sample: SplitSample | None = None  # validation of the rp/Q tuning (item 4)
+
     methods: list[MethodResult]
-    primary_method: str  # the solver config the gate is judged on ("solver_paper")
-    baseline_methods: list[str]  # the two naive baselines the primary must beat
+    primary_method: str  # the solver config the gate is judged on
+    baseline_methods: list[str]  # the naive baselines the primary must beat
     gate_passed: bool  # primary MAE < every baseline MAE
     worst_issues: list[IssueError] = Field(default_factory=list)  # worst-N by the primary method
