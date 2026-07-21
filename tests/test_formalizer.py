@@ -114,9 +114,11 @@ def test_firewall_blocks_planted_fact_from_evidence(tmp_path: Path) -> None:
     index = _planted_index(tmp_path, PLANTED_FACT)
     client = replay_from_text(json.dumps(leaked))
     with pytest.raises(IndexLeakageError) as exc:
-        formalize(SITUATION, client=client, index=index)
-    # The planted content, absent from the situation, is named as the leak.
-    assert any("zorbian" in leak or "hypersonic" in leak for leak in exc.value.leaks)
+        formalize(SITUATION, client=client, index=index, max_leak_retries=0)
+    # The planted content, absent from the situation, is named as the leak, with its location.
+    assert any("zorbian" in leak.phrase or "hypersonic" in leak.phrase for leak in exc.value.leaks)
+    assert all("evidence" in leak.location for leak in exc.value.leaks)
+    assert exc.value.draft is not None  # rejected draft attached for quarantine
 
 
 def test_firewall_passes_clean_draft_with_index(tmp_path: Path) -> None:
@@ -133,6 +135,51 @@ def test_find_leaks_detects_shingle_overlap() -> None:
     draft = DraftExtraction.model_validate(json.loads(_clean_draft_text()))
     # Nothing leaks when the concepts text shares no unique phrase with the factual surface.
     assert find_leaks(draft, allowed_text=SITUATION, concepts_text="median voter theorem") == []
+
+
+def _leak_draft_text() -> str:
+    d = json.loads(_clean_draft_text())
+    d["game"]["actors"][0]["evidence"][0]["note"] = (
+        "Zorbian Federation fields nine hundred hypersonic interceptors."
+    )
+    return json.dumps(d)
+
+
+def test_firewall_ignores_theory_and_stopword_phrases() -> None:
+    # D6.5: the false positives from the first real run ('of the future', 'shadow of the')
+    # are game-theory vocabulary + stopword-heavy English, and must NOT trip the firewall.
+    d = json.loads(_clean_draft_text())
+    d["game"]["actors"][0]["evidence"][0]["note"] = (
+        "Aland weighs the shadow of the future and the future gains from cooperation."
+    )
+    draft = DraftExtraction.model_validate(d)
+    concepts = (
+        "In repeated games the shadow of the future sustains cooperation via trigger strategies."
+    )
+    assert find_leaks(draft, allowed_text=SITUATION, concepts_text=concepts) == []
+
+
+def test_leak_retry_recovers_when_rephrased(tmp_path: Path) -> None:
+    index = _planted_index(tmp_path, PLANTED_FACT)
+    client = ReplayClient(
+        [LLMResult(_leak_draft_text(), 100, 50), LLMResult(_clean_draft_text(), 100, 50)]
+    )
+    draft = formalize(SITUATION, client=client, index=index)  # default max_leak_retries=1
+    assert draft.metadata.leak_retries == 1
+    assert draft.metadata.input_tokens == 200  # both attempts counted
+    assert len(client.calls) == 2
+    # the rephrase prompt fed the flagged phrases back to the model
+    _, messages = client.calls[1]
+    assert "Rephrase" in messages[-1].content
+
+
+def test_leak_retry_fails_closed_after_one_retry(tmp_path: Path) -> None:
+    index = _planted_index(tmp_path, PLANTED_FACT)
+    client = ReplayClient([LLMResult(_leak_draft_text(), 100, 50)] * 2)
+    with pytest.raises(IndexLeakageError) as exc:
+        formalize(SITUATION, client=client, index=index, max_leak_retries=1)
+    assert len(client.calls) == 2  # initial + one rephrase retry, then fail closed
+    assert exc.value.draft is not None
 
 
 def test_cost_usd_uses_opus_pricing() -> None:
