@@ -595,3 +595,78 @@ PDF; Achen 2006; the DEU III data paper) and are clearly flagged as **not direct
 (different DEU version, issue subset, capability/resolve handling) — cited to show the regime and
 the known ordering, not as a like-for-like benchmark. The report is a new artifact type in
 `render()`; four goldens were refreshed for the added CSS.
+
+---
+
+## Session 10 — the fair fight (Phase 2)
+
+### D10.0 — Session-9 carry-overs (Session 8 review items)
+Already covered in D9.0; no new work this session. (Kept for numbering continuity.)
+
+### D10.1 — Sourced capability table (real Council power, both sides)
+DEU records no capability (Session 9 used equal=100). The published DEU convention is the
+Shapley–Shubik power index (Arregui, Stokman & Thomson 2004, *European Union Politics*, p. 592;
+confirmed by pdftotext of the source PDF this session). Per Hassan's approval we use the transparent,
+fully-citable **approximation**: each member state's capability is its Council power under the treaty
+regime in force at the issue's decision date, rescaled so the strongest actor = 100 (Policon).
+Sources: pre-Nice EC weights (total 87; Treaty establishing the EC, art. 148 Amsterdam
+consolidation), Treaty of Nice weights (EU-27 total 345; OJ C 80 2001), Lisbon-era populations
+(double majority has no vote weights, so population is the proxy; Eurostat via Wikipedia, retrieved
+2026-07-21). Self-check assertions pin the 87 and 345 totals. The SAME table feeds the challenge
+solver and the weighted-mean baseline — the "fair fight" (equal treatment). This is *restoring
+inputs*, not a model modification, so it does not need split-sample validation.
+
+### D10.2 — Period mapping by decision date (unambiguous cutoffs)
+Each issue's regime is chosen by its `finact` (final-act) year: ≤2004 pre-Nice, 2005–2014 Nice,
+≥2015 Lisbon. The DEU decision-date distribution clusters cleanly (1998–2001, 2005–2009, 2016–2019)
+with empty gaps at 2002–2004 and 2010–2015, so no issue lands on a cutoff boundary.
+
+### D10.3 — Commission & EP capability = the largest member-state weight (Hassan's decision)
+The Commission and EP have no Council vote, so their capability is a modeling choice. Hassan chose
+"largest-state weight each," so both normalize to 100 in every regime — heavy unitary actors. (The
+DEU SSI instead folds them in via procedure-specific co-legislator roles; we deliberately took the
+simpler, transparent rule and recorded it for approval rather than computing the SSI ourselves.)
+
+### D10.4 — The reference-point (rp-anchored) challenge variant
+`SolverConfig.reference_point` (default None). When None the status quo is "no move" (`u_sq` at
+distance 0, Scholz eq. 24 — unchanged, so the replication stays 9.53 bit-for-bit). When set, the
+reversion outcome is that continuum point, so `u_sq_i = 2 − 4(0.5 + 0.5·min(|x_i − rp|/R, 1))^r`:
+an actor's status-quo utility falls with its distance from the reference, making distant actors more
+willing to move. Wired scalar (`basic_utilities`) and vectorized (`eu_matrix`, per-challenger
+column) and threaded from config through `rounds`. On the DEU rp-issues this is fed each issue's DEU
+reference point. This IS a model modification, so its Q is tuned split-sample (D10.7).
+
+### D10.5 — The compromise model as a first-class solver (ship the winner)
+The compromise model — the capability×salience weighted mean (Van den Bos 1991; a first-order Nash
+bargaining approximation, Achen) — is now a first-class forecaster in the MC layer:
+`ForecastRecord.model` ∈ {"challenge", "compromise"}, `run_monte_carlo(model=…)` computes the
+weighted mean per draw (so it gets a real CI80 from the triangular draws), and `run_id` carries a
+`-compromise` tag. `schelling solve --solver challenge|compromise|both` (default **both**) reports
+them side by side; the report names the model in its header. This makes the DEU winner a shippable
+model, not just a baseline column.
+
+### D10.6 — The forecast ledger (FORECASTS.md)
+`schelling ledger <game> --grade-date` seals BOTH models' forecasts for a real, unresolved question
+into `FORECASTS.md`, to be graded later. `forecast_commitment` hashes only the substantive
+prediction (question, model, inputs_hash, seed, ensemble) — **excluding** engine SHA and timestamps —
+so the same inputs + seed reproduce the same commitment across engine commits. The sealed game files
+stay out of the public tree; only the forecasts + hashes are committed. First entry: the sealed
+US-Iran stage-two game (`Q-2026-USIRAN-STAGE2`, frozen 2026-07-21, anchored to House of Commons
+Library CBP-10637) — challenge 34.576 vs compromise 41.636 on the 0=US/100=Iran continuum, graded
+**2026-09-01**. Two models, one event.
+
+### D10.7 — Gate v2 (fixed in advance): the challenge solver still loses the fair fight
+**Gate v2 (immovable, stated before running):** with real capabilities and the reference point, the
+challenge solver must beat the equally-equipped weighted mean on DEU MAE; any model change beyond
+restoring inputs is validated split-sample (tune Q on the even-indexed half, score on the odd half).
+**Verdict: FAILED.** Full 351-issue set: sourced capabilities improved *both* models (challenge
+28.31→27.94, weighted mean 23.64→**22.99**); the rp-anchored challenge (split-sample-selected Q=0.7)
+improved the challenge further to **26.83**, and the split-sample confirms this is real, not overfit
+(held-out test MAE 26.07 vs the weighted mean's 23.32 — the rp gain holds but still loses). So the
+fair fight *narrowed* the gap (challenge 28.31→26.83) yet the compromise model wins by ~4 MAE,
+exactly as Achen/BdM predict. The reference point helped but did not collapse the pole-stampede
+failures (max error stays 100 on the worst issues). A robust negative finding, written up in the
+now-living `BACKTEST.md`. **The ICB coercive benchmark is scheduled next regardless** — EU
+legislative bargaining is the cooperative setting BdM notes his model handles worst; ICB (coercive
+interstate crises) is where the mechanism should have its best shot, and that test decides more than
+this one.
