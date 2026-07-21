@@ -670,3 +670,51 @@ now-living `BACKTEST.md`. **The ICB coercive benchmark is scheduled next regardl
 legislative bargaining is the cooperative setting BdM notes his model handles worst; ICB (coercive
 interstate crises) is where the mechanism should have its best shot, and that test decides more than
 this one.
+
+---
+
+## Session R1 — the successor search (Phase 2)
+
+### R1.0 — Pre-registration: the split is committed before any model is fitted
+The DEU issues are cut 40/30/30 into train/dev/**TEST** by a seeded hash of the issue id (seed
+20260721 → train 140, dev 105, TEST 106; rp-issues 103/70/79), exact counts, order-independent. The
+assignment is written to `deu3_split.json` and **committed as its own commit, ahead of any candidate
+code** (git history is the audit trail). The TEST split is scored **exactly once**, at the very end;
+model selection (L2) uses dev only. Feature standardization uses train statistics only — no dev/TEST
+leakage.
+
+### R1.1 — Candidate A: status-quo gravity
+`outcome = λ·wmean + (1−λ)·rp` on the rp-issues, with `λ = sigmoid(bias + β·standardized[rule_cod,
+herfindahl, rp_dist])`. Fit by deterministic full-batch Adam in pure numpy (no sklearn/scipy
+dependency; byte-identical, rule 2) on train rp-issues; L2 chosen by dev MAE (→ 1.0). Idea: let the
+outcome gravitate from the compromise mean toward the status quo where structure says it should.
+
+### R1.2 — Candidate B: regime-aware settlement
+Softmax regime weights `π = softmax(W·[1, standardized(gini, polarization, rp_offset, n_actors,
+rule_cod)])` over three regimes (compromise / challenge / status-quo); prediction is the π-weighted
+blend of the three component estimates — the compromise weighted mean, the Session-10 real-input
+challenge solver, and the status-quo reference point (falling back to the weighted mean where no rp
+exists). Fit by Adam on all train issues (MSE, differentiable mixture-of-experts; no observed regime
+labels); L2 by dev MAE (→ 1.0).
+
+### R1.3 — The gate (immovable): both candidates FAIL on the untouched TEST split
+Each candidate had to beat the compromise weighted mean on TEST; MAE deltas carry a paired bootstrap
+95% CI (seed 20260721). **Verdict: neither beats compromise.** Candidate A (TEST rp-issues, 79):
+MAE 22.09 vs compromise 21.26, Δ **+0.83** [−0.15, +1.91]. Candidate B (TEST all, 106): MAE 21.57 vs
+21.09, Δ **+0.48** [−0.69, +1.76]. Both point estimates are *worse*; both CIs straddle zero →
+statistically indistinguishable from, but not better than, the mean. Candidate B's learned regime
+weights collapse onto compromise (≈0.83) — it essentially rediscovered "use the weighted mean," and
+the challenge/status-quo components add noise. A robust, pre-registered negative result: the
+compromise model remains the settlement model for DEU. Consistent with Sessions 9–10 and the DEU
+literature.
+
+### R1.4 — Shipping + the living leaderboard; nothing sealed
+Both candidates ship as first-class `schelling solve --solver gravity|regime` options (the train-fit
+parameters are committed as `deu3_candidate_gravity.json` / `deu3_candidate_regime.json` and loaded
+at predict time; features + components are computed for any game, rp optional). `schelling successor`
+runs the whole protocol and writes the leaderboard into `BACKTEST.md` between idempotent markers —
+the living leaderboard. **No candidate survived, so nothing was sealed against the live US-Iran game**
+(item 4's "surviving candidate" clause did not trigger). The out-of-domain check on the ICB coercive
+set is deferred to Session 11 (when that data lands), as specified. Note the out-of-domain fragility
+already visible: on US-Iran (features far outside DEU's range) both candidates' softmax/logistic
+saturate onto the compromise mean.

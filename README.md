@@ -92,6 +92,16 @@ challenge solver, fully equipped, must beat the weighted mean — it still doesn
 MAE; the fair fight narrowed the gap but the compromise model wins, split-sample confirmed). The
 ICB coercive benchmark is scheduled next (D10.7).
 
+**Session R1 (done) — the successor search (Phase 2):** a pre-registered 40/30/30
+train/dev/**TEST** split of DEU (seeded, **committed before any model was fitted**) hunts for a
+model that beats the compromise mean. Two candidates — **A: status-quo gravity** (`λ·wmean +
+(1−λ)·rp`) and **B: regime-aware settlement** (softmax blend of compromise/challenge/status-quo) —
+were fit on train, tuned on dev, and scored on the untouched TEST split exactly once, with paired
+bootstrap CIs. **Both FAIL the gate** (A 22.09 vs 21.26; B 21.57 vs 21.09; CIs straddle zero). The
+compromise model stands; nothing was sealed. Both ship as `solve --solver gravity|regime`, and
+`schelling successor` writes the living leaderboard in [`BACKTEST.md`](BACKTEST.md) (R1.x). ICB
+out-of-domain check deferred to Session 11.
+
 ## CLI
 
 ```sh
@@ -130,6 +140,10 @@ schelling backtest data/deu/ --capability-mode equal --no-reference-point   # Se
 
 # Seal both models' forecasts for a real, unresolved question into FORECASTS.md (graded later)
 schelling ledger game.json --grade-date 2026-09-01 --note "what is being forecast"
+
+# Successor search: fit train / tune dev / score TEST once; update the BACKTEST.md leaderboard
+schelling successor data/deu/
+schelling solve game.json --solver regime      # a fitted successor model (R1); also --solver gravity
 ```
 
 The DEU dataset is not redistributed here; download the four open-access DEU III files
