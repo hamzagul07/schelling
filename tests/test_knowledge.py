@@ -58,3 +58,35 @@ def test_build_is_deterministic(chunks: list[Chunk], tmp_path: Path) -> None:
     qa = [(r.chunk.lecture, round(r.score, 6)) for r in a.search("game theory power", 5)]
     qb = [(r.chunk.lecture, round(r.score, 6)) for r in b.search("game theory power", 5)]
     assert qa == qb
+
+
+# --------------------------------------------------------------- canon corpus (Session 19)
+CANON_DIR = Path(__file__).parent.parent / "data" / "concepts"
+
+
+def test_canon_cards_are_indexed_and_searchable(tmp_path: Path) -> None:
+    from schelling.knowledge.chunker import chunk_concepts_directory
+
+    cards = chunk_concepts_directory(CANON_DIR)
+    index = KnowledgeIndex.build(cards, HashingEmbedder(), db_path=tmp_path / "k.db")
+    assert index.count() == 28
+    hit = index.search("sacred stakes", k=1)[0]
+    assert hit.chunk.lecture.startswith("Canon D2") and hit.chunk.source_file == "canon.md"
+    index.close()
+
+
+def test_build_from_corpus_combines_transcripts_and_concepts(tmp_path: Path) -> None:
+    # Hermetic: a fake lecture + a fake concept card must both land in the index (CI has no transcripts).
+    tdir = tmp_path / "t"
+    tdir.mkdir()
+    (tdir / "lec.txt").write_text("Game Theory #1: The Dating Game\nFive men, five women.\n")
+    cdir = tmp_path / "c"
+    cdir.mkdir()
+    (cdir / "canon.md").write_text("**A1. Interest asymmetry (Mack 1975).** Weak side prevails.\n")
+    index = KnowledgeIndex.build_from_corpus(
+        tdir, cdir, embedder=HashingEmbedder(), db_path=tmp_path / "k.db"
+    )
+    refs = {index.search("anything", k=10)[i].chunk.lecture for i in range(index.count())}
+    assert any(r.startswith("Canon A1") for r in refs)  # concept card indexed
+    assert any("Dating Game" in r for r in refs)  # transcript lecture indexed
+    index.close()
