@@ -50,10 +50,16 @@ that every real-world claim traces to the supplied text/sources (CLAUDE.md rule 
 use a record/replay client so CI never calls the live API.
 
 **Session 6 (done) — report renderer:** `schelling report` renders a `DraftGameSpec`
-(review sheet) or a `ForecastRecord` (full analysis) to a single self-contained HTML file —
-inline CSS, charts as inline SVG (actor map, outcome histogram, sensitivity tornado, median
-trajectory), no JavaScript and no network. Deterministic: same artifact → byte-identical
-HTML (D6.x).
+(review sheet), a `ForecastRecord` (full analysis), or an `AdviseRecord` to a single
+self-contained HTML file — inline CSS, charts as inline SVG (actor map, outcome histogram,
+sensitivity tornado, median trajectory), no JavaScript and no network. Deterministic: same
+artifact → byte-identical HTML (D6.x).
+
+**Session 7 (done) — advise mode:** `schelling advise --actor <id>` runs a one-sided lever
+search — the actor's own position/salience moves (benefit and cost reported separately) and
+a ranked "who to work on" list of feasible shifts of other actors toward the advisor's ideal.
+Writes a deterministic `AdviseRecord`; the report carries a standing caveat that opponents are
+held to the model's fixed behaviour — lever-finding, not a playbook (D7.x).
 
 ## CLI
 
@@ -73,23 +79,30 @@ schelling knowledge search "war of attrition" -k 5
 # auto-solves — review, then solve. On a concepts-library leak it quarantines the draft.
 schelling formalize situation.txt --sources ./sources -o game.draft.json
 
-# Render any artifact (a draft or a ForecastRecord) to a self-contained HTML report
+# Find levers for one actor: own moves (position/salience) + who to persuade. Writes an
+# AdviseRecord to runs/. One-sided search — lever-finding, not a playbook.
+schelling advise game.json --actor germany --draws-per-candidate 2000 --target-draws 10000
+
+# Render any artifact (draft, ForecastRecord, or AdviseRecord) to a self-contained HTML report
 schelling report runs/Q-1994-EMISSIONS-mc10000-s42-*.json -o report.html --open
 ```
-
-Optional extras: `uv sync --extra knowledge` (bge-m3 embeddings, ~2 GB model) and
-`uv sync --extra formalize` (the Claude client). Neither is needed to run the tests.
 
 ## Development
 
 This project is managed with [`uv`](https://docs.astral.sh/uv/) and targets Python 3.12.
 
 ```sh
-uv sync --extra dev      # create the environment
+uv sync --all-extras     # the one install command — full working environment (D7.0)
 uv run ruff check .      # lint
 uv run mypy              # type-check (strict on the solver)
 uv run pytest            # tests
 ```
+
+**Install with `uv sync --all-extras`.** It installs everything — dev tooling, the
+`knowledge` extra (bge-m3 embeddings, ~2 GB model), and the `formalize` extra (the Claude
+client) — in one command, so a partial `--extra X` sync can never silently remove another
+extra. The tests themselves need only the base + dev deps (they inject lightweight fakes for
+bge-m3 and Claude), but `--all-extras` is the standard so the environment is always complete.
 
 Every stochastic path takes an explicit `seed`; same seed + same inputs = byte-identical
 output. Auditability starts there.
