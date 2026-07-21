@@ -71,6 +71,16 @@ be frozen in the past — so backtests always run with search OFF, CLAUDE.md rul
 renders the fetched sources as a linked list. Off by default; CI stays offline via replay
 fixtures (D8.x).
 
+**Session 9 (done) — the DEU backtest (Phase 2):** `schelling backtest data/deu/` scores the
+solver against **351 resolved issues** from the open-access **DEU III** dataset (EU legislative
+decision-making; `doi:10.34810/data53`, CC BY 4.0, downloaded into the gitignored `data/deu/`).
+It reports MAE for the paper-faithful solver, a risk-off variant, an R×Q sweep, and two naive
+baselines (capability×salience weighted mean, median actor position), writes a deterministic
+`BacktestRecord` + `BACKTEST.md` + an HTML report, and judges a **gate fixed in advance**: the
+solver must beat both baselines. **It does not** — the solver (MAE 28.31) loses to the weighted
+mean (23.64), reproducing the canonical DEU finding that a simple weighted mean is hard to beat.
+A negative finding, written up honestly in [`BACKTEST.md`](BACKTEST.md) (D9.x).
+
 ## CLI
 
 ```sh
@@ -97,9 +107,15 @@ schelling formalize situation.txt --search --max-searches 5 -o game.draft.json
 # AdviseRecord to runs/. One-sided search — lever-finding, not a playbook.
 schelling advise game.json --actor germany --draws-per-candidate 2000 --target-draws 10000
 
-# Render any artifact (draft, ForecastRecord, or AdviseRecord) to a self-contained HTML report
+# Render any artifact (draft, ForecastRecord, AdviseRecord, or BacktestRecord) to a report
 schelling report runs/Q-1994-EMISSIONS-mc10000-s42-*.json -o report.html --open
+
+# Backtest the solver + naive baselines against the DEU benchmark (search off; writes BACKTEST.md)
+schelling backtest data/deu/ --draws 2000 --seed 42 --html backtest.html
 ```
+
+The DEU dataset is not redistributed here; download the four open-access DEU III files
+(`doi:10.34810/data53`) into `data/deu/` before running the backtest — see [`BACKTEST.md`](BACKTEST.md).
 
 ## Development
 

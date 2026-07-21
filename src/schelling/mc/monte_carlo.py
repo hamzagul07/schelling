@@ -137,6 +137,7 @@ def build_forecast_record(
     created_at: str | None = None,
     assumptions: list[Assumption] | None = None,
     formalizer_metadata: DraftMetadata | None = None,
+    live_searched: bool = False,
 ) -> ForecastRecord:
     """Assemble the complete :class:`ForecastRecord` from a Monte Carlo run.
 
@@ -173,6 +174,7 @@ def build_forecast_record(
         median_trajectory=trajectory,
         assumptions=list(assumptions or []),
         formalizer_metadata=formalizer_metadata,
+        live_searched=live_searched,
         outcome_distribution=[float(v) for v in dist],
         convergence_stats=convergence_stats(mc),
         sensitivity=sensitivity,
@@ -198,6 +200,7 @@ def forecast(
     write: bool = True,
     assumptions: list[Assumption] | None = None,
     formalizer_metadata: DraftMetadata | None = None,
+    live_searched: bool = False,
 ) -> ForecastRecord:
     """Run Monte Carlo + sensitivity, build the ForecastRecord, and (by default) persist it.
 
@@ -215,6 +218,7 @@ def forecast(
         created_at=created_at,
         assumptions=assumptions,
         formalizer_metadata=formalizer_metadata,
+        live_searched=live_searched,
     )
     if write:
         write_record(record, out_dir)

@@ -12,9 +12,11 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from schelling.backtest.context import CITATIONS, CONTEXT_PROSE, PUBLISHED_RESULTS
 from schelling.formalizer.schemas import DraftGameSpec, FetchedSource
 from schelling.report import svg
 from schelling.report.svg import ActorPoint, BarRow, ScatterPoint, TornadoRow
+from schelling.schemas.backtest import BacktestRecord
 from schelling.schemas.forecast import (
     ADVISE_CAVEAT,
     AdviseRecord,
@@ -75,6 +77,11 @@ ul.checklist .why { color:var(--muted); font-size:12px; margin-top:3px; }
 .caveat { border-left:3px solid var(--accent); background:#fff7ed; color:#7c2d12;
   padding:11px 14px; font-size:13px; margin:14px 0; border-radius:0 6px 6px 0; }
 .flag { color:var(--accent); font-size:11px; }
+.verdict { padding:12px 16px; border-radius:8px; font-weight:600; margin:8px 0 18px; }
+.verdict.pass { background:#ecfdf5; color:#065f46; border:1px solid #6ee7b7; }
+.verdict.fail { background:#fef2f2; color:#991b1b; border:1px solid #fca5a5; }
+.cite { color:var(--muted); font-size:12px; }
+tr.primary td { background:#fff7ed; }
 .badge { display:inline-block; border:1px solid var(--accent); color:var(--accent);
   border-radius:10px; padding:0 7px; font-size:11px; letter-spacing:.03em; }
 ul.sources { list-style:none; margin:0; padding:0; }
@@ -208,7 +215,13 @@ def _sources_list(draft: DraftGameSpec) -> str:
         title = _esc(s.title or s.url)
         link = f'<a href="{_esc(s.url)}" rel="noopener noreferrer">{title}</a>'
         meta = f'<div class="meta">{_esc(s.url)} · retrieved {_esc(s.retrieved_at)}</div>'
-        snip = f'<div class="snip">{_esc(s.snippet)}</div>' if s.snippet else ""
+        # A source Claude fetched but never quoted has no snippet — flag it so a reviewer knows the
+        # citation is weaker than one with quoted text (D9.0b).
+        snip = (
+            f'<div class="snip">{_esc(s.snippet)}</div>'
+            if s.snippet
+            else '<div class="snip flag">retrieved, not cited</div>'
+        )
         items.append(f"<li>{link}{meta}{snip}</li>")
     return f'<ul class="sources">{"".join(items)}</ul>'
 
@@ -241,6 +254,14 @@ def render_forecast(record: ForecastRecord) -> str:
         f"<h1>{_esc(record.question_id)}</h1>",
         f'<p class="sub">frozen {_esc(frozen)} · template: {_esc(template)}</p>',
         f'<p class="sub">run {_esc(record.run_id)}</p>',
+    ]
+    if record.live_searched:  # D9.0a — the inputs rest on a live search, not a frozen snapshot
+        parts.append(
+            '<div class="caveat"><strong>Live-searched inputs.</strong> This game was formalized '
+            "with live web search on, so its inputs reflect the web as of the freeze date — not a "
+            "record frozen in the past. Do not treat this as a clean historical backtest.</div>"
+        )
+    parts += [
         "<h2>Headline</h2>",
         '<div class="metrics">'
         + _metric(f"{e.median:.3f}", "settlement median")
@@ -378,6 +399,113 @@ def _advise_provenance(record: AdviseRecord) -> str:
     return f'<div class="prov">Provenance{_dl(pairs)}</div>'
 
 
+def _pct(sorted_vals: list[float], q: float) -> float:
+    """Deterministic percentile (linear interpolation) of an already-sorted list."""
+    if not sorted_vals:
+        return 0.0
+    if len(sorted_vals) == 1:
+        return sorted_vals[0]
+    pos = q / 100.0 * (len(sorted_vals) - 1)
+    lo = int(pos)
+    frac = pos - lo
+    hi = min(lo + 1, len(sorted_vals) - 1)
+    return sorted_vals[lo] + (sorted_vals[hi] - sorted_vals[lo]) * frac
+
+
+def _mae_bars(record: BacktestRecord) -> str:
+    return svg.hbars([BarRow(m.label, m.mae) for m in record.methods])
+
+
+def _method_table(record: BacktestRecord) -> str:
+    rows = []
+    for m in record.methods:
+        cls = ' class="primary"' if m.key == record.primary_method else ""
+        mark = " ★" if m.key == record.primary_method else ""
+        rows.append(
+            f"<tr{cls}><td>{_esc(m.label)}{mark}</td><td>{_esc(m.kind)}</td>"
+            f"<td class='num'>{m.mae:.2f}</td><td class='num'>{m.rmse:.2f}</td>"
+            f"<td class='num'>{m.median_error:.2f}</td><td class='num'>{m.max_error:.2f}</td></tr>"
+        )
+    return (
+        "<table><thead><tr><th>method</th><th>kind</th><th>MAE</th><th>RMSE</th>"
+        f"<th>median AE</th><th>max AE</th></tr></thead><tbody>{''.join(rows)}</tbody></table>"
+    )
+
+
+def _worst_table(record: BacktestRecord) -> str:
+    rows = "".join(
+        f"<tr><td>{_esc(w.issue_id)}</td><td>{_esc(w.proposal_name[:48])}</td>"
+        f"<td class='num'>{w.forecast:.1f}</td><td class='num'>{w.actual:.1f}</td>"
+        f"<td class='num'>{w.error:.1f}</td></tr>"
+        for w in record.worst_issues
+    )
+    return (
+        "<table><thead><tr><th>issue</th><th>proposal</th><th>forecast</th><th>actual</th>"
+        f"<th>error</th></tr></thead><tbody>{rows}</tbody></table>"
+    )
+
+
+def _context_table() -> str:
+    rows = "".join(
+        f"<tr><td>{_esc(p.model)}</td><td class='num'>{p.mean_abs_error:.1f}</td>"
+        f"<td>{_esc(p.subset)}</td><td>{_esc(p.source)}</td></tr>"
+        for p in PUBLISHED_RESULTS
+    )
+    cites = "".join(f"<li class='cite'>{_esc(c)}</li>" for c in CITATIONS)
+    return (
+        "<table><thead><tr><th>published model</th><th>mean abs error</th><th>subset</th>"
+        f"<th>source</th></tr></thead><tbody>{rows}</tbody></table>"
+        f"<ul>{cites}</ul>"
+    )
+
+
+def render_backtest(record: BacktestRecord) -> str:
+    """Render a BacktestRecord: gate verdict, per-method MAE, error histogram, worst issues."""
+    primary = next(m for m in record.methods if m.key == record.primary_method)
+    baselines = [next(m for m in record.methods if m.key == k) for k in record.baseline_methods]
+    verdict_cls = "pass" if record.gate_passed else "fail"
+    verdict_txt = "PASSED" if record.gate_passed else "FAILED"
+    b_txt = "; ".join(f"{b.label.split('—')[-1].strip()} {b.mae:.2f}" for b in baselines)
+
+    errors = sorted(primary.errors)
+    p10, p90 = _pct(errors, 10), _pct(errors, 90)
+
+    parts = [
+        '<div class="kicker">Backtest — DEU benchmark</div>',
+        f"<h1>{_esc(record.dataset)}</h1>",
+        f'<p class="sub">{record.n_issues} resolved issues · search off (frozen benchmark) · '
+        f"capability fixed at {record.capability:g}</p>",
+        f'<div class="verdict {verdict_cls}">Gate {verdict_txt}: the solver '
+        f"(MAE {primary.mae:.2f}) must beat both baselines ({_esc(b_txt)}).</div>",
+        "<h2>Mean absolute error by method</h2>",
+        f"<figure>{_mae_bars(record)}</figure>",
+        _method_table(record),
+        "<h2>Error distribution — primary solver</h2>",
+        "<figure>"
+        + svg.histogram(primary.errors, p10=p10, p90=p90, median=primary.median_error)
+        + "</figure>",
+        "<h2>Worst issues — for inspection</h2>",
+        _worst_table(record),
+        "<h2>Published DEU error rates — for context</h2>",
+        f'<p class="sub">{_esc(CONTEXT_PROSE)}</p>',
+        _context_table(),
+    ]
+    prov = _dl(
+        {
+            "dataset_sha256": record.dataset_sha256,
+            "engine": record.engine_version,
+            "seed": str(record.seed),
+            "n_issues": str(record.n_issues),
+        }
+    )
+    parts.append(f'<div class="prov">Provenance{prov}</div>')
+    return _page(f"Backtest — {record.dataset}", "".join(parts))
+
+
+def _looks_like_backtest(data: dict[str, Any]) -> bool:
+    return "methods" in data and "gate_passed" in data and "primary_method" in data
+
+
 def _fmt_err(exc: ValidationError) -> str:
     err = exc.errors()[0]
     loc = ".".join(str(p) for p in err.get("loc", ())) or "(root)"
@@ -400,6 +528,13 @@ def _looks_like_advise(data: dict[str, Any]) -> bool:
 
 def render(data: dict[str, Any]) -> str:
     """Detect the artifact type and render it. Raises ValueError with a named reason otherwise."""
+    if _looks_like_backtest(data):
+        try:
+            return render_backtest(BacktestRecord.model_validate(data))
+        except ValidationError as exc:
+            raise ValueError(
+                f"this looks like a BacktestRecord but does not match the schema ({_fmt_err(exc)})."
+            ) from exc
     if _looks_like_advise(data):
         try:
             return render_advise(AdviseRecord.model_validate(data))

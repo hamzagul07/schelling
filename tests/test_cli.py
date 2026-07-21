@@ -282,6 +282,41 @@ def test_report_on_replication_fixture_record(tmp_path: Path) -> None:
         assert token not in html.lower()
 
 
+def test_backtest_cli_on_sample_writes_md_and_record(tmp_path: Path) -> None:
+    md = tmp_path / "BACKTEST.md"
+    result = runner.invoke(
+        app,
+        [
+            "backtest",
+            str(FIXTURES / "deu_sample.csv"),
+            "--seed",
+            "7",
+            "--draws",
+            "40",
+            "--md",
+            str(md),
+            "--out-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Gate" in result.output  # a verdict is printed
+    assert "capability x salience weighted mean" in result.output
+    assert md.exists() and "DEU benchmark" in md.read_text()
+    from schelling.schemas.backtest import BacktestRecord
+
+    written = next(tmp_path.glob("backtest-*.json"))
+    rec = BacktestRecord.model_validate_json(written.read_text())
+    assert rec.n_issues == 3 and rec.primary_method == "solver_paper"
+
+
+def test_backtest_cli_missing_csv_is_friendly(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["backtest", str(tmp_path)])  # empty dir, no CSV
+    assert result.exit_code == 2
+    assert "DEU CSV not found" in result.output
+    assert "Traceback" not in result.output
+
+
 def test_report_missing_artifact_errors(tmp_path: Path) -> None:
     result = runner.invoke(app, ["report", str(tmp_path / "nope.json")])
     assert result.exit_code == 2

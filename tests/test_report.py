@@ -42,13 +42,20 @@ def test_searched_draft_report_matches_golden() -> None:
     assert html == (FIXTURES / "draft_searched_report.html").read_text()
 
 
+def test_backtest_report_matches_golden() -> None:
+    html = render(_load("backtest.json"))
+    assert html == (FIXTURES / "backtest_report.html").read_text()
+
+
 def test_render_is_deterministic() -> None:
     data = _load("forecast_record.json")
     assert render(data) == render(data)
 
 
 # --------------------------------------------------------------- offline / self-contained
-@pytest.mark.parametrize("name", ["forecast_record.json", "draft.json", "advise.json"])
+@pytest.mark.parametrize(
+    "name", ["forecast_record.json", "draft.json", "advise.json", "backtest.json"]
+)
 def test_report_references_no_external_resources(name: str) -> None:
     html = render(_load(name)).lower()
     for token in _NETWORK_TOKENS:
@@ -158,6 +165,45 @@ def test_searched_draft_report_loads_no_external_resource() -> None:
     for token in ("<script", "<link", "src=", "@import", "url("):
         assert token not in html, f"draft_searched contains resource token {token!r}"
     assert 'href="https://' in html  # but hyperlinks to sources are present and expected
+
+
+# --------------------------------------------------------------- backtest report (D9.x)
+def test_backtest_report_has_gate_verdict_and_context() -> None:
+    html = render(_load("backtest.json"))
+    for heading in (
+        "Mean absolute error by method",
+        "Error distribution",
+        "Worst issues",
+        "Published DEU error rates",
+    ):
+        assert heading in html
+    assert "Gate FAILED" in html or "Gate PASSED" in html  # a verdict is stated
+    assert 'class="verdict' in html
+    assert "Bueno de Mesquita" in html  # cited context
+    assert "dataset_sha256" in html  # provenance
+
+
+def test_backtest_report_rejects_bad_schema() -> None:
+    bad = {"methods": [], "gate_passed": True, "primary_method": "x"}  # backtest-shaped but invalid
+    with pytest.raises(ValueError, match="BacktestRecord"):
+        render(bad)
+
+
+# --------------------------------------------------------------- D9.0 carry-overs
+def test_forecast_report_shows_live_searched_caveat() -> None:
+    record = _load("forecast_record.json")
+    record["live_searched"] = True
+    html = render(record)
+    assert "Live-searched inputs" in html
+    assert 'class="caveat"' in html
+
+
+def test_snippetless_fetched_source_is_labeled_retrieved_not_cited() -> None:
+    draft = _load("draft_searched.json")
+    for s in draft["sources_fetched"]:
+        s["snippet"] = ""  # a source Claude fetched but never quoted
+    html = render(draft)
+    assert "retrieved, not cited" in html
 
 
 def test_advise_report_has_sections_and_caveat() -> None:

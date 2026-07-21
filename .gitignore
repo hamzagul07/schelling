@@ -72,3 +72,5 @@ data/*.db
 runs/
 # Local analysis working files (situations, sources, drafts) — not part of the engine.
 analyses/
+# DEU benchmark dataset (CC BY 4.0; downloaded locally, not redistributed here).
+data/deu/
