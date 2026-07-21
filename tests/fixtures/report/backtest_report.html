@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Backtest — DEU sample (test fixture)</title><style>
+:root { --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --panel:#f9fafb; --accent:#b45309; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#fff;
+  font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.wrap { max-width:760px; margin:0 auto; padding:40px 28px 72px; }
+h1 { font-size:22px; font-weight:650; margin:0 0 2px; letter-spacing:-.01em; }
+h2 { font-size:13px; font-weight:650; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--muted); margin:38px 0 12px; }
+.sub { color:var(--muted); font-size:13px; margin:0 0 4px; }
+.kicker { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
+figure { margin:0; }
+.metrics { display:flex; flex-wrap:wrap; gap:12px; margin:6px 0 4px; }
+.metric { flex:1 1 130px; border:1px solid var(--line); border-radius:8px; padding:12px 14px;
+  background:var(--panel); }
+.metric .m-val { font-size:20px; font-weight:650; letter-spacing:-.01em; }
+.metric .m-lab { color:var(--muted); font-size:11px; text-transform:uppercase;
+  letter-spacing:.05em; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line);
+  vertical-align:top; }
+th { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase;
+  letter-spacing:.04em; }
+td.num { font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ev { color:var(--muted); font-size:12px; }
+.ev q { color:var(--ink); }
+ul.checklist { list-style:none; margin:0; padding:0; }
+ul.checklist li { border:1px solid var(--line); border-radius:8px; padding:10px 12px 10px 34px;
+  position:relative; margin-bottom:8px; background:var(--panel); }
+ul.checklist .box { position:absolute; left:11px; top:11px; width:14px; height:14px;
+  border:1.5px solid #9ca3af; border-radius:3px; }
+ul.checklist .why { color:var(--muted); font-size:12px; margin-top:3px; }
+.prov { border-top:1px solid var(--line); margin-top:40px; padding-top:14px; color:var(--muted);
+  font-size:12px; }
+.prov dl { display:grid; grid-template-columns:150px 1fr; gap:3px 14px; margin:0; }
+.prov dt { color:#9ca3af; }
+.prov dd { margin:0; word-break:break-all; font-variant-numeric:tabular-nums; }
+/* SVG chart classes */
+.axis, .whisker, .baseline, .settle-line, .median-line { stroke:#9ca3af; fill:none; }
+.axis { stroke:var(--line); } .whisker { stroke:#94a3b8; stroke-width:1.4; }
+.dot { fill:#334155; } .bar { fill:#cbd5e1; } .tbar { fill:#94a3b8; }
+.ci-band { fill:#eef2f7; } .traj-line { stroke:#334155; stroke-width:1.6; fill:none; }
+.baseline { stroke-dasharray:3 3; } .settle-line, .median-line { stroke:var(--accent);
+  stroke-width:1.4; stroke-dasharray:4 3; }
+.tick, .actor-label, .swing, .settle-label { font:11px sans-serif; fill:var(--muted); }
+.actor-label { fill:var(--ink); } .swing { fill:#374151; font-variant-numeric:tabular-nums; }
+.settle-label { fill:var(--accent); font-weight:600; }
+.caveat { border-left:3px solid var(--accent); background:#fff7ed; color:#7c2d12;
+  padding:11px 14px; font-size:13px; margin:14px 0; border-radius:0 6px 6px 0; }
+.flag { color:var(--accent); font-size:11px; }
+.verdict { padding:12px 16px; border-radius:8px; font-weight:600; margin:8px 0 18px; }
+.verdict.pass { background:#ecfdf5; color:#065f46; border:1px solid #6ee7b7; }
+.verdict.fail { background:#fef2f2; color:#991b1b; border:1px solid #fca5a5; }
+.cite { color:var(--muted); font-size:12px; }
+tr.primary td { background:#fff7ed; }
+.badge { display:inline-block; border:1px solid var(--accent); color:var(--accent);
+  border-radius:10px; padding:0 7px; font-size:11px; letter-spacing:.03em; }
+ul.sources { list-style:none; margin:0; padding:0; }
+ul.sources li { border:1px solid var(--line); border-radius:8px; padding:9px 12px;
+  margin-bottom:8px; background:var(--panel); }
+ul.sources a { color:var(--accent); text-decoration:none; word-break:break-all; }
+ul.sources .meta { color:var(--muted); font-size:12px; margin-top:2px; }
+ul.sources .snip { color:var(--ink); font-size:12px; margin-top:4px; }
+@media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .wrap { max-width:none; padding:0 12px; } h2 { margin-top:24px; } }
+</style></head><body><div class="wrap"><div class="kicker">Backtest — DEU benchmark</div><h1>DEU sample (test fixture)</h1><p class="sub">3 resolved issues · search off (frozen benchmark) · capability fixed at 100</p><div class="verdict fail">Gate FAILED: the solver (MAE 16.67) must beat both baselines (capability x salience weighted mean 10.71; median actor position 16.67).</div><h2>Mean absolute error by method</h2><figure><svg viewBox="0 0 680.00 230.00" width="100%" preserveAspectRatio="xMidYMid meet" role="img"><line x1="217.45" y1="8.00" x2="217.45" y2="218.00" class="baseline"/><text x="190.00" y="27.00" text-anchor="end" class="actor-label">Solver — paper-faithful (dynamic R, Q=1, risk on)</text><rect x="217.45" y="16.00" width="277.92" height="14" class="tbar"/><text x="632.00" y="27.00" text-anchor="start" class="swing">+16.67</text><text x="190.00" y="53.00" text-anchor="end" class="actor-label">Solver — risk off</text><rect x="217.45" y="42.00" width="389.09" height="14" class="tbar"/><text x="632.00" y="53.00" text-anchor="start" class="swing">+23.33</text><text x="190.00" y="79.00" text-anchor="end" class="actor-label">Baseline — capability x salience weighted mean</text><rect x="217.45" y="68.00" width="178.66" height="14" class="tbar"/><text x="632.00" y="79.00" text-anchor="start" class="swing">+10.71</text><text x="190.00" y="105.00" text-anchor="end" class="actor-label">Baseline — median actor position</text><rect x="217.45" y="94.00" width="277.92" height="14" class="tbar"/><text x="632.00" y="105.00" text-anchor="start" class="swing">+16.67</text><text x="190.00" y="131.00" text-anchor="end" class="actor-label">R=dynamic, Q=1</text><rect x="217.45" y="120.00" width="277.92" height="14" class="tbar"/><text x="632.00" y="131.00" text-anchor="start" class="swing">+16.67</text><text x="190.00" y="157.00" text-anchor="end" class="actor-label">R=dynamic, Q=0.5</text><rect x="217.45" y="146.00" width="389.09" height="14" class="tbar"/><text x="632.00" y="157.00" text-anchor="start" class="swing">+23.33</text><text x="190.00" y="183.00" text-anchor="end" class="actor-label">R=fixed, Q=1</text><rect x="217.45" y="172.00" width="277.92" height="14" class="tbar"/><text x="632.00" y="183.00" text-anchor="start" class="swing">+16.67</text><text x="190.00" y="209.00" text-anchor="end" class="actor-label">R=fixed, Q=0.5</text><rect x="217.45" y="198.00" width="389.09" height="14" class="tbar"/><text x="632.00" y="209.00" text-anchor="start" class="swing">+23.33</text></svg></figure><table><thead><tr><th>method</th><th>kind</th><th>MAE</th><th>RMSE</th><th>median AE</th><th>max AE</th></tr></thead><tbody><tr class="primary"><td>Solver — paper-faithful (dynamic R, Q=1, risk on) ★</td><td>solver</td><td class='num'>16.67</td><td class='num'>19.15</td><td class='num'>10.00</td><td class='num'>30.00</td></tr><tr><td>Solver — risk off</td><td>solver</td><td class='num'>23.33</td><td class='num'>25.17</td><td class='num'>30.00</td><td class='num'>30.00</td></tr><tr><td>Baseline — capability x salience weighted mean</td><td>baseline</td><td class='num'>10.71</td><td class='num'>11.20</td><td class='num'>10.00</td><td class='num'>15.00</td></tr><tr><td>Baseline — median actor position</td><td>baseline</td><td class='num'>16.67</td><td class='num'>19.15</td><td class='num'>10.00</td><td class='num'>30.00</td></tr><tr><td>R=dynamic, Q=1</td><td>sweep</td><td class='num'>16.67</td><td class='num'>19.15</td><td class='num'>10.00</td><td class='num'>30.00</td></tr><tr><td>R=dynamic, Q=0.5</td><td>sweep</td><td class='num'>23.33</td><td class='num'>25.17</td><td class='num'>30.00</td><td class='num'>30.00</td></tr><tr><td>R=fixed, Q=1</td><td>sweep</td><td class='num'>16.67</td><td class='num'>19.15</td><td class='num'>10.00</td><td class='num'>30.00</td></tr><tr><td>R=fixed, Q=0.5</td><td>sweep</td><td class='num'>23.33</td><td class='num'>25.17</td><td class='num'>30.00</td><td class='num'>30.00</td></tr></tbody></table><h2>Error distribution — primary solver</h2><figure><svg viewBox="0 0 680.00 200.00" width="100%" preserveAspectRatio="xMidYMid meet" role="img"><rect x="20.00" y="12.00" width="512.00" height="162.00" class="ci-band"/><rect x="20.50" y="12.00" width="25.67" height="162.00" class="bar"/><rect x="633.83" y="93.00" width="25.67" height="81.00" class="bar"/><line x1="20.00" y1="12.00" x2="20.00" y2="174.00" class="median-line"/><line x1="20.00" y1="174.00" x2="660.00" y2="174.00" class="axis"/><text x="20.00" y="190.00" text-anchor="start" class="tick">10</text><text x="660.00" y="190.00" text-anchor="end" class="tick">30</text><text x="340.00" y="190.00" text-anchor="middle" class="tick">median 10</text></svg></figure><h2>Worst issues — for inspection</h2><table><thead><tr><th>issue</th><th>proposal</th><th>forecast</th><th>actual</th><th>error</th></tr></thead><tbody><tr><td>t02i1</td><td>sample beta</td><td class='num'>50.0</td><td class='num'>80.0</td><td class='num'>30.0</td></tr><tr><td>t01i1</td><td>sample alpha</td><td class='num'>40.0</td><td class='num'>50.0</td><td class='num'>10.0</td></tr><tr><td>t01i2</td><td>sample alpha</td><td class='num'>50.0</td><td class='num'>40.0</td><td class='num'>10.0</td></tr></tbody></table><h2>Published DEU error rates — for context</h2><p class="sub">The most-cited finding in this literature (Achen 2006, in Thomson et al.&#x27;s DEU project) is that the influence- and salience-weighted mean of member-state positions predicts EU outcomes as well as or better than the more complex bargaining and procedural models. Bueno de Mesquita&#x27;s own tests on Thomson&#x27;s data (2011) reproduce this: his &#x27;Old Model&#x27; — the expected-utility / challenge model our solver reconstructs — records a mean absolute error around 21-28 on the 0-100 scale, losing to the simple weighted mean (~12-19). Our full-set result sits in the same regime and shows the same ordering.</p><table><thead><tr><th>published model</th><th>mean abs error</th><th>subset</th><th>source</th></tr></thead><tbody><tr><td>Old Model (expected-utility / challenge)</td><td class='num'>21.5</td><td>9 issues w/ resolve data</td><td>BdM 2011, Table 1</td></tr><tr><td>Weighted mean, round 1</td><td class='num'>11.8</td><td>9 issues w/ resolve data</td><td>BdM 2011, Table 1</td></tr><tr><td>Weighted median, round 1</td><td class='num'>29.4</td><td>9 issues w/ resolve data</td><td>BdM 2011, Table 1</td></tr><tr><td>Old Model (expected-utility / challenge)</td><td class='num'>28.2</td><td>issues w/o recursion point</td><td>BdM 2011, Table 3</td></tr><tr><td>Weighted mean, round 1</td><td class='num'>19.4</td><td>issues w/o recursion point</td><td>BdM 2011, Table 3</td></tr><tr><td>Weighted median, round 1</td><td class='num'>19.8</td><td>issues w/o recursion point</td><td>BdM 2011, Table 3</td></tr></tbody></table><ul><li class='cite'>Bueno de Mesquita, B. (2011). A New Model for Predicting Policy Choices: Preliminary Tests. Conflict Management and Peace Science 28(1): 1-21. doi:10.1177/0738894210388127.</li><li class='cite'>Achen, C. H. (2006). Institutional realism and bargaining models. In Thomson, Stokman, Achen &amp; Konig (eds.), The European Union Decides. Cambridge University Press. (Finds the influence- and-salience-weighted mean of member positions did as well or better than more complex models.)</li><li class='cite'>Arregui, J. &amp; Perarnaud, C. (2021). A new dataset on legislative decision-making in the European Union: the DEU III dataset. Journal of European Public Policy. doi:10.34810/data53.</li></ul><div class="prov">Provenance<dl><dt>dataset_sha256</dt><dd>61c04281887b7af17d11571526787c7def85b537a0d3cdf290ab635676e557cb</dd><dt>engine</dt><dd>0000000000000000000000000000000000000000</dd><dt>seed</dt><dd>7</dd><dt>n_issues</dt><dd>3</dd></dl></div></div></body></html>

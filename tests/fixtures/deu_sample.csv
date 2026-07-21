@@ -1,0 +1,6 @@
+prnrnmc;isnrnmc;prnr;prname;isnr;type;council;proc;counvte;proccde;issues;intro;finact;pcom;pep;pat;pbe;pbu;pcr;pcy;pcz;pdk;pee;pfi;pfr;pde;pel;phu;pie;pit;plv;plt;plu;pmt;pnl;ppl;ppt;pro;psi;psk;pes;pse;puk;scom;sep;sat;sbe;sbu;scr;scy;scz;sdk;see;sfi;sfr;sde;sel;shu;sie;sit;slv;slt;slu;smt;snl;spl;spt;sro;ssi;ssk;ses;sse;suk;rp;out
+1;1;t01;sample alpha;t01i1;Reg;General;COD;;;;01-01-10;01-06-11;80;60;;;;;;;;;;40;20;;;;0;;;;;;;;;;;;;;100;50;;;;;;;;;;50;100;;;;50;;;;;;;;;;;;;;0;50
+1;1;t01;sample alpha;t01i2;Reg;General;COD;;;;01-01-10;01-06-11;100;;;;;;;;;;;50;0;;;;;;;;;;;;;;;;;;50;;;;;;;;;;;50;50;;;;;;;;;;;;;;;;;;;40
+1;1;t02;sample beta;t02i1;Reg;General;CNS;;;;01-01-10;01-06-11;0;100;;;;;;;;;;50;;;;;50;;;;;;;;;;;;;;20;80;;;;;;;;;;50;;;;;50;;;;;;;;;;;;;;50;80
+1;1;t02;sample beta;t02i2;Reg;General;CNS;;;;01-01-10;01-06-11;0;100;;;;;;;;;;50;;;;;;;;;;;;;;;;;;;20;80;;;;;;;;;;50;;;;;;;;;;;;;;;;;;;;999
+1;1;t03;sample gamma;t03i1;Reg;General;COD;;;;01-01-10;01-06-11;10;;;;;;;;;;;;90;;;;;;;;;;;;;;;;;;50;;;;;;;;;;;;50;;;;;;;;;;;;;;;;;;;50
