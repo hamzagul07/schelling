@@ -64,8 +64,10 @@ _SEARCH_GUIDANCE = (
     "Before drafting, you MAY use the web_search tool to find current sources for this situation "
     "(recent positions, capabilities, statements). Anything you fetch is EVIDENCE, on the same "
     "footing as the supplied SOURCES: you may cite a fetched page in an evidence note, and you "
-    "SHOULD prefer a fetched citation over an assumption. This does NOT relax the rule above — the "
-    "concepts library is still never a source of facts. Finish by returning the JSON object."
+    "SHOULD prefer a fetched citation over an assumption. Prefer a few authoritative primary "
+    "sources (official statements, filings, primary reporting) over many secondary ones, and cite "
+    "the passage you actually rely on. This does NOT relax the rule above — the concepts library "
+    "is still never a source of facts. Finish by returning the JSON object."
 )
 
 
