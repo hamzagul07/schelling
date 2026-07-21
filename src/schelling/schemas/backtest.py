@@ -82,6 +82,24 @@ class SplitSample(BaseModel):
     passed: bool  # test_mae < test_baseline_mae (no overfit to the tuning half)
 
 
+class OracleSummary(BaseModel):
+    """DIAGNOSTIC noise-floor oracle (D11.0): a flexible CV model vs the compromise mean.
+
+    ``oracle_mae`` is the cross-validated MAE of a deliberately flexible model (kernel/linear ridge
+    over rich features incl. positions) — an estimate of the extractable-signal ceiling. A small (or
+    negative) ``gap`` means the compromise mean is at/near that ceiling: no headroom to exploit.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    n_issues: int
+    folds: int
+    best_model: str
+    oracle_mae: float
+    compromise_mae: float
+    gap: float  # compromise_mae - oracle_mae; small/negative => mean at ceiling
+
+
 class BacktestRecord(BaseModel):
     """The deterministic audit artifact of a backtest run (same inputs + seed -> byte-identical)."""
 
@@ -100,6 +118,7 @@ class BacktestRecord(BaseModel):
     capability_mode: str = "equal"  # "equal" (D9.2) or "sourced" (treaty regime, D10.1)
     reference_point_used: bool = False  # whether an rp-anchored challenge variant is included
     split_sample: SplitSample | None = None  # validation of the rp/Q tuning (item 4)
+    oracle: OracleSummary | None = None  # noise-floor diagnostic (Session 11, D11.0)
 
     methods: list[MethodResult]
     primary_method: str  # the solver config the gate is judged on

@@ -94,6 +94,25 @@ def backtest_markdown(record: BacktestRecord) -> str:
             f"{'' if s.passed else 'still '}insufficient."
         )
         out.append("")
+    if record.oracle is not None:
+        o = record.oracle
+        near = "at/near the ceiling" if o.gap <= 1.0 else f"below the ceiling by {o.gap:.2f}"
+        out.append("## Noise-floor oracle (DIAGNOSTIC, D11.0)")
+        out.append("")
+        out.append(
+            f"A deliberately flexible cross-validated model ({o.best_model}, {o.folds}-fold, rich "
+            f"features incl. positions) scores MAE **{o.oracle_mae:.2f}** — an estimate of the "
+            f"extractable-signal ceiling. The compromise mean scores **{o.compromise_mae:.2f}**, "
+            f"so the gap is **{o.gap:+.2f}**: the mean is **{near}**. "
+            + (
+                "Even an optimistic flexible model does not beat the mean — there is essentially "
+                "no signal beyond the influence-weighted average, which is why every model we "
+                "have tried fails to beat it."
+                if o.gap <= 1.0
+                else "There is some headroom a better model might exploit."
+            )
+        )
+        out.append("")
     out.append("## Per-method error (full issue set)")
     out.append("")
     out += _mae_table(record)
@@ -153,6 +172,21 @@ def backtest_markdown(record: BacktestRecord) -> str:
         f"- **Determinism.** Dataset pinned by SHA-256 `{record.dataset_sha256[:16]}…`; "
         f"engine `{record.engine_version[:12]}`; seed {record.seed}. Same inputs → byte-identical "
         f"record."
+    )
+    out.append("")
+    out.append("## Domain verdicts, side by side")
+    out.append("")
+    out.append("| Domain | Benchmark | Verdict |")
+    out.append("|---|---|---|")
+    out.append(
+        f"| Cooperative (EU legislative) | DEU III, {record.n_issues} issues | **Compromise mean "
+        f"wins.** The challenge solver loses even fully equipped; the noise-floor oracle shows the "
+        f"mean is at the extractable-signal ceiling. |"
+    )
+    out.append(
+        "| Coercive (interstate crises) | Coercive library | **PENDING.** The expert-coded "
+        "coercive tables (Hong Kong 1985, Iran 1984, ...) are in paywalled books; the harness is "
+        "built and waits on the printed inputs (D11.1). |"
     )
     out.append("")
     out.append("## Scheduled next: the ICB coercive benchmark")

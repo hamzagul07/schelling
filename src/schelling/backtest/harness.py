@@ -25,6 +25,7 @@ from schelling.schemas.backtest import (
     DEUIssue,
     IssueError,
     MethodResult,
+    OracleSummary,
     SplitSample,
 )
 from schelling.schemas.question import GameSpec
@@ -216,6 +217,7 @@ def run_backtest(
     q_grid: Sequence[float] = _Q_GRID,
     worst_n: int = 10,
     created_at: str | None = None,
+    oracle: OracleSummary | None = None,
 ) -> BacktestRecord:
     """Score every method over ``issues`` and assemble the deterministic :class:`BacktestRecord`.
 
@@ -279,6 +281,7 @@ def run_backtest(
         capability_mode=capability_mode,
         reference_point_used=reference_point,
         split_sample=split_sample,
+        oracle=oracle,
         engine_version=engine_version(),
         created_at=created_at,
         methods=results,
