@@ -40,7 +40,12 @@ from schelling.formalizer.firewall import IndexLeakageError
 from schelling.formalizer.formalize import formalize as run_formalize
 from schelling.formalizer.schemas import DraftGameSpec
 from schelling.knowledge.embed import make_embedder
-from schelling.knowledge.index import DEFAULT_DB_PATH, DEFAULT_TRANSCRIPTS, KnowledgeIndex
+from schelling.knowledge.index import (
+    DEFAULT_CONCEPTS,
+    DEFAULT_DB_PATH,
+    DEFAULT_TRANSCRIPTS,
+    KnowledgeIndex,
+)
 from schelling.mc.monte_carlo import forecast, write_record
 from schelling.mc.sensitivity import format_tornado, zero_swing_warning
 from schelling.report.render import render as render_report
@@ -1065,17 +1070,21 @@ def knowledge_search(
 @knowledge_app.command("build")
 def knowledge_build(
     transcripts: Path = typer.Option(DEFAULT_TRANSCRIPTS, "--transcripts"),
+    concepts: Path = typer.Option(
+        DEFAULT_CONCEPTS, "--concepts", help="Concept-card corpus (*.md)."
+    ),
     db_path: Path = typer.Option(DEFAULT_DB_PATH, "--db"),
     embedder: str = typer.Option("bge-m3", "--embedder", help="'bge-m3' or 'hashing'."),
 ) -> None:
-    """Chunk the transcripts and build the sqlite-vec index."""
+    """Chunk the transcripts + concept cards and build the sqlite-vec index (Session 19)."""
     if not transcripts.exists() or not any(transcripts.glob("*.txt")):
         typer.echo(f"no transcripts in {transcripts}", err=True)
         raise typer.Exit(code=2)
-    typer.echo(f"building index ({embedder}) from {transcripts} ...")
+    n_cards = len(list(concepts.glob("*.md"))) if concepts.exists() else 0
+    typer.echo(f"building index ({embedder}) from {transcripts} + {n_cards} concept file(s) ...")
     try:
-        index = KnowledgeIndex.build_from_transcripts(
-            transcripts, embedder=make_embedder(embedder), db_path=db_path
+        index = KnowledgeIndex.build_from_corpus(
+            transcripts, concepts, embedder=make_embedder(embedder), db_path=db_path
         )
     except ImportError as exc:
         typer.echo(_KNOWLEDGE_HINT, err=True)

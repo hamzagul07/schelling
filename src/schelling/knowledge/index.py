@@ -14,11 +14,12 @@ from pathlib import Path
 import numpy as np
 import sqlite_vec
 
-from schelling.knowledge.chunker import Chunk, chunk_directory
+from schelling.knowledge.chunker import Chunk, chunk_concepts_directory, chunk_directory
 from schelling.knowledge.embed import Embedder, HashingEmbedder, make_embedder
 
 DEFAULT_DB_PATH = Path("data/knowledge.db")
 DEFAULT_TRANSCRIPTS = Path("data/transcripts")
+DEFAULT_CONCEPTS = Path("data/concepts")
 
 
 @dataclass(frozen=True)
@@ -78,6 +79,24 @@ class KnowledgeIndex:
     ) -> KnowledgeIndex:
         """Chunk every transcript in ``transcripts_dir`` and build the index."""
         return cls.build(chunk_directory(transcripts_dir), embedder, db_path)
+
+    @classmethod
+    def build_from_corpus(
+        cls,
+        transcripts_dir: Path = DEFAULT_TRANSCRIPTS,
+        concepts_dir: Path = DEFAULT_CONCEPTS,
+        embedder: Embedder | None = None,
+        db_path: Path = DEFAULT_DB_PATH,
+    ) -> KnowledgeIndex:
+        """Build the index from the whole concepts corpus: transcripts + concept cards (Session 19).
+
+        The canon cards in ``concepts_dir`` (``*.md``) join the lecture transcripts as retrievable
+        classification concepts. Both remain concepts-library ONLY — never a source of facts (rule 6).
+        """
+        chunks = chunk_directory(transcripts_dir)
+        if concepts_dir.exists():
+            chunks += chunk_concepts_directory(concepts_dir)
+        return cls.build(chunks, embedder, db_path)
 
     @classmethod
     def open(cls, db_path: Path, embedder: Embedder | None = None) -> KnowledgeIndex:
