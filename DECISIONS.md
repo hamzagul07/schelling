@@ -1627,3 +1627,15 @@ is the only venue `schelling compare` ranks over (contaminated runs never reach 
 test_llm_forecast.py`: sampling/aggregation, record shape + round-trip, parse rejection, contamination
 flag + override, the refuse-to-rank guard both sides of the threshold, the seal path, the
 non-determinism note, and the replayed CLI. 413 tests green; sealed records + the ledger untouched.
+
+### D28.0 — Question-design lesson: site status-quo outcomes at a pole, not the midpoint
+Pre-resolution observation on Q-2026-IAEA-SEP (recorded 2026-07-23, an analyst note that changes no
+grading rule — see the note added to `GRADING-Q-2026-IAEA-SEP.md`): this continuum places the
+**no-action / status-quo** outcome at its **midpoint** (band 40-59). A mean-based solver (the
+compromise weighted mean, and to a degree the challenge median) lands mid-scale *mechanically* when
+actors are dispersed across the scale, so a placement in the midpoint band may reflect **continuum
+geometry rather than a genuine belief about inaction** — the two are confounded when the status quo
+sits at the centre. **Lesson for future question design: site status-quo / no-action outcomes at a
+pole (0 or 100), not the midpoint**, so that a mid-scale forecast is informative rather than the
+default a dispersed field produces. The sealed IAEA forecasts and all grading rules stand unchanged;
+this is guidance for the next question's continuum, not a change to this one.
