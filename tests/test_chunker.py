@@ -95,7 +95,7 @@ def test_chunk_concept_cards_splits_every_canon_card() -> None:
     from schelling.knowledge.chunker import chunk_concept_cards
 
     cards = chunk_concept_cards(CANON.read_text(), "canon.md")
-    assert len(cards) == 28  # families A1-A7, B1-B5, C1-C6, D1-D7, E1-E3
+    assert len(cards) == 29  # families A1-A7, B1-B5, C1-C7, D1-D7, E1-E3
     refs = {c.lecture for c in cards}
     assert "Canon A3: Loss-domain risk seeking" in refs
     assert "Canon D2: Indivisibility and sacred stakes" in refs

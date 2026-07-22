@@ -127,6 +127,20 @@ signals because noise, organizational filters, and preconceptions suppress warni
 estimates of opaque actors carry systematic uncertainty. Tag: SUPPORTED. Coding rule: opacity of an
 actor's decision process. Use: widen ranges for opaque actors.
 
+**C7. Intelligence asymmetry and decapitation (Wohlstetter 1962; Betts 1982; Jordan 2009, 2014;
+Johnston 2012).** Intelligence advantage acts through three distinct channels: operational reach (the
+ability to act inside the adversary's territory — largely already priced into demonstrated-capability
+codings and NEVER to be added as a separate multiplier); information advantage in bargaining (the
+superior side suffers less private-information friction — knows resolve, reads bluffs, times offers);
+and surprise vulnerability for the penetrated side (see C6 — widen its ranges). Leadership
+decapitation's coercive effectiveness is contested: weaker against religious and highly
+institutionalized adversaries, modest at best elsewhere. Tag: SUPPORTED (asymmetry channels) /
+CONTESTED (decapitation effectiveness). Coding rule: per directed pair, demonstrated penetration
+operations versus surprises suffered, from the public record ex ante; sacred-stakes and
+institutionalized adversaries resist decapitation per the contested literature. Use: capability-coding
+guidance and range widening only; the information-advantage channel is a registered MT-1.1 candidate,
+to be considered solely after the MT-1.0 reading.
+
 ## Family D — Structure of the bargain
 
 **D1. Third-party guarantees (Walter 1997, 2002).** Settlements requiring the weaker side to
