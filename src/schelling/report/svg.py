@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import html
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import NamedTuple
 
 
@@ -21,6 +21,17 @@ class ActorPoint(NamedTuple):
     mode: float
     high: float
     weight: float
+
+
+class Palette(NamedTuple):
+    """Report figure colours, loaded from the committed ``palette.yaml`` (D23.4)."""
+
+    low_half: str
+    high_half: str
+    modal_stroke: str
+    median_pointer: str
+    ci_bracket: str
+    non_voting_flag: str
 
 
 def _n(v: float) -> str:
@@ -41,13 +52,20 @@ def _nice_bounds(lo: float, hi: float, pad_frac: float = 0.05) -> tuple[float, f
     return lo - pad, hi + pad
 
 
-def _svg(width: float, height: float, body: str) -> str:
+def _svg(width: float, height: float, body: str, *, title: str = "", desc: str = "") -> str:
     # No xmlns: inline SVG in an HTML5 document is placed in the SVG namespace by the parser.
     # Omitting it keeps the report free of any URL-shaped strings (offline-clean).
+    # role="img" + <title>/<desc> make the figure legible to a screen reader (D23.5); both default
+    # to empty so every pre-D23 caller renders byte-identically.
+    a11y = ""
+    if title:
+        a11y += f"<title>{_esc(title)}</title>"
+    if desc:
+        a11y += f"<desc>{_esc(desc)}</desc>"
     return (
         f'<svg viewBox="0 0 {_n(width)} {_n(height)}" width="100%" '
         f'preserveAspectRatio="xMidYMid meet" role="img">'
-        f"{body}</svg>"
+        f"{a11y}{body}</svg>"
     )
 
 
@@ -306,3 +324,223 @@ def trajectory(medians: Sequence[float], *, width: float = 680.0, height: float 
         parts.append(f'<circle cx="{_n(sx(i))}" cy="{_n(sy(m))}" r="3" class="dot"/>')
         parts.append(_text(sx(i), y1 + 16, str(i + 1), "tick", "middle"))
     return _svg(width, height, "".join(parts))
+
+
+# --------------------------------------------------------------- report visuals (Session 23, D23)
+class BandSeg(NamedTuple):
+    """One band-strip segment: its [lo, hi] slice of 0-100, share of draws, label, modal flag."""
+
+    lo: float
+    hi: float
+    share: float
+    label: str
+    modal: bool
+
+
+class WActor(NamedTuple):
+    """One actor for the weighted diagram: mode position, size weight, non-voting flag."""
+
+    name: str
+    position: float
+    weight: float
+    non_voting: bool
+
+
+def _half_color(mid: float, pal: Palette) -> str:
+    """The continuum-half ramp colour: low half (< 50) vs high half (>= 50)."""
+    return pal.low_half if mid < 50.0 else pal.high_half
+
+
+def _short(label: str, n: int) -> str:
+    """Truncate a label to fit ``n`` characters, with an ellipsis when clipped."""
+    label = label.strip()
+    if len(label) <= n or n < 2:
+        return label
+    return label[: n - 1].rstrip() + "…"
+
+
+def _strip_footer(
+    sx: Callable[[float], float], y1: float, median: float, p10: float, p90: float, pal: Palette
+) -> tuple[str, float]:
+    """The shared median pointer + 80%-CI bracket drawn beneath a strip; returns (svg, height)."""
+    by = y1 + 14.0
+    color = pal.ci_bracket
+    parts = [
+        f'<line x1="{_n(sx(p10))}" y1="{_n(by)}" x2="{_n(sx(p90))}" y2="{_n(by)}" '
+        f'stroke="{color}" stroke-width="1.4"/>'
+    ]
+    for e in (p10, p90):
+        parts.append(
+            f'<line x1="{_n(sx(e))}" y1="{_n(by - 4)}" x2="{_n(sx(e))}" y2="{_n(by + 4)}" '
+            f'stroke="{color}" stroke-width="1.4"/>'
+        )
+    mx = sx(median)
+    parts.append(
+        f'<path d="M {_n(mx)} {_n(by - 6)} L {_n(mx - 5)} {_n(by + 2)} '
+        f'L {_n(mx + 5)} {_n(by + 2)} Z" fill="{pal.median_pointer}"/>'
+    )
+    parts.append(
+        _text(mx, by + 16, f"median {median:g}  ·  CI80 [{p10:g}, {p90:g}]", "tick", "middle")
+    )
+    return "".join(parts), by + 22.0
+
+
+def band_strip(
+    segments: Sequence[BandSeg],
+    *,
+    median: float,
+    p10: float,
+    p90: float,
+    palette: Palette,
+    width: float = 680.0,
+    desc: str = "",
+) -> str:
+    """Banded outcome strip: one segment per rubric band, width ~ band width, opacity ~ draw share.
+
+    The modal band is outlined; a median pointer and an 80%-CI bracket sit beneath. Labels are the
+    rubric's own words, truncated to fit each segment.
+    """
+    if not segments:
+        return _svg(width, 40, _text(width / 2, 24, "(no bands)", "tick", "middle"))
+    x0, x1 = 20.0, width - 20.0
+    top, strip_h = 8.0, 44.0
+    y1 = top + strip_h
+
+    def sx(v: float) -> float:
+        return x0 + (x1 - x0) * max(0.0, min(100.0, v)) / 100.0
+
+    parts: list[str] = []
+    for seg in segments:
+        lo, hi = sx(seg.lo), sx(seg.hi)
+        w = max(hi - lo, 0.5)
+        color = _half_color((seg.lo + seg.hi) / 2.0, palette)
+        op = 0.12 + 0.73 * min(max(seg.share, 0.0), 1.0)  # opacity floor keeps 0-share visible
+        parts.append(
+            f'<rect x="{_n(lo)}" y="{_n(top)}" width="{_n(w)}" height="{_n(strip_h)}" '
+            f'fill="{color}" fill-opacity="{_n(op)}"/>'
+        )
+        if seg.modal:
+            parts.append(
+                f'<rect x="{_n(lo + 0.75)}" y="{_n(top + 0.75)}" width="{_n(max(w - 1.5, 0.5))}" '
+                f'height="{_n(strip_h - 1.5)}" fill="none" stroke="{palette.modal_stroke}" '
+                f'stroke-width="1.5"/>'
+            )
+        cx = (lo + hi) / 2.0
+        parts.append(_text(cx, top + strip_h / 2.0 + 4.0, f"{seg.share:.0%}", "band-pct", "middle"))
+        label = _short(seg.label, max(4, int(w / 6.0)))
+        parts.append(_text(cx, y1 + 12.0, label, "band-lab", "middle"))
+    footer, height = _strip_footer(sx, y1 + 14.0, median, p10, p90, palette)
+    parts.append(footer)
+    return _svg(width, height, "".join(parts), title="Band-probability strip", desc=desc)
+
+
+def density_strip(
+    draws: Sequence[float],
+    *,
+    median: float,
+    p10: float,
+    p90: float,
+    palette: Palette,
+    width: float = 680.0,
+    desc: str = "",
+    cells: int = 50,
+) -> str:
+    """Continuous density strip for an arithmetic/linear rubric (no bands): opacity ~ draw density,
+    with the same median pointer + 80%-CI bracket beneath."""
+    if not draws:
+        return _svg(width, 40, _text(width / 2, 24, "(no draws)", "tick", "middle"))
+    x0, x1 = 20.0, width - 20.0
+    top, strip_h = 8.0, 44.0
+    y1 = top + strip_h
+    counts = [0] * cells
+    for v in draws:
+        idx = min(cells - 1, max(0, int(max(0.0, min(100.0, v)) / 100.0 * cells)))
+        counts[idx] += 1
+    peak = max(counts) or 1
+    cw = (x1 - x0) / cells
+
+    def sx(v: float) -> float:
+        return x0 + (x1 - x0) * max(0.0, min(100.0, v)) / 100.0
+
+    parts: list[str] = []
+    for i, c in enumerate(counts):
+        mid = (i + 0.5) / cells * 100.0
+        op = 0.08 + 0.77 * (c / peak)
+        parts.append(
+            f'<rect x="{_n(x0 + i * cw)}" y="{_n(top)}" width="{_n(cw + 0.5)}" '
+            f'height="{_n(strip_h)}" fill="{_half_color(mid, palette)}" fill-opacity="{_n(op)}"/>'
+        )
+    footer, height = _strip_footer(sx, y1 + 14.0, median, p10, p90, palette)
+    parts.append(footer)
+    return _svg(width, height, "".join(parts), title="Outcome density strip", desc=desc)
+
+
+def weighted_actors(
+    actors: Sequence[WActor],
+    *,
+    settlement: float | None,
+    palette: Palette,
+    width: float = 680.0,
+    desc: str = "",
+) -> str:
+    """Actors as circles on the 0-100 line at their mode position, radius ~ capability x salience,
+    stacked vertically so none overlap. Colour by continuum half; non-voting actors get a dashed
+    ring; a settlement line marks the forecast."""
+    if not actors:
+        return _svg(width, 40, _text(width / 2, 24, "(no actors)", "tick", "middle"))
+    x0, x1 = 20.0, width - 20.0
+    r_min, r_max = 6.0, 22.0
+    max_w = max((a.weight for a in actors), default=1.0) or 1.0
+
+    def sx(v: float) -> float:
+        return x0 + (x1 - x0) * max(0.0, min(100.0, v)) / 100.0
+
+    def radius(w: float) -> float:
+        return r_min + (r_max - r_min) * math.sqrt(max(w, 0.0) / max_w)
+
+    # Greedy vertical packing: place each actor (sorted by position) in the lowest row where its
+    # circle clears every circle already in that row. Deterministic (sorted order).
+    order = sorted(range(len(actors)), key=lambda i: (actors[i].position, actors[i].name))
+    rows: list[list[tuple[float, float]]] = []
+    row_of: dict[int, int] = {}
+    for i in order:
+        cx, r = sx(actors[i].position), radius(actors[i].weight)
+        ri = 0
+        while True:
+            if ri >= len(rows):
+                rows.append([])
+            if all(abs(cx - ox) >= r + orr + 3.0 for ox, orr in rows[ri]):
+                rows[ri].append((cx, r))
+                row_of[i] = ri
+                break
+            ri += 1
+
+    top = 22.0
+    row_h = 2.0 * r_max + 10.0
+    axis_y = top + len(rows) * row_h + 6.0
+    height = axis_y + 26.0
+
+    def cy(row: int) -> float:
+        return top + row * row_h + row_h / 2.0
+
+    parts: list[str] = []
+    if settlement is not None:
+        px = sx(settlement)
+        parts.append(_line(px, top - 8, px, axis_y, "settle-line"))
+        parts.append(_text(px, top - 12, f"settlement {settlement:g}", "settle-label", "middle"))
+    for i, a in enumerate(actors):
+        cx, r, y = sx(a.position), radius(a.weight), cy(row_of[i])
+        color = _half_color(a.position, palette)
+        dash = (
+            f' stroke-dasharray="3 2" stroke="{palette.non_voting_flag}"'
+            if a.non_voting
+            else (f' stroke="{color}"')
+        )
+        parts.append(
+            f'<circle cx="{_n(cx)}" cy="{_n(y)}" r="{_n(r)}" fill="{color}" '
+            f'fill-opacity="0.5" stroke-width="1.4"{dash}/>'
+        )
+        name = _short(a.name, 16) + ("*" if a.non_voting else "")
+        parts.append(_text(cx, y - r - 3.0, name, "actor-dot-label", "middle"))
+    parts.append(_axis_ticks(x0, x1, axis_y, 0.0, 100.0))
+    return _svg(width, height, "".join(parts), title="Weighted actor positions", desc=desc)

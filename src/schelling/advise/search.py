@@ -91,7 +91,9 @@ def _inputs_hash(
     game: GameSpec, cfg: SolverConfig, advise_cfg: Mapping[str, object], actor: str
 ) -> str:
     payload = {
-        "game": game.model_dump(mode="json"),
+        # Exclude the report-only display coding so it never shifts the advise content-address
+        # (matches mc.inputs_hash, which excludes non-solver metadata).
+        "game": game.model_dump(mode="json", exclude={"non_voting_actor_ids"}),
         "config": cfg.model_dump(mode="json"),
         "advise": advise_cfg,
         "actor": actor,

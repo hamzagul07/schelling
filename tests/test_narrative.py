@@ -7,6 +7,7 @@ that a rubric-less record still routes to the unchanged standard layout.
 
 from __future__ import annotations
 
+import itertools
 import json
 from collections.abc import Sequence
 from pathlib import Path
@@ -195,3 +196,77 @@ def test_position_vocabulary_buckets() -> None:
     assert phrase_for(10, v.position_thirds) == "near the low end"
     assert phrase_for(90, v.position_thirds) == "near the high end"
     assert phrase_for(90, v.salience_thirds) == "a defining issue for it"
+
+
+# --------------------------------------------------------------- report visuals (Session 23)
+def test_band_segments_tile_0_100_and_shares_match_probs() -> None:
+    from schelling.report.render import _band_segments
+
+    readout = bandmap.map_bands(
+        _record([10, 10, 10, 30, 30, 60, 90, 90], median=30.0, bands=_BANDS)
+    )
+    segs = _band_segments(readout)
+    assert segs[0].lo == 0.0 and segs[-1].hi == 100.0  # tile the full scale
+    assert all(a.hi == b.lo for a, b in itertools.pairwise(segs))  # no gaps
+    # the strip's shares are exactly the computed band probabilities (item 5)
+    assert [s.share for s in segs] == [bp.probability for bp in readout.per_band]
+    assert sum(s.modal for s in segs) == 1  # exactly one modal segment
+
+
+def test_band_strip_svg_is_byte_identical_and_accessible() -> None:
+    from schelling.report.palette import load_palette
+    from schelling.report.render import _band_segments
+    from schelling.report.svg import band_strip
+
+    readout = bandmap.map_bands(
+        _record([10, 10, 10, 30, 30, 60, 90, 90], median=30.0, bands=_BANDS)
+    )
+    segs = _band_segments(readout)
+    pal = load_palette()
+    kw = dict(median=30.0, p10=10.0, p90=90.0, palette=pal, desc="a strip")
+    a = band_strip(segs, **kw)  # type: ignore[arg-type]
+    b = band_strip(segs, **kw)  # type: ignore[arg-type]
+    assert a == b  # deterministic, byte-identical
+    assert 'role="img"' in a and "<title>" in a and "<desc>a strip</desc>" in a  # a11y (item 4)
+
+
+def test_weighted_actors_flags_non_voting_and_degrades() -> None:
+    from schelling.report.palette import load_palette
+    from schelling.report.svg import WActor, weighted_actors
+
+    pal = load_palette()
+    coded = [WActor("A", 20, 100, False), WActor("B", 80, 50, True)]
+    with_flag = weighted_actors(coded, settlement=50.0, palette=pal, desc="d")
+    assert "stroke-dasharray" in with_flag and "<desc>d</desc>" in with_flag
+    # graceful: with nothing coded non-voting, no dashed ring is drawn
+    plain = weighted_actors([WActor("A", 20, 100, False)], settlement=50.0, palette=pal)
+    assert "stroke-dasharray" not in plain
+
+
+def test_palette_loads_two_ramps_from_committed_file() -> None:
+    from schelling.report.palette import load_palette
+
+    pal = load_palette()
+    assert pal.low_half.startswith("#") and pal.high_half.startswith("#")
+    assert pal.low_half != pal.high_half  # two distinct continuum-half ramps
+
+
+def test_linear_rubric_uses_density_strip_not_band_strip() -> None:
+    draws = [float(x) for x in range(0, 100, 5)]
+    html = render_forecast_narrative(_record(draws, median=50.0, bands=[]))
+    assert "Outcome density strip" in html  # continuous density strip for arithmetic rubrics
+    assert "Band-probability strip" not in html
+
+
+def test_verdict_and_reading_carry_their_figures() -> None:
+    html = render_forecast_narrative(_record([10] * 7 + [90] * 3, median=10.0, bands=_BANDS))
+    assert "Band-probability strip" in html  # VERDICT strip
+    assert "Weighted actor positions" in html  # READING diagram
+    assert "Circle area" in html  # the actor-diagram legend
+
+
+def test_narrative_report_loads_no_external_resources() -> None:
+    # The inline SVG figures must not introduce any resource-loading token (offline-clean, D8.4).
+    html = render(json.loads((FIXTURES / "report" / "forecast_narrative.json").read_text())).lower()
+    for token in ("<script", "<link", "src=", "@import", "url("):
+        assert token not in html

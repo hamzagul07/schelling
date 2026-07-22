@@ -1369,3 +1369,57 @@ two-record pairing is a possible future enhancement). New fixture + golden (`for
 / `.html`) and `tests/test_narrative.py` cover band arithmetic (sum-to-1 vs a hand-computed fixture),
 modal/median bands, the linear and no-rubric graceful paths, verdict text, determinism, the dispatch
 both ways, and the vocabulary. 359 tests green.
+
+### D23.1 — Band-probability strip (SVG) in the VERDICT section
+`svg.band_strip` renders one segment per rubric band, deterministic from the record + committed
+rubric. **Interpretive choices, logged:** (1) segments are **threshold-tiled** — segment *i* spans
+`[lo_i, lo_{i+1}]` (last to 100), matching the band-membership rule (D22.2) so the strip tiles 0-100
+with no gaps and each segment covers exactly the region that maps to its band; (2) **fill opacity
+encodes the draw share** (floor 0.12, cap 0.85 so a 0-share band stays visible and a modal band never
+goes pure-solid); (3) the **modal band is outlined** (`modal_stroke`); (4) beneath the strip sit a
+**median pointer** (a triangle at the median) and an **80%-CI bracket** from p10 to p90 — the shared
+`_strip_footer`. Band labels are the rubric's own words, truncated to each segment's pixel width.
+**Arithmetic/linear rubrics** (no bands) get `svg.density_strip` instead: a continuous density of the
+draws across 0-100 (opacity ~ local density) with the identical pointer/bracket. The strip degrades
+to nothing when there are no cached draws.
+
+### D23.2 — Weighted actor diagram (SVG) in the READING section
+`svg.weighted_actors` places each actor as a circle on the 0-100 line at its mode position, radius
+`= r_min + (r_max - r_min)·sqrt(weight/max_weight)` with `weight = capability·salience` and a min
+floor so tiny actors stay visible. Circles are **greedily packed into vertical rows** (sorted by
+position, then name — deterministic) so none overlap. The settlement is a vertical line; **non-voting
+/ out-of-body actors** get a dashed ring + a `*` on their label. **Interpretive choice, logged:** the
+non-voting coding is a new `GameSpec.non_voting_actor_ids` (list of ids) — presentation metadata only,
+so it is **excluded from `inputs_hash`** (added to the exclude set in `mc.inputs_hash` *and*
+`advise._inputs_hash`), exactly like the rubric; a defaulted empty list leaves every existing/sealed
+game's hash byte-identical (verified: advise + mc + integrity suites unchanged). If no actor is coded
+non-voting, no flags are drawn (graceful).
+
+### D23.3 — Both figures are pure functions; degrade gracefully
+Each figure is a pure function of the record (+ rubric + palette): no LLM, no clock, byte-identical on
+re-run (tested directly on the SVG string and via the full-report determinism test). Missing fields
+degrade to a small placeholder or an omitted figure rather than an error (no draws -> no strip; no
+actors -> "(no actors)"; no non-voting coding -> no flags).
+
+### D23.4 — Colours from a committed palette map
+`report/palette.yaml` holds the figure colours — **two ramps, one per continuum half** (`low_half`
+amber for < 50, `high_half` teal for >= 50) plus `modal_stroke` / `median_pointer` / `ci_bracket` /
+`non_voting_flag`. `report/palette.py::load_palette()` reads it into an `svg.Palette`; nothing is
+hardcoded in `svg.py` or `render.py`. Each figure carries a one-line HTML legend beneath it (the
+actor diagram names the two halves from the continuum's own `anchor_0`/`anchor_100`).
+
+### D23.5 — Accessibility
+`svg._svg` gained optional `title`/`desc`; both new figures pass `role="img"` with a `<title>`
+(short name) and a `<desc>` — a one-sentence summary generated from the same record fields (e.g.
+"Band-probability strip: {modal label} is the most likely outcome at {p}% of {n} draws; the median is
+{m} of 100."). Both default to empty, so every pre-D23 figure renders byte-identically.
+
+### D23.6 — Goldens updated intentionally
+The narrative report golden (`forecast_narrative.{json,html}`) was regenerated to include the two new
+figures; the fixture game gained a non-voting "subject" actor + `non_voting_actor_ids` to exercise the
+flag. **Every other report golden (standard forecast, draft, advise, backtest) is unchanged** — the
+figures live only in the narrative VERDICT/READING sections, and the new SVG text classes live in the
+narrative-only `_NARR_CSS`. `tests/test_narrative.py` adds: strip shares equal the computed band
+probabilities, segments tile 0-100, SVG byte-identical + accessible, the non-voting flag appears when
+coded and not otherwise, the palette loads two ramps, linear rubrics use the density strip, and the
+report stays offline-clean. 366 tests green; ruff/format/mypy clean; paper-evidence --check passes.

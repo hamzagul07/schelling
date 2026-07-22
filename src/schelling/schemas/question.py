@@ -76,3 +76,7 @@ class GameSpec(BaseModel):
     horizon: str
     notes: str = ""
     resolution_rubric: ResolutionRubric | None = None
+    # Report-display coding (Session 23, D23.2): actor ids that are non-voting / out-of-body
+    # influence (e.g. the subject of a committee's decision). Presentation metadata only — like the
+    # rubric it is EXCLUDED from ``inputs_hash``, so it never changes a forecast or a sealed hash.
+    non_voting_actor_ids: list[str] = Field(default_factory=list)
