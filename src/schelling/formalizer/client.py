@@ -87,6 +87,7 @@ class LLMClient(Protocol):
         *,
         search: bool = False,
         max_searches: int = 5,
+        temperature: float | None = None,
     ) -> LLMResult: ...
 
 
@@ -123,15 +124,21 @@ class AnthropicClient:
         *,
         search: bool = False,
         max_searches: int = 5,
+        temperature: float | None = None,
     ) -> LLMResult:
         client = self._ensure_client()
         kwargs: dict[str, object] = {
             "model": self._model,
             "max_tokens": max_tokens,
             "system": system,
-            "thinking": {"type": "adaptive"},
             "messages": [{"role": m.role, "content": m.content} for m in messages],
         }
+        # An explicit temperature elicits an independently-sampled judgment (used by
+        # llm-forecast, D27.1); otherwise use adaptive thinking. The two are mutually exclusive.
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        else:
+            kwargs["thinking"] = {"type": "adaptive"}
         if search:
             kwargs["tools"] = [
                 {"type": WEB_SEARCH_TOOL_TYPE, "name": "web_search", "max_uses": max_searches}
@@ -231,6 +238,7 @@ class ReplayClient:
         *,
         search: bool = False,
         max_searches: int = 5,
+        temperature: float | None = None,
     ) -> LLMResult:
         self.calls.append((system, list(messages)))
         if self._index >= len(self.responses):
