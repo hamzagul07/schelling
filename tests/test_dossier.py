@@ -222,3 +222,11 @@ def test_record_context_is_the_only_provenance() -> None:
     situation, _sources = record_context(_record())
     assert situation.startswith("QUESTION ")
     assert "CONTINUUM" in situation and "ACTORS AND EVIDENCE" in situation
+
+
+def test_enforceability_disclaimer_is_reader_facing() -> None:
+    # The closing disclaimer is for the reader: no guardrail wording, no canon codes (D26.8).
+    html = assemble_dossier(_record(), narrative=None)
+    assert "an analysis of coalition durability, not a prescription" in html
+    assert "defection playbook" not in html  # internal guardrail wording never shown
+    assert "C8/D1/D5" not in html and "canon C" not in html  # no canon codes leaked to the reader

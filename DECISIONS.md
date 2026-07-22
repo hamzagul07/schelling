@@ -1578,3 +1578,11 @@ entries in FORECASTS.md but are not this paper's evidence. **The frozen paper, E
 four sealed US-Iran figures are byte-unchanged**; the test and `paper-evidence --check` pass again
 (only pre-existing provenance/test-count warnings remain). Ratified by Hassan ("Fix ledger, then
 merge"). Sealed records and the ledger itself are untouched.
+
+### D26.8 — Enforceability disclaimer written for the reader
+The enforceability section's closing disclaimer echoed internal guardrail wording ("never a defection
+playbook") and canon codes (C8/D1/D5) — model-facing framing, not reader-facing. Replaced with one
+plain sentence that keeps the substantive point: "This section is an analysis of how durable the
+resulting agreement is likely to be — an analysis of coalition durability, not a prescription." The
+model-facing guardrail stays in the narrative system prompt (where it belongs); only the reader-shown
+line changed. A test asserts the disclaimer carries no guardrail wording or canon codes.
