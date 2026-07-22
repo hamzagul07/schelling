@@ -80,3 +80,7 @@ class GameSpec(BaseModel):
     # influence (e.g. the subject of a committee's decision). Presentation metadata only — like the
     # rubric it is EXCLUDED from ``inputs_hash``, so it never changes a forecast or a sealed hash.
     non_voting_actor_ids: list[str] = Field(default_factory=list)
+    # Optional per-actor short display names, keyed by actor id (Session 25, D25.3). Used by the
+    # report prose and figures; the stakeholder table keeps the full name. Absent ids fall back to
+    # the first clause of the actor's name. Display metadata only — also EXCLUDED from the hash.
+    short_names: dict[str, str] = Field(default_factory=dict)
