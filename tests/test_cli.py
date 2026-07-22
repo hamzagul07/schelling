@@ -489,6 +489,67 @@ def test_advise_unknown_actor_is_friendly(tmp_path: Path) -> None:
     assert "Traceback" not in result.output
 
 
+# --------------------------------------------------------------- advise 2.0 strategy (Session 21)
+def test_advise_equilibrium_mode_prints_successor_caveat(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "advise",
+            _WIDENED,
+            "--actor",
+            "germany",
+            "--solver",
+            "compromise",
+            "--mode",
+            "equilibrium",
+            "--draws-per-candidate",
+            "20",
+            "--target-draws",
+            "40",
+            "--seed",
+            "7",
+            "--grid-step",
+            "10",
+            "--out-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "upper bound on adaptation" in result.output  # SUCCESSOR_CAVEAT, not the one-sided one
+    record = AdviseRecord.model_validate_json(next(tmp_path.glob("*-advise-*.json")).read_text())
+    assert record.mode == "equilibrium" and record.equilibrium is not None
+
+
+def test_advise_equilibrium_needs_the_exact_lens(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "advise",
+            _WIDENED,
+            "--actor",
+            "germany",
+            "--solver",
+            "challenge",
+            "--mode",
+            "equilibrium",
+            "--out-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 2
+    assert "needs the exact lens" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_advise_rejects_unknown_mode(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["advise", _WIDENED, "--actor", "germany", "--mode", "wander", "--out-dir", str(tmp_path)],
+    )
+    assert result.exit_code == 2
+    assert "--mode must be" in result.output
+
+
 # --------------------------------------------------------------- env loading (D6.5)
 def test_startup_loads_dotenv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SCHELLING_DOTENV_PROBE", raising=False)

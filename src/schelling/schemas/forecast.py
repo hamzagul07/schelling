@@ -200,6 +200,45 @@ ADVISE_CAVEAT = (
     "adapt. Treat as lever-finding, not a playbook."
 )
 
+# Equilibrium mode drops the one-sided caveat for this stronger one (Session 21, Advise 2.0).
+SUCCESSOR_CAVEAT = (
+    "Equilibrium mode assumes model-optimal play by all actors — an upper bound on adaptation, "
+    "not a prophecy."
+)
+
+
+class MoveAction(BaseModel):
+    """A named diplomatic action from the move vocabulary (moves.yaml), with its parameter delta."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    name: str  # e.g. "phased_concession", "coalition_pull"
+    rationale: str
+    delta: str  # human-readable typed delta, e.g. "position -10 (toward the settlement)"
+
+
+class ResponsePreview(BaseModel):
+    """One-ply preview (Advise 2.0): the most-affected opponent's best single counter-response."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    responder_id: str
+    responder_move: str  # e.g. "position -> 45"
+    gross_benefit: float  # the advisor's benefit before any response
+    net_benefit: float  # the advisor's benefit after the responder's best counter
+    simulated: bool = False  # True = challenge lens, computed at reduced draws (labeled)
+
+
+class Robustness(BaseModel):
+    """Robustness grade of a move's benefit across the MC draws (Advise 2.0)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    benefit_ci_lo: float  # 10th percentile of the per-draw benefit
+    benefit_ci_hi: float  # 90th percentile
+    sign_stable_fraction: float  # fraction of draws whose benefit shares the point-benefit sign
+    grade: str  # "ROBUST" (>= 90% sign-stable) | "KNIFE-EDGE"
+
 
 class OwnMove(BaseModel):
     """One candidate move the advising actor could make (Session 7 advise mode).
@@ -217,6 +256,10 @@ class OwnMove(BaseModel):
     benefit: float  # |median_before - ideal| - |median_after - ideal|
     cost: float  # position distance conceded from the actor's ideal (0 for salience)
     beyond_stated_range: bool
+    # Advise 2.0 enrichments (optional, defaulted so Session-7/12 records stay valid).
+    action: MoveAction | None = None  # the vocabulary action, when the move came from moves.yaml
+    response: ResponsePreview | None = None  # one-ply best-response preview (top moves only)
+    robustness: Robustness | None = None  # benefit CI + sign-stability grade
 
 
 class PersuasionTarget(BaseModel):
@@ -232,6 +275,45 @@ class PersuasionTarget(BaseModel):
     benefit: float  # settlement shift toward the advisor's ideal
     # "energize" (raise salience / pull position toward the advisor) vs "defuse" (lower salience)
     kind: str = "energize"
+    action: MoveAction | None = None  # the vocabulary action, when applicable (Advise 2.0)
+    robustness: Robustness | None = None
+
+
+class EquilibriumMove(BaseModel):
+    """One actor's move at the equilibrium fixed point (Advise 2.0, --mode equilibrium)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    actor_id: str
+    position_from: float
+    position_to: float
+    salience_from: float
+    salience_to: float
+
+
+class EquilibriumResult(BaseModel):
+    """Iterated best-response equilibrium under the exact lens (Advise 2.0)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    settlement: float  # the settled settlement (last on the path)
+    converged: bool
+    iterations: int
+    path: list[float] = Field(default_factory=list)  # settlement after each round
+    cycle: list[float] = Field(default_factory=list)  # non-empty when a cycle is detected
+    moves: list[EquilibriumMove] = Field(default_factory=list)
+
+
+class MovePackage(BaseModel):
+    """A best two-move bundle under the exact lens (Advise 2.0), benefit/cost separated."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    moves: list[str]  # the two move descriptions (own and/or persuasion)
+    settlement_median: float
+    benefit: float
+    cost: float
+    robustness: Robustness | None = None
 
 
 class AdviseLens(BaseModel):
@@ -250,6 +332,9 @@ class AdviseLens(BaseModel):
     own_moves: list[OwnMove] = Field(default_factory=list)
     top_moves: list[OwnMove] = Field(default_factory=list)
     persuasion_targets: list[PersuasionTarget] = Field(default_factory=list)
+    # Advise 2.0 (optional): equilibrium fixed point (exact lens) and best two-move packages.
+    equilibrium: EquilibriumResult | None = None
+    packages: list[MovePackage] = Field(default_factory=list)
 
 
 class AdviseRecord(BaseModel):
@@ -288,5 +373,12 @@ class AdviseRecord(BaseModel):
     model: str = "challenge"
     exact: bool = False
     second_lens: AdviseLens | None = None
+
+    # Advise 2.0 (optional, defaulted): the run mode and a deterministic strategy-brief paragraph,
+    # plus equilibrium/packages carried on the primary lens fields for the report.
+    mode: str = "levers"  # "levers" (default) | "equilibrium"
+    strategy_brief: str = ""
+    equilibrium: EquilibriumResult | None = None
+    packages: list[MovePackage] = Field(default_factory=list)
 
     game: GameSpec | None = None  # for the report's baseline actor map
