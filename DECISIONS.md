@@ -1174,3 +1174,15 @@ constants-vs-spec check, and the coercive-harness integration; the existing suit
 total). MT-1.0 is added to BACKTEST.md's coercive section as **"PRE-REGISTERED — awaiting the
 reading"** with the §6 gate quoted verbatim (generated in `writeup.py` so it survives regeneration).
 The model is NOT run against the real library — scored once, at the reading, never before.
+
+### D21.0 — Canon card C7 (intelligence asymmetry and decapitation) added to Family C
+`data/concepts/canon.md` gains card **C7. Intelligence asymmetry and decapitation** (Wohlstetter
+1962; Betts 1982; Jordan 2009, 2014; Johnston 2012), appended in Family C after C6. Tag: SUPPORTED
+(asymmetry channels) / CONTESTED (decapitation effectiveness). Its three channels are scoped exactly
+as written: operational reach stays priced into demonstrated capability (**never a separate
+multiplier**); surprise vulnerability routes to C6 (range widening); and the information-advantage
+channel is a **registered MT-1.1 candidate, considered only after the MT-1.0 reading** — nothing is
+wired into any model now. The knowledge index rebuilt to 99 chunks (70 transcript + 29 canon); C7 is
+retrievable (top hit for intelligence-advantage/decapitation queries). Firewall unchanged and green —
+its whitelist is `templates.yaml` only, so C7's phrases stay catchable as leaks and its new theorist
+names (Jordan, Johnston) do not false-positive. Card-count tests updated 28 → 29. 321 tests green.
