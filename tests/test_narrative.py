@@ -270,3 +270,103 @@ def test_narrative_report_loads_no_external_resources() -> None:
     html = render(json.loads((FIXTURES / "report" / "forecast_narrative.json").read_text())).lower()
     for token in ("<script", "<link", "src=", "@import", "url("):
         assert token not in html
+
+
+# --------------------------------------------------------------- verdict calibration + polish (S25)
+def test_format_share_caps_at_boundaries() -> None:
+    from schelling.report.svg import format_share
+
+    assert format_share(1.0) == ">99%"
+    assert format_share(0.995) == ">99%"
+    assert format_share(0.99) == "99%"  # exactly 0.99 is not "above 0.99"
+    assert format_share(0.5) == "50%"
+    assert format_share(0.01) == "1%"  # exactly 0.01 is not "below 0.01"
+    assert format_share(0.005) == "<1%"
+    assert format_share(0.0) == "<1%"
+
+
+def test_capped_shares_never_show_zero_or_hundred_in_report() -> None:
+    # All draws in one band -> that band ~1.0, the rest 0.0; the strip/table/verdict must cap.
+    html = render_forecast_narrative(_record([30.0] * 20, median=30.0, bands=_BANDS))
+    assert ">99%" in html and "<1%" in html  # the cap fired for both extremes
+    # no band-share cell reads a false certainty
+    assert "<td class='num'>100%</td>" not in html and "<td class='num'>0%</td>" not in html
+
+
+def test_scope_line_always_present() -> None:
+    scope = "reflect uncertainty in the stated input ranges only"
+    assert scope in render_forecast_narrative(_record([10, 30, 60], median=30.0, bands=_BANDS))
+    assert scope in render_forecast_narrative(
+        _record([10, 30, 60], median=30.0, bands=[])
+    )  # linear
+    assert scope in render_forecast_narrative(
+        _record([10, 30, 60], median=30.0, bands=None)
+    )  # none
+
+
+def test_short_name_derivation() -> None:
+    from schelling.report.render import _derive_short
+
+    assert _derive_short("Subject state (influence only)") == "Subject state"
+    assert _derive_short("United States — the pressure bloc") == "United States"
+    assert _derive_short("E3 - penholders") == "E3"
+    assert (
+        _derive_short("Non-aligned swing bloc") == "Non-aligned swing bloc"
+    )  # internal hyphen kept
+
+
+def test_short_names_override_used_in_prose_and_figure_not_table() -> None:
+    from schelling.report.render import render_forecast_narrative as rfn
+
+    game = _game(_BANDS).model_copy(
+        update={
+            "actors": [
+                Actor(
+                    id="a",
+                    name="Aardvark Coalition (the doves)",
+                    position=T(low=5, mode=20, high=40),
+                    salience=T(low=80, mode=90, high=97),
+                    capability=T(low=90, mode=100, high=100),
+                ),
+                _game(_BANDS).actors[1],
+            ],
+            "short_names": {"b": "Bees"},
+        }
+    )
+    rec = _record([10, 30, 60], median=30.0, bands=_BANDS).model_copy(update={"game": game})
+    html = rfn(rec)
+    assert "Aardvark Coalition (the doves)" in html  # full name kept in the stakeholder table
+    assert "<strong>Aardvark Coalition</strong> sits" in html  # prose uses the derived short name
+    assert "Aardvark Coalition (the doves)</strong> sits" not in html  # not the full name in prose
+    assert "<strong>Bees</strong> sits" in html  # the explicit short_names override is used
+
+
+def test_actor_diagram_legend_uses_fixed_direction_phrases() -> None:
+    # The legend must use fixed direction phrases, never truncated anchor prose (D25.4).
+    html = render_forecast_narrative(_record([10, 30, 60], median=30.0, bands=_BANDS))
+    assert "Amber = the low half (toward 0); teal = the high half (toward 100)." in html
+    assert (
+        "low end" not in html.split("Reading")[0]
+    )  # anchor prose 'low end' not leaked into legend
+
+
+def test_players_grouped_when_sharing_side_and_tier() -> None:
+    from schelling.report.render import render_forecast_narrative as rfn
+
+    def actor(i: str, pos: float) -> Actor:
+        return Actor(
+            id=i,
+            name=i.upper(),
+            position=T(low=pos, mode=pos, high=pos),
+            salience=T(low=90, mode=90, high=90),
+            capability=T(low=50, mode=50, high=50),
+        )
+
+    game = _game(_BANDS).model_copy(
+        update={"actors": [actor("a", 10), actor("b", 15), actor("c", 20)]}
+    )
+    rec = _record([10, 30, 60], median=30.0, bands=_BANDS).model_copy(update={"game": game})
+    html = rfn(rec)
+    # three actors share the low third + high salience tier -> one grouped sentence
+    assert "Three members sit near the low end:" in html
+    assert "a defining issue for each" in html

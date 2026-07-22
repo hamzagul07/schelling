@@ -1483,3 +1483,39 @@ any future edit to one that does not match the other fails CI. **Confirmed:** al
 records still `schelling verify` 4/4 (ledger-match, inputs-hash, determinism), and `FORECASTS.md` +
 `ledger-proofs/` are byte-untouched (the OTS-anchored ledger is unaffected — only the grading files
 changed). Full gate green.
+
+### D25.1 — Cap displayed band shares (never a false certainty)
+A displayed probability share must never read 100% or 0%: `svg.format_share` renders ``>99%`` for any
+share above 0.99 and ``<1%`` below 0.01, otherwise the rounded percent. Applied everywhere a share is
+shown — the verdict line, the band-probability table, the strip labels, and the strip's `<desc>`.
+Boundaries are exact-inclusive on the safe side: 0.99 -> "99%", 1.0 -> ">99%", 0.01 -> "1%",
+0.0 -> "<1%". The converged-fraction diagnostic and `width="100%"` are not shares and are untouched.
+
+### D25.2 — Standing scope line beneath every verdict
+A fixed, deterministic sentence now sits beneath the verdict in every narrative report (banded,
+arithmetic, or no-rubric): "These shares reflect uncertainty in the stated input ranges only. They
+exclude model error, coding error, and events outside the modelled game." Template text, always shown.
+
+### D25.3 — Per-actor short names (display only, hash-excluded)
+`GameSpec.short_names: dict[str, str]` (actor id -> short name) joins `non_voting_actor_ids` as
+display metadata **excluded from `inputs_hash`** (added to the exclude set in both `mc.inputs_hash` and
+`advise._inputs_hash`); a defaulted empty dict leaves every existing and sealed hash byte-identical
+(asserted by test; sealed records still verify 4/4). The report resolves each actor's short name as an
+explicit override else `_derive_short(name)` = the first clause before the first parenthesis or
+spaced/en/em dash (internal hyphens kept, e.g. "Non-aligned swing bloc"). **Prose and figures use the
+short name; the stakeholder table keeps the full name.** The "what would change this" line and the
+widest-uncertain-inputs list also use short names.
+
+### D25.4 — Actor-diagram legend uses fixed direction phrases
+The weighted-actor legend no longer truncates the continuum's anchor prose (which produced clipped,
+ambiguous fragments); it now states fixed, direction-derived phrases: "Amber = the low half (toward 0);
+teal = the high half (toward 100)."
+
+### D25.5 — Grouped player sentences (less template monotony)
+The READING "players and where they stand" list groups actors that share a side (position third) and
+salience tier into one sentence — "Three members sit near the low end: A, B and C — a defining issue
+for each" — instead of one identical sentence per actor. Singletons keep the direct form; the salience
+phrase switches "for it" -> "for each" in a group. Deterministic (groups keyed on the vocab phrases,
+first-appearance order). New `tests/test_narrative.py` cases cover the cap boundaries, the always-on
+scope line, short-name derivation + override + prose/figure/table split, the fixed legend text, and
+the grouping; sealed hashes confirmed untouched. 387 tests green; full gate + paper-evidence pass.
