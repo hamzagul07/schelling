@@ -42,3 +42,33 @@ sources are published in FORECASTS.md at grading.
 OpenTimestamps proof checked with `ots verify` to confirm the commitment predates resolution.
 
 **Final:** no edits to this rubric under any circumstances after 2026-09-30.
+
+## Machine-readable rubric (canonical, embedded)
+
+The exact `ResolutionRubric` object (schema: `schemas/question.py` → `ResolutionRubric`) — the
+machine-readable form of everything above, added 2026-07-22 (pre-resolution, D24.2) so
+`schelling report` can resolve it and render the two-audience report. Its `bands` are a verbatim
+structuring of the seven bands in the table above; the prose and the sealed continuum text govern.
+
+```json
+{
+  "resolution_criteria": "The question resolves on the formal output of the IAEA Board of Governors concerning Iran adopted on or before 2026-09-30 23:59 UTC, at its September regular session or any special session held within the window. Statements by individual member states, Director General reports, and chair's remarks are not Board action; only adopted resolutions or formal decisions count. If no resolution or decision is adopted, the outcome grades in the no-action band.",
+  "adjudicating_sources": [
+    "The text of any resolution or decision adopted by the Board, as published by the IAEA",
+    "IAEA Board reports and the Director General's introductory statement",
+    "IAEA press releases and the Agency's chronology of key events",
+    "Wire services of record (Reuters, Associated Press) corroborating the above"
+  ],
+  "outcome_mapping": "Place the Board's adopted action in exactly one band (the bands tile 0-100 with no gaps or overlaps): non-compliance finding and/or referral or report to the UN Security Council 0-9; censure resolution demanding immediate access, explicit escalation language, no referral 10-24; resolution urging cooperation, comparable to or modestly firmer than 10 June 2026 25-39; no new resolution or decision, report noted, matter left to the diplomatic track 40-59; Board welcomes or endorses an agreed modalities arrangement restoring inspection access 60-74; Board welcomes substantially restored safeguards implementation including attacked facilities 75-89; Board closes or normalises the Iran file, ending Iran-specific reporting 90-100. Within a band the grade defaults to the band midpoint; any deviation must cite specific adopted language. The sealed game's continuum text is canonical; these anchors summarise it.",
+  "grading_formula": "score(r) = |r.ensemble.median - actual| per sealed record on the 0-100 continuum; the grade integer, its justification, and all cited sources are published in FORECASTS.md at grading.",
+  "bands": [
+    {"lo": 0, "hi": 9, "label": "Non-compliance finding and/or referral to the UN Security Council"},
+    {"lo": 10, "hi": 24, "label": "Censure resolution demanding immediate access, no referral"},
+    {"lo": 25, "hi": 39, "label": "Resolution urging cooperation, comparable to 10 June 2026"},
+    {"lo": 40, "hi": 59, "label": "No new resolution; report noted; left to the diplomatic track"},
+    {"lo": 60, "hi": 74, "label": "Board welcomes an agreed modalities arrangement restoring access"},
+    {"lo": 75, "hi": 89, "label": "Board welcomes substantially restored safeguards implementation"},
+    {"lo": 90, "hi": 100, "label": "Board closes or normalises the Iran file"}
+  ]
+}
+```
