@@ -188,7 +188,7 @@ def test_cost_usd_uses_opus_pricing() -> None:
     assert cost_usd("unknown-model", 1_000_000, 0) == 0.0
 
 
-# ---------------------------------------------------------------- (Session 19) the canon in the firewall
+# ---------------------------------------------------------- (Session 19) the canon in the firewall
 _CANON = (Path(__file__).parent.parent / "data" / "concepts" / "canon.md").read_text()
 
 
@@ -199,7 +199,8 @@ def _draft_with_evidence_note(note: str) -> DraftExtraction:
 
 
 def test_canon_phrase_in_evidence_field_trips_the_firewall() -> None:
-    # A distinctive canon phrase ("loss-domain risk seeking", card A3) copied into a FACTUAL field is
+    # A distinctive canon phrase ("loss-domain risk seeking", card A3) copied into a FACTUAL
+    # field is
     # a leak: the canon classifies, it never sources a draft's facts (rule 6).
     draft = _draft_with_evidence_note(
         "Belland exhibits loss-domain risk seeking under the deadline."
@@ -211,10 +212,12 @@ def test_canon_phrase_in_evidence_field_trips_the_firewall() -> None:
 
 def test_canon_concept_shaping_template_classification_passes() -> None:
     # The SAME concept legitimately citing the canon in template_classification does NOT trip the
-    # firewall — that field is where the concept library is meant to be cited (excluded from the scan).
+    # firewall — that field is where the concept library is meant to be cited
+    # (excluded from the scan).
     d = json.loads(_clean_draft_text())
     d["template_classification"]["rationale"] = (
-        "Belland's deadline framing suggests loss-domain risk seeking; the bargaining template holds."
+        "Belland's deadline framing suggests loss-domain risk seeking; "
+        "the bargaining template holds."
     )
     d["template_classification"]["template_cards"] = ["Canon A3: Loss-domain risk seeking"]
     draft = DraftExtraction.model_validate(d)
