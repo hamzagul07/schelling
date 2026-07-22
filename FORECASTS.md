@@ -30,6 +30,8 @@ rubric on their question.
 | compromise | v2 | Q-2026-USIRAN-STAGE2 | 2026-07-21 | 39.443 | `d55ffc3e78fc5543b5224f6bb925b5793226913f436f9af7b9a8f20511dd12f6` |
 | challenge | v1 | Q-2026-IAEA-SEP | 2026-07-22 | 45.837 | `fc271d2dbd8c7493d9001026ab59c2b937a16eb612c065799e20a615970a2f00` |
 | compromise | v1 | Q-2026-IAEA-SEP | 2026-07-22 | 50.518 | `e8d10117192f1259b9e9ab6250641f82e0c1d50a4c00c2e73ff193580f867f99` |
+| llm-judgment | v2 | Q-2026-USIRAN-STAGE2 | 2026-07-21 | 41.000 | `180da06528d6a03128e4acde8e12e50432045e4cfb49d783105345bbc92bf2d4` |
+| llm-judgment | v1 | Q-2026-IAEA-SEP | 2026-07-22 | 32.000 | `074e17529b416a7b6deabb75b6e8ceccc62be1f6feba061c44b0ee47979f52cf` |
 <!-- LEDGER:END -->
 
 
