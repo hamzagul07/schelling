@@ -69,7 +69,7 @@ def test_canon_cards_are_indexed_and_searchable(tmp_path: Path) -> None:
 
     cards = chunk_concepts_directory(CANON_DIR)
     index = KnowledgeIndex.build(cards, HashingEmbedder(), db_path=tmp_path / "k.db")
-    assert index.count() == 28
+    assert index.count() == 29
     hit = index.search("sacred stakes", k=1)[0]
     assert hit.chunk.lecture.startswith("Canon D2") and hit.chunk.source_file == "canon.md"
     index.close()
