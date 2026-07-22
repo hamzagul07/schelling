@@ -1,7 +1,7 @@
 {
   "question_id": "Q-DEMO-COMMITTEE",
   "run_id": "Q-DEMO-COMMITTEE-mc300-s42-ee2ecaf05921",
-  "engine_version": "1ace52a31f7eb4775ce55d891a1667628bed73b8",
+  "engine_version": "1fef82d2e996227b4bc4cb07971b42552d200fdf",
   "inputs_hash": "ee2ecaf059211f77f1406889518bdffedd9b31facd49a44a97d6cd855ab697a6",
   "seed": 42,
   "model": "challenge",

@@ -1423,3 +1423,47 @@ narrative-only `_NARR_CSS`. `tests/test_narrative.py` adds: strip shares equal t
 probabilities, segments tile 0-100, SVG byte-identical + accessible, the non-voting flag appears when
 coded and not otherwise, the palette loads two ramps, linear rubrics use the density strip, and the
 report stays offline-clean. 366 tests green; ruff/format/mypy clean; paper-evidence --check passes.
+
+### D24.1 — Render-time rubric resolution from the committed grading file
+The formalizer never writes a `resolution_rubric` into the game, so every solved record — including
+the four **sealed US-Iran records that can never be regenerated** — embedded none, and the two-audience
+narrative fell back to the standard layout. Confirmed empirically before changing anything (all ten
+forecast records report `rubric=none`; a USIRAN record rendered the standard "Headline" layout, not
+"Verdict/Reading"). Fix: `report/rubric_lookup.py` resolves a rubric at **render time** —
+`grading_path` walks up from the record's directory (and the cwd) to find `GRADING-<question_id>.md`,
+`parse_rubric_block` extracts the first ```json fenced block that validates as a `ResolutionRubric`.
+The CLI `report` command's `_resolve_rubric` injects it into the **in-memory** copy of the record and
+passes a source label to `render(..., rubric_source=...)`, which the appendix states ("resolved at
+render time from GRADING-….md (the record was not modified)" vs "embedded in the record").
+**Precedence: an embedded rubric always wins** — lookup only runs when the game has none.
+**Read-only (item 2): the record file on disk is never rewritten** (asserted by test: bytes unchanged;
+`schelling verify` on the sealed record still passes 4/4). The missing-rubric path (no rubric, no
+grading file) is byte-identical to before.
+
+### D24.2 — Structured `bands` added to both grading files' machine-readable blocks
+For the band-probability strip the rubric needs structured `bands` (D22.2), which the pre-D22 grading
+files lacked. **USIRAN:** its machine-readable block already existed but carried the seven bands only
+in `outcome_mapping` prose; a `bands` array was added as a **verbatim structuring of those already-
+committed bands** — same boundaries, same meaning — with an in-file note. This changes no grading
+semantics (`outcome_mapping` and the sealed continuum text remain canonical), is done **pre-resolution**
+(before 2026-08-31, when the rubric still allows ratified structuring), and is **hash-irrelevant** (the
+rubric is excluded from `inputs_hash`) — so no sealed record's hash and no ledger/OTS seal is touched
+(seals are on the record files and FORECASTS.md, not the grading file). **IAEA:** had no machine-
+readable block at all (only a markdown table); a full `ResolutionRubric` JSON block with the seven
+table bands was appended so `schelling report` can resolve it. **Flagged for Hassan:** the USIRAN grading
+file is his ratified pre-registration; this edit is a faithful machine-readable structuring, not a
+change of grading — please confirm at review.
+
+### D24.3 — Rubric attached to the IAEA draft for future solves (hash-unchanged)
+`analyses/iaea/iaea.json` (gitignored) gained `game.resolution_rubric` (the IAEA rubric with its seven
+bands) plus `non_voting_actor_ids = ["iran_subject_influence_only"]` (Iran is the subject, not a
+voter). Asserted by test that adding a rubric + non-voting coding leaves `inputs_hash` byte-identical
+(both are hash-excluded), and confirmed directly: the draft's hash stays `a4aff64fd883…`, so a future
+solve reproduces the same run_id and embeds the rubric (embedded then wins over lookup). Both target
+reports re-rendered and verified: the **IAEA compromise** record (modal band "No new resolution; report
+noted; left to the diplomatic track") and a **sealed US-Iran compromise** record (modal band "Interim
+or framework on largely US terms") each show the band strip, actor diagram, verdict and reading
+sections. New `tests/test_rubric_lookup.py` (12 tests: parse, walk-up lookup, embedded-wins precedence,
+inject-without-rewrite, missing-rubric unchanged, determinism, source labels, hash-unchanged). The
+narrative golden was updated for the new "Rubric source" appendix line. 378 tests green; ruff/format/
+mypy clean; paper-evidence --check passes.
