@@ -67,7 +67,7 @@ def test_head_to_head_is_deterministic() -> None:
     ]
 
 
-# --------------------------------------------------------------- model-three integration (Session 20)
+# ----------------------------------------------------------- model-three integration (Session 20)
 import json  # noqa: E402
 
 import pytest  # noqa: E402
@@ -166,7 +166,8 @@ def test_model_three_refuses_a_case_without_coding_flags() -> None:
 
 
 def test_cli_coercive_refuses_model_three_before_the_reading() -> None:
-    # The real library is not the reading: model-three must refuse (never run before 8 verified cases).
+    # The real library is not the reading: model-three must refuse (never run before 8
+    # verified cases).
     result = _runner.invoke(app, ["coercive", "--solver", "model-three"])
     assert result.exit_code == 2
     assert (

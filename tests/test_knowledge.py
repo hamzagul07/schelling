@@ -76,7 +76,8 @@ def test_canon_cards_are_indexed_and_searchable(tmp_path: Path) -> None:
 
 
 def test_build_from_corpus_combines_transcripts_and_concepts(tmp_path: Path) -> None:
-    # Hermetic: a fake lecture + a fake concept card must both land in the index (CI has no transcripts).
+    # Hermetic: a fake lecture + a fake concept card must both land in the index
+    # (CI has no transcripts).
     tdir = tmp_path / "t"
     tdir.mkdir()
     (tdir / "lec.txt").write_text("Game Theory #1: The Dating Game\nFive men, five women.\n")

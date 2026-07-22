@@ -49,7 +49,13 @@ from schelling.knowledge.index import (
 from schelling.mc.monte_carlo import forecast, write_record
 from schelling.mc.sensitivity import format_tornado, zero_swing_warning
 from schelling.report.render import render as render_report
-from schelling.schemas.forecast import ADVISE_CAVEAT, AnalogPanel, Assumption, DraftMetadata
+from schelling.schemas.forecast import (
+    ADVISE_CAVEAT,
+    SUCCESSOR_CAVEAT,
+    AnalogPanel,
+    Assumption,
+    DraftMetadata,
+)
 from schelling.schemas.question import GameSpec
 from schelling.schemas.stakeholders import TriangularEstimate
 from schelling.solver.config import RangeMode, SolverConfig
@@ -567,14 +573,30 @@ def advise(
     solver: str = typer.Option(
         "challenge", "--solver", help="challenge (simulated), compromise (exact), or both."
     ),
+    mode: str = typer.Option(
+        "levers", "--mode", help="levers (default) | equilibrium (exact/compromise lens only)."
+    ),
     out_dir: Path = typer.Option(Path("runs"), "--out-dir"),
 ) -> None:
-    """Find levers for one actor: own moves + who to persuade. Writes an AdviseRecord to runs/."""
+    """Advise 2.0 — strategy layer: response previews, robustness, equilibrium, packages.
+
+    Writes an AdviseRecord to runs/. Every recommendation is robustness-graded across the MC
+    draws and shows its net-after-response; ``--mode equilibrium`` iterates best responses to a
+    fixed point.
+    """
     if not fixture.exists():
         typer.echo(f"input not found: {fixture}", err=True)
         raise typer.Exit(code=2)
     if solver not in ("challenge", "compromise", "both"):
         typer.echo("--solver must be 'challenge', 'compromise', or 'both'.", err=True)
+        raise typer.Exit(code=2)
+    if mode not in ("levers", "equilibrium"):
+        typer.echo("--mode must be 'levers' or 'equilibrium'.", err=True)
+        raise typer.Exit(code=2)
+    if mode == "equilibrium" and solver == "challenge":
+        typer.echo(
+            "--mode equilibrium needs the exact lens: use --solver compromise or both.", err=True
+        )
         raise typer.Exit(code=2)
     try:
         game, _assumptions, _fm, _ls = _load_solve_input(fixture)
@@ -587,6 +609,8 @@ def advise(
             seed=seed,
             grid_step=grid_step,
             salience_floor=salience_floor,
+            strategy=True,
+            mode=mode,
         )
     except ValueError as exc:  # bad JSON/schema, or unknown actor id
         typer.echo(str(exc), err=True)
@@ -603,20 +627,55 @@ def advise(
         f"baseline settlement {record.baseline_median:.3f})  [{lens_label} lens]"
     )
     typer.echo("")
-    typer.echo("Top own moves (benefit toward ideal / cost conceded):")
+    typer.echo("Top own moves (benefit toward ideal / cost conceded / net-after-response):")
     for mv in record.top_moves:
         flag = "  [beyond stated range]" if mv.beyond_stated_range else ""
+        action = f" [{mv.action.name}]" if mv.action else ""
         typer.echo(
-            f"  {mv.dimension} -> {mv.value:g}: settle {mv.settlement_median:.3f}  "
+            f"  {mv.dimension} -> {mv.value:g}{action}: settle {mv.settlement_median:.3f}  "
             f"benefit {mv.benefit:+.3f}  cost {mv.cost:g}{flag}"
         )
+        if mv.response is not None:
+            sim = " (sim)" if mv.response.simulated else ""
+            typer.echo(
+                f"      response: gross {mv.response.gross_benefit:+.3f} -> net "
+                f"{mv.response.net_benefit:+.3f} vs {mv.response.responder_id}{sim}"
+            )
+        if mv.robustness is not None:
+            r = mv.robustness
+            typer.echo(
+                f"      robustness: {r.grade}  ({r.sign_stable_fraction:.0%} sign-stable, "
+                f"CI [{r.benefit_ci_lo:+.2f}, {r.benefit_ci_hi:+.2f}])"
+            )
     typer.echo("")
     typer.echo("Top persuasion targets (who to work on):")
     for t in record.persuasion_targets[:5]:
+        grade = f"  [{t.robustness.grade}]" if t.robustness else ""
         typer.echo(
             f"  [{t.kind}] {t.actor_id}.{t.dimension} {t.from_value:g}->{t.to_value:g}: "
-            f"settle {t.settlement_median:.3f}  benefit {t.benefit:+.3f}"
+            f"settle {t.settlement_median:.3f}  benefit {t.benefit:+.3f}{grade}"
         )
+    if record.packages:
+        typer.echo("")
+        typer.echo("Best two-move packages (exact lens):")
+        for p in record.packages:
+            g = f"  [{p.robustness.grade}]" if p.robustness else ""
+            typer.echo(
+                f"  {' + '.join(p.moves)}: settle {p.settlement_median:.3f}  "
+                f"benefit {p.benefit:+.3f}  cost {p.cost:g}{g}"
+            )
+    if record.equilibrium is not None:
+        eq = record.equilibrium
+        status = "cycle" if eq.cycle else ("converged" if eq.converged else "unsettled")
+        typer.echo("")
+        typer.echo(
+            f"Equilibrium ({status}, {eq.iterations} iters): settlement {eq.settlement:.3f}  "
+            f"path {[round(x, 2) for x in eq.path]}"
+        )
+    if record.strategy_brief:
+        typer.echo("")
+        typer.echo("Strategy brief:")
+        typer.echo(f"  {record.strategy_brief}")
     if record.second_lens is not None:
         s = record.second_lens
         typer.echo("")
@@ -628,7 +687,7 @@ def advise(
             )
     typer.echo("")
     typer.echo(f"AdviseRecord written: {out}")
-    typer.echo(ADVISE_CAVEAT)
+    typer.echo(SUCCESSOR_CAVEAT if record.mode == "equilibrium" else ADVISE_CAVEAT)
 
 
 _DEU_CSV_NAME = "Dataset_DEU_III.csv"
@@ -783,13 +842,14 @@ def coercive(
     ),
 ) -> None:
     """Run the pre-registered coercive head-to-head (challenge vs compromise vs successors)."""
-    from schelling.backtest.coercive import MODEL_THREE, _METHODS, head_to_head, load_library
+    from schelling.backtest.coercive import _METHODS, MODEL_THREE, head_to_head, load_library
 
     cases = load_library(library)
     methods: tuple[str, ...] = _METHODS
     if solver == MODEL_THREE:
-        # MT-1.0 is scored ONCE, at the pre-registered reading, and never before (specs/MT-1.0.md §3,
-        # §6). Refuse until the library holds the reading's worth of verified, coded coercive cases.
+        # MT-1.0 is scored ONCE, at the pre-registered reading, never before
+        # (specs/MT-1.0.md §3, §6). Refuse until the library holds the reading's
+        # worth of verified, coded coercive cases.
         ready = [
             c
             for c in cases
@@ -797,9 +857,10 @@ def coercive(
         ]
         if len(ready) < _READING_N or len(ready) != len(cases):
             typer.echo(
-                f"Refusing to run model-three: it is scored once, at the {_READING_N}-verified-case "
-                f"coercive reading, never before (specs/MT-1.0.md). The library has {len(ready)} "
-                f"ready (verified, coercive, coded) of {len(cases)} — the reading has not arrived.",
+                f"Refusing to run model-three: it is scored once, at the "
+                f"{_READING_N}-verified-case coercive reading, never before (specs/MT-1.0.md). "
+                f"The library has {len(ready)} ready (verified, coercive, coded) of {len(cases)} "
+                f"— the reading has not arrived.",
                 err=True,
             )
             raise typer.Exit(code=2)
