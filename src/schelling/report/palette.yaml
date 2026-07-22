@@ -1,0 +1,9 @@
+# Report figure palette (Session 23, D23.4). Two colour ramps — one per continuum half — plus the
+# support colours for the band-probability strip and the weighted-actor diagram. Nothing is
+# hardcoded in svg.py; edit the hex values here and every figure follows.
+low_half: "#b45309" # amber — the 0-end (low / pressure) continuum half; matches the report accent
+high_half: "#0f766e" # teal — the 100-end (high / accommodation) continuum half
+modal_stroke: "#1f2937" # outline that emphasizes the modal band
+median_pointer: "#1f2937" # the median triangle beneath a strip
+ci_bracket: "#6b7280" # the 80% confidence bracket beneath a strip
+non_voting_flag: "#6b7280" # dashed ring + marker for non-voting / out-of-body actors

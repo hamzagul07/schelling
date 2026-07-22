@@ -23,7 +23,8 @@ from schelling.report.bands import (
     compromise_point,
     map_bands,
 )
-from schelling.report.svg import ActorPoint, BarRow, ScatterPoint, TornadoRow
+from schelling.report.palette import load_palette
+from schelling.report.svg import ActorPoint, BandSeg, BarRow, ScatterPoint, TornadoRow, WActor
 from schelling.report.vocab import load_vocab, phrase_for
 from schelling.schemas.backtest import BacktestRecord
 from schelling.schemas.forecast import (
@@ -119,6 +120,11 @@ section.narr { margin:0 0 10px; }
 .narr pre { background:var(--panel); border:1px solid var(--line); border-radius:6px;
   padding:10px 12px; font-size:12px; overflow-x:auto; margin:6px 0; }
 tr.modal td { background:#fff7ed; }
+.narr figure { margin:10px 0 4px; }
+.narr .legend { color:var(--muted); font-size:12px; margin:2px 0 6px; }
+.band-pct { fill:#1f2937; font-size:11px; font-weight:650; }
+.band-lab { fill:#6b7280; font-size:10px; }
+.actor-dot-label { fill:#1f2937; font-size:10px; }
 """
 
 
@@ -398,6 +404,98 @@ def _what_would_change(record: ForecastRecord, game: GameSpec) -> str:
     )
 
 
+def _band_segments(readout: BandReadout) -> list[BandSeg]:
+    """Threshold-tiled strip segments from the banded readout: segment i spans [lo_i, lo_{i+1}]
+    (last to 100), matching the band-membership rule so the strip tiles 0-100 with no gaps."""
+    per = readout.per_band
+    los = [bp.band.lo for bp in per]
+    uppers = [*los[1:], 100.0]
+    return [
+        BandSeg(
+            lo=los[i], hi=uppers[i], share=bp.probability, label=bp.band.label, modal=bp.is_modal
+        )
+        for i, bp in enumerate(per)
+    ]
+
+
+def _verdict_strip(record: ForecastRecord, readout: BandReadout) -> str:
+    """The band-probability strip (banded rubric) or continuous density strip (arithmetic/none),
+    with a one-line legend. A pure function of the record + rubric (D23.1)."""
+    pal = load_palette()
+    e = record.ensemble
+    if readout.kind == BANDED and readout.per_band:
+        modal = readout.modal_band
+        modal_prob = next((bp.probability for bp in readout.per_band if bp.is_modal), 0.0)
+        modal_label = modal.label if modal is not None else "the modal band"
+        desc = (
+            f"Band-probability strip: {modal_label} is the most likely outcome at "
+            f"{modal_prob:.0%} of {e.n_draws} draws; the median is {e.median:.0f} of 100."
+        )
+        fig = svg.band_strip(
+            _band_segments(readout), median=e.median, p10=e.p10, p90=e.p90, palette=pal, desc=desc
+        )
+        legend = (
+            "Segment width tracks each band's span; fill darkness is its share of the draws; the "
+            "outlined band is the most likely. Beneath: &#9650; median, bracket = 80% CI."
+        )
+    else:
+        if not record.outcome_distribution:
+            return ""  # graceful: nothing to draw without cached draws
+        desc = (
+            f"Outcome density across the 0-100 scale; median {e.median:.0f}, 80% of draws between "
+            f"{e.p10:.0f} and {e.p90:.0f}."
+        )
+        fig = svg.density_strip(
+            record.outcome_distribution,
+            median=e.median,
+            p10=e.p10,
+            p90=e.p90,
+            palette=pal,
+            desc=desc,
+        )
+        legend = (
+            "Arithmetic rubric: a continuous density of the draws (darker = denser). Beneath: "
+            "&#9650; median, bracket = 80% CI."
+        )
+    return f"<figure>{fig}</figure><p class='legend'>{legend}</p>"
+
+
+def _reading_diagram(record: ForecastRecord, game: GameSpec) -> str:
+    """The weighted-actor diagram + a one-line legend. Pure function of the record (D23.2)."""
+    pal = load_palette()
+    non_voting = set(game.non_voting_actor_ids)
+    actors = [
+        WActor(
+            name=a.name,
+            position=a.position.mode,
+            weight=a.capability.mode * a.salience.mode,
+            non_voting=a.id in non_voting,
+        )
+        for a in game.actors
+    ]
+    e = record.ensemble
+    desc = (
+        f"Actors on the 0-100 scale sized by capability times salience; the settlement is at "
+        f"{e.median:.0f} of 100."
+    )
+    fig = svg.weighted_actors(actors, settlement=e.median, palette=pal, desc=desc)
+    c = game.continuum
+    lo_half, hi_half = _esc(_short(c.anchor_0)), _esc(_short(c.anchor_100))
+    legend_bits = [
+        "Circle area &#8733; capability&times;salience.",
+        f"Amber = the {lo_half} half; teal = the {hi_half} half.",
+    ]
+    if non_voting:
+        legend_bits.append("Dashed ring + * = non-voting / out-of-body influence.")
+    return f"<figure>{fig}</figure><p class='legend'>{' '.join(legend_bits)}</p>"
+
+
+def _short(text: str, n: int = 40) -> str:
+    """Trim a continuum anchor to a short phrase for a legend (first clause / n chars)."""
+    head = text.split(" — ")[0].split(",")[0].strip()
+    return head if len(head) <= n else head[: n - 1].rstrip() + "…"
+
+
 def _narr_verdict(record: ForecastRecord, game: GameSpec, readout: BandReadout) -> str:
     e = record.ensemble
     parts = [
@@ -427,6 +525,7 @@ def _narr_verdict(record: ForecastRecord, game: GameSpec, readout: BandReadout) 
             f'<p class="lede">The forecast median is <strong>{e.median:.0f}</strong> on the 0-100 '
             f"scale (CI80 [{e.p10:.0f}, {e.p90:.0f}]). {_esc(readout.note)}</p>"
         )
+    parts.append(_verdict_strip(record, readout))
     parts.append(_what_would_change(record, game))
     parts.append("</section>")
     return "".join(parts)
@@ -460,6 +559,7 @@ def _narr_reading(record: ForecastRecord, game: GameSpec, readout: BandReadout) 
         for a in game.actors
     )
     parts.append(f"<p>The players and where they stand:</p><ul>{lis}</ul>")
+    parts.append(_reading_diagram(record, game))
     weights = [(a, a.capability.mode * a.salience.mode) for a in game.actors]
     total = sum(w for _, w in weights) or 1.0
     heaviest = sorted(weights, key=lambda x: (-x[1], x[0].id))[:2]
