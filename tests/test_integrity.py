@@ -258,7 +258,7 @@ def test_stamp_exits_nonzero_when_ots_absent(
     assert result.exit_code == 1 and "OpenTimestamps" in result.output
 
 
-# --------------------------------------------------------------- BACKTEST.md section ownership (D18.4)
+# ----------------------------------------------------------- BACKTEST.md section ownership (D18.4)
 def test_preserve_leaderboard_keeps_the_successor_block() -> None:
     from schelling.cli import _LEADERBOARD_END, _LEADERBOARD_START, _preserve_leaderboard
 

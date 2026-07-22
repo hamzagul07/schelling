@@ -1,8 +1,9 @@
 """Golden tests for Model Three / Asabiyyah (MT-1.0), against specs/MT-1.0.md §3.
 
-Every term is exercised firing alone and composed, against an INDEPENDENT hand-computation of the
-spec's pipeline (the spec's literal constants are written into the test arithmetic, so the test fails
-if the code drifts from them). Determinism is pinned. These are synthetic fixtures only — MT-1.0 is
+Every term is exercised firing alone and composed, against an INDEPENDENT hand-computation of
+the spec's pipeline (the spec's literal constants are written into the test arithmetic, so the
+test fails if the code drifts from them). Determinism is pinned. These are synthetic fixtures
+only — MT-1.0 is
 never run against the real library before its 8-verified-case reading.
 """
 
@@ -72,7 +73,7 @@ def test_comfort_decay_only_at_long_horizon_and_only_comfortable() -> None:
         _actor(0, 50, 100, endurance="comfortable"),
         _actor(100, 50, 100, endurance="hardened"),
     ]
-    # T >= 18 -> comfortable actor A decays x0.80 -> its weight shrinks -> mean moves toward B (100).
+    # T >= 18 -> comfortable actor A decays x0.80 -> weight shrinks -> mean moves toward B (100).
     wm_long = adjusted_mean(comfortable, horizon_months=24)
     sA = 50 * 0.80
     assert wm_long == pytest.approx(

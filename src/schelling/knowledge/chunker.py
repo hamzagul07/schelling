@@ -167,8 +167,10 @@ def chunk_directory(directory: Path) -> list[Chunk]:
 
 
 # A concept card heads with a bold ``**A1. Title (citations).**`` marker at line start (Session 19).
-# One card = one chunk (cards are short and self-contained); its ``lecture`` ref is ``Canon A1: Title``.
-# DOTALL so a header whose citation list wraps across a line (e.g. "Trachtenberg\n2012)") still matches.
+# One card = one chunk (cards are short and self-contained); its ``lecture`` ref is
+# ``Canon A1: Title``.
+# DOTALL so a header whose citation list wraps across a line (e.g. "Trachtenberg\n2012)")
+# still matches.
 _CARD = re.compile(r"^\*\*([A-Z]\d+)\.\s+(.+?)\*\*", re.MULTILINE | re.DOTALL)
 
 
