@@ -1586,3 +1586,44 @@ plain sentence that keeps the substantive point: "This section is an analysis of
 resulting agreement is likely to be — an analysis of coalition durability, not a prescription." The
 model-facing guardrail stays in the narrative system prompt (where it belongs); only the reader-shown
 line changed. A test asserts the disclaimer carries no guardrail wording or canon codes.
+
+### D27.1 — `schelling llm-forecast`: the direct-judgment baseline
+New command `schelling llm-forecast <game-or-draft.json>` gives a model the SAME situation text,
+sources, and 0-100 continuum the solver received and asks directly for a settlement point, an 80%
+interval, and (when the rubric is banded) a probability per band — **no solver, no game math**
+(`src/schelling/llm_forecast/forecast.py`). It samples `n=5` independently (via `LLMClient.complete`,
+which gained an optional `temperature` that elicits a sampled judgment instead of adaptive thinking);
+the headline is the **median** of the sampled points and the **spread** (max-min) is its
+self-consistency. The rubric is resolved read-only from the grading file if absent (D24.1), so band
+probabilities can be requested. Replayable via any `LLMClient` (tested with `ReplayClient`; CI never
+calls the live API).
+
+### D27.2 — `LLMForecastRecord` with full provenance; SHA-256 is the commitment
+`LLMForecastRecord` (schemas/forecast.py) carries the judge model, temperature, n_samples, prompt
+hash, every sample verbatim (`LLMSample`: point / p10 / p90 / band probs / raw text), cost, and the
+aggregate `ensemble`. **Non-deterministic by nature** — re-running produces different samples — so
+there is no reproducibility claim; the commitment is the SHA-256 of the record file (as
+`schelling seal` computes). `render_llm_forecast` + the CLI output state this plainly.
+
+### D27.3 — Sealable, unchanged, labelled `llm-judgment`
+The record is shaped so `schelling seal` accepts it with **no changes**: `model = "llm-judgment"`
+labels the ledger row, `ensemble.median` is the sealed headline, and an embedded `game` supplies the
+frozen date and the `resolution_rubric` the seal requires (a judgment that cannot be graded by a
+pre-registered rule is not sealed). Verified: sealing an llm record writes a `| llm-judgment | …` row.
+
+### D27.4 — Pre-registered comparison, fixed now, with a refuse-to-rank guard
+`schelling compare` computes `|median - actual|` across challenge, compromise, and llm-judgment on the
+live ledger (`src/schelling/llm_forecast/compare.py`). **Exploratory until `MIN_GRADED = 10` graded
+questions** (with all three families sealed): the harness returns no ranking and prints only the
+exploratory status before the threshold — the same discipline the coercive reading holds to (D20).
+Only at 10+ does it rank by MAE. Fixed now, before any question grades.
+
+### D27.5 — Contamination rule; the live sealed ledger is the clean venue
+An `llm-forecast` run whose inputs resemble DEU or the coercive library is auto-flagged
+`CONTAMINATION-RISK` (`detect_contamination`, overridable with `--contamination-risk/--live-question`)
+and reported separately, because the model may know those historical outcomes. `docs/LLM-BASELINE.md`
+states that the live sealed ledger — questions sealed before they resolve — is the clean venue, and it
+is the only venue `schelling compare` ranks over (contaminated runs never reach it). `tests/
+test_llm_forecast.py`: sampling/aggregation, record shape + round-trip, parse rejection, contamination
+flag + override, the refuse-to-rank guard both sides of the threshold, the seal path, the
+non-determinism note, and the replayed CLI. 413 tests green; sealed records + the ledger untouched.
