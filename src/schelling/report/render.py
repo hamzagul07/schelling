@@ -20,6 +20,7 @@ from schelling.report.svg import ActorPoint, BarRow, ScatterPoint, TornadoRow
 from schelling.schemas.backtest import BacktestRecord
 from schelling.schemas.forecast import (
     ADVISE_CAVEAT,
+    SUCCESSOR_CAVEAT,
     AdviseRecord,
     AnalogPanel,
     Assumption,
@@ -402,7 +403,8 @@ def render_advise(record: AdviseRecord) -> str:
         f"<h1>{_esc(record.question_id)}</h1>",
         f'<p class="sub">advising <strong>{_esc(record.advising_actor)}</strong> · '
         f"ideal {record.ideal:g} · baseline settlement {record.baseline_median:.3f}</p>",
-        f'<div class="caveat"><strong>Caveat.</strong> {_esc(ADVISE_CAVEAT)}</div>',
+        f'<div class="caveat"><strong>Caveat.</strong> '
+        f"{_esc(SUCCESSOR_CAVEAT if record.mode == 'equilibrium' else ADVISE_CAVEAT)}</div>",
     ]
     if record.exact or record.second_lens is not None:
         parts.append(f'<p class="sub">Primary lever lens: <strong>{lens}</strong>.</p>')
@@ -435,8 +437,78 @@ def render_advise(record: AdviseRecord) -> str:
             _own_moves_table(s.top_moves),
             _targets_table(s.persuasion_targets),
         ]
+    parts.append(_strategy_sections(record))
     parts.append(_advise_provenance(record))
     return _page(record.question_id, "".join(parts))
+
+
+def _strategy_sections(record: AdviseRecord) -> str:
+    """Advise 2.0 report sections — all guarded so pre-2.0 records render byte-identically."""
+    out: list[str] = []
+    detailed = [m for m in record.top_moves if m.response or m.robustness or m.action]
+    if detailed:
+        rows = ""
+        for m in detailed:
+            act = _esc(m.action.name) if m.action else "&mdash;"
+            if m.response is not None:
+                sim = " (sim)" if m.response.simulated else ""
+                resp = (
+                    f"{m.response.gross_benefit:+.3f} &rarr; {m.response.net_benefit:+.3f} "
+                    f"vs {_esc(m.response.responder_id)}{sim}"
+                )
+            else:
+                resp = "&mdash;"
+            rob = (
+                f"{_esc(m.robustness.grade)} ({m.robustness.sign_stable_fraction:.0%})"
+                if m.robustness
+                else "&mdash;"
+            )
+            rows += (
+                f"<tr><td>{_esc(m.dimension)} &rarr; {m.value:g}</td><td>{act}</td>"
+                f"<td class='num'>{resp}</td><td>{rob}</td></tr>"
+            )
+        out.append(
+            "<h2>Response preview &amp; robustness</h2><table><thead><tr><th>move</th>"
+            "<th>action</th><th>gross &rarr; net (responder)</th><th>robustness</th></tr></thead>"
+            f"<tbody>{rows}</tbody></table>"
+        )
+    if record.packages:
+        rows = "".join(
+            f"<tr><td>{_esc(' + '.join(p.moves))}</td>"
+            f"<td class='num'>{p.settlement_median:.3f}</td>"
+            f"<td class='num'>{p.benefit:+.3f}</td><td class='num'>{p.cost:g}</td>"
+            f"<td>{_esc(p.robustness.grade) if p.robustness else ''}</td></tr>"
+            for p in record.packages
+        )
+        out.append(
+            "<h2>Best two-move packages (exact lens)</h2><table><thead><tr><th>package</th>"
+            "<th>settlement</th><th>benefit</th><th>cost</th><th>robustness</th></tr></thead>"
+            f"<tbody>{rows}</tbody></table>"
+        )
+    if record.equilibrium is not None:
+        eq = record.equilibrium
+        status = (
+            "cycle detected" if eq.cycle else ("converged" if eq.converged else "did not settle")
+        )
+        mrows = "".join(
+            f"<tr><td>{_esc(m.actor_id)}</td>"
+            f"<td class='num'>{m.position_from:g} &rarr; {m.position_to:g}</td>"
+            f"<td class='num'>{m.salience_from:g} &rarr; {m.salience_to:g}</td></tr>"
+            for m in eq.moves
+        )
+        path = _esc(str([round(x, 2) for x in eq.path]))
+        out.append(
+            f"<h2>Equilibrium &mdash; iterated best responses</h2>"
+            f'<p class="sub">{status}, {eq.iterations} iterations; settlement '
+            f"{eq.settlement:.3f}. Path: {path}.</p>"
+            "<table><thead><tr><th>actor</th><th>position</th><th>salience</th></tr></thead>"
+            f"<tbody>{mrows}</tbody></table>"
+        )
+    if record.strategy_brief:
+        out.append(
+            f'<div class="brief"><h2>Strategy brief</h2><p>{_esc(record.strategy_brief)}</p></div>'
+        )
+    return "".join(out)
 
 
 def _advise_provenance(record: AdviseRecord) -> str:

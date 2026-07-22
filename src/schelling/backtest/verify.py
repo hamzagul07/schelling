@@ -92,7 +92,8 @@ def verify_record(record_path: Path, ledger_path: Path) -> VerifyReport:
             Check(
                 "inputs-hash",
                 True,
-                "legacy canonicalization not derivable — authenticated by determinism + ledger-match",
+                "legacy canonicalization not derivable — authenticated by determinism "
+                "+ ledger-match",
             )
         )
 

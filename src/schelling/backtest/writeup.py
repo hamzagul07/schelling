@@ -199,12 +199,17 @@ def backtest_markdown(record: BacktestRecord) -> str:
     )
     out.append(
         "| **Model Three — Asabiyyah (MT-1.0)** | **PRE-REGISTERED — awaiting the reading** | "
-        "Specification sealed ([`specs/MT-1.0.md`](specs/MT-1.0.md), D20.0) while the library holds "
-        "two verified cases, none coercive. Scored **once**, at the 8-verified-case reading. **Gate "
-        '(§6, verbatim):** *"Primary: at the pre-registered 8-verified-case coercive reading, MT-1.0 '
-        "must beat the unadjusted compromise mean on MAE, reported with paired bootstrap intervals. "
+        "Specification sealed ([`specs/MT-1.0.md`](specs/MT-1.0.md), D20.0) while the "
+        "library holds "
+        "two verified cases, none coercive. Scored **once**, at the 8-verified-case "
+        "reading. **Gate "
+        '(§6, verbatim):** *"Primary: at the pre-registered 8-verified-case coercive '
+        "reading, MT-1.0 "
+        "must beat the unadjusted compromise mean on MAE, reported with paired bootstrap "
+        "intervals. "
         "… Negative results are published with the same prominence as positive ones. If MT-1.0 "
-        "fails, it is retired exactly as R1's candidates were; its committed specification remains as "
+        "fails, it is retired exactly as R1's candidates were; its committed specification "
+        "remains as "
         'the record that the theory stated its claim before the evidence existed."* |'
     )
     out.append("")

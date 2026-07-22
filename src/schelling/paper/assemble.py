@@ -42,15 +42,15 @@ _FIG_AFTER: dict[str, list[tuple[str, str]]] = {
         ),
         (
             "fig_challenge_vs_compromise.svg",
-            "Figure 2. Absolute-error distributions compared: challenge (primary) vs the compromise "
-            "weighted mean.",
+            "Figure 2. Absolute-error distributions compared: challenge (primary) vs the "
+            "compromise weighted mean.",
         ),
     ],
     "04-successor-search.md": [
         (
             "fig_leaderboard.svg",
-            "Figure 3. Successor-search leaderboard — neither candidate beats the compromise mean on "
-            "the untouched TEST split.",
+            "Figure 3. Successor-search leaderboard — neither candidate beats the compromise "
+            "mean on the untouched TEST split.",
         ),
         (
             "fig_r1_split.svg",

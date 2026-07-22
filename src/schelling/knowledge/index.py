@@ -91,7 +91,8 @@ class KnowledgeIndex:
         """Build the index from the whole concepts corpus: transcripts + concept cards (Session 19).
 
         The canon cards in ``concepts_dir`` (``*.md``) join the lecture transcripts as retrievable
-        classification concepts. Both remain concepts-library ONLY — never a source of facts (rule 6).
+        classification concepts. Both remain concepts-library ONLY — never a source of facts
+        (rule 6).
         """
         chunks = chunk_directory(transcripts_dir)
         if concepts_dir.exists():

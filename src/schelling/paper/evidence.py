@@ -377,7 +377,8 @@ def _context_items(repo_root: Path) -> list[EvidenceItem]:
                 m["mae"],
                 "BACKTEST.md",
                 prov,
-                f"{m['subset'].strip()} — {m['src'].strip()} (regime/ordering only, NOT like-for-like)",
+                f"{m['subset'].strip()} — {m['src'].strip()} "
+                "(regime/ordering only, NOT like-for-like)",
             )
         )
         if "Old Model" in model:
@@ -394,7 +395,8 @@ def _context_items(repo_root: Path) -> list[EvidenceItem]:
                 f"Old Model {'/'.join(old_model)} vs weighted mean {'/'.join(wmean)}",
                 "BACKTEST.md",
                 prov,
-                "BdM 2011 Tables 1 & 3 — same regime & ordering, NOT like-for-like (diff DEU version)",
+                "BdM 2011 Tables 1 & 3 — same regime & ordering, NOT like-for-like "
+                "(diff DEU version)",
             )
         )
     if "Achen" in text and "as well or better" in text:
