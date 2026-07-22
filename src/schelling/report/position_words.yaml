@@ -1,0 +1,23 @@
+# Position-to-words vocabulary (Session 22, D22.4).
+#
+# Maps a 0-100 continuum position (and salience) to an auditable, editable phrase, so the narrative
+# report never hardcodes phrasing in Python strings. The continuum's own anchor_0 / anchor_100 text
+# supplies the *meaning* of the two ends; these phrases supply the *location* along it. Buckets are
+# keyed to thirds (coarse) and fifths (fine); a value falls in the first bucket whose `upto` it is
+# below. Edit the phrases or thresholds here — they are read at render time.
+position:
+  thirds:
+    - {upto: 33.34, phrase: "near the low end"}
+    - {upto: 66.67, phrase: "around the midpoint"}
+    - {upto: 100.01, phrase: "near the high end"}
+  fifths:
+    - {upto: 20.0, phrase: "at the far low end"}
+    - {upto: 40.0, phrase: "toward the low end"}
+    - {upto: 60.0, phrase: "close to the midpoint"}
+    - {upto: 80.0, phrase: "toward the high end"}
+    - {upto: 100.01, phrase: "at the far high end"}
+salience:
+  thirds:
+    - {upto: 33.34, phrase: "a routine item for it"}
+    - {upto: 66.67, phrase: "a live concern for it"}
+    - {upto: 100.01, phrase: "a defining issue for it"}
