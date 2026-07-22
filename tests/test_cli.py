@@ -21,6 +21,11 @@ from schelling.schemas.question import GameSpec
 runner = CliRunner()
 FIXTURES = Path(__file__).parent / "fixtures"
 TRANSCRIPTS = Path(__file__).parent.parent / "data" / "transcripts"
+# The lecture transcripts are gitignored (not redistributable), so they are absent on CI.
+_HAS_TRANSCRIPTS = TRANSCRIPTS.exists() and any(TRANSCRIPTS.glob("*.txt"))
+_needs_transcripts = pytest.mark.skipif(
+    not _HAS_TRANSCRIPTS, reason="lecture transcripts are gitignored; run locally"
+)
 
 
 def _fake_anthropic_factory(text: str) -> Callable[..., ReplayClient]:
@@ -132,6 +137,7 @@ def test_solve_bad_gamespec_is_friendly(tmp_path: Path) -> None:
     assert "Traceback" not in result.output
 
 
+@_needs_transcripts
 def test_knowledge_build_then_search(tmp_path: Path) -> None:
     db = tmp_path / "k.db"
     build = runner.invoke(
@@ -164,6 +170,7 @@ def test_knowledge_search_without_index_errors(tmp_path: Path) -> None:
     assert "no index" in result.output
 
 
+@_needs_transcripts
 def test_knowledge_build_missing_extra_is_friendly(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

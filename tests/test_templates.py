@@ -6,11 +6,14 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
 import yaml
 
 from schelling.knowledge.chunker import lecture_names
 
 TRANSCRIPTS = Path(__file__).parent.parent / "data" / "transcripts"
+# The lecture transcripts are gitignored (not redistributable), so they are absent on CI.
+_HAS_TRANSCRIPTS = TRANSCRIPTS.exists() and any(TRANSCRIPTS.glob("*.txt"))
 _REQUIRED_FIELDS = {"name", "conditions", "solution_concept", "transcript_refs", "notes"}
 
 # The eight patterns BUILD_PLAN §7 requires the deck to cover, matched by a distinctive token.
@@ -47,6 +50,7 @@ def test_required_concepts_are_covered() -> None:
         assert concept.lower() in names.lower(), f"missing template concept: {concept}"
 
 
+@pytest.mark.skipif(not _HAS_TRANSCRIPTS, reason="lecture transcripts are gitignored; run locally")
 def test_transcript_refs_are_real_lectures() -> None:
     valid = set(lecture_names(TRANSCRIPTS))
     for card in _load_cards():
