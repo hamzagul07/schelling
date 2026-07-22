@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from schelling.knowledge.chunker import (
     chunk_directory,
     chunk_text,
@@ -13,6 +15,11 @@ from schelling.knowledge.chunker import (
 )
 
 TRANSCRIPTS = Path(__file__).parent.parent / "data" / "transcripts"
+# The lecture transcripts are gitignored (not redistributable), so they are absent on CI.
+_HAS_TRANSCRIPTS = TRANSCRIPTS.exists() and any(TRANSCRIPTS.glob("*.txt"))
+_needs_transcripts = pytest.mark.skipif(
+    not _HAS_TRANSCRIPTS, reason="lecture transcripts are gitignored; run locally"
+)
 
 SAMPLE = (
     "Game Theory #1: The Alpha\n"
@@ -42,6 +49,7 @@ def test_chunk_ref_cites_lecture_and_file() -> None:
     assert chunk.ref == "Game Theory #1: The Alpha (sample.txt)"
 
 
+@_needs_transcripts
 def test_real_transcripts_yield_29_lectures() -> None:
     names = lecture_names(TRANSCRIPTS)
     assert len(names) == 29
@@ -71,6 +79,7 @@ def test_normalizer_strips_ai_summary_boilerplate() -> None:
     assert "war of attrition" in out  # substantive content preserved
 
 
+@_needs_transcripts
 def test_chunks_carry_lecture_provenance() -> None:
     chunks = chunk_directory(TRANSCRIPTS)
     assert len(chunks) >= 29  # at least one chunk per lecture

@@ -11,6 +11,11 @@ from schelling.knowledge.embed import HashingEmbedder
 from schelling.knowledge.index import KnowledgeIndex
 
 TRANSCRIPTS = Path(__file__).parent.parent / "data" / "transcripts"
+# The lecture transcripts are gitignored (not redistributable), so they are absent on CI.
+_HAS_TRANSCRIPTS = TRANSCRIPTS.exists() and any(TRANSCRIPTS.glob("*.txt"))
+_needs_transcripts = pytest.mark.skipif(
+    not _HAS_TRANSCRIPTS, reason="lecture transcripts are gitignored; run locally"
+)
 
 
 @pytest.fixture(scope="module")
@@ -28,6 +33,7 @@ def test_index_round_trips_every_chunk(chunks: list[Chunk], tmp_path: Path) -> N
     assert reopened.count() == len(chunks)
 
 
+@_needs_transcripts
 def test_search_returns_chunks_with_refs(chunks: list[Chunk], tmp_path: Path) -> None:
     index = KnowledgeIndex.build(chunks, HashingEmbedder(), db_path=tmp_path / "k.db")
     results = index.search("game theory", k=5)
@@ -37,6 +43,7 @@ def test_search_returns_chunks_with_refs(chunks: list[Chunk], tmp_path: Path) ->
     assert [r.score for r in results] == sorted((r.score for r in results), reverse=True)
 
 
+@_needs_transcripts
 def test_seeded_relevance_dating_game(chunks: list[Chunk], tmp_path: Path) -> None:
     # A query whose expected passage is known in advance: the distinctive vocabulary of the
     # opening "Dating Game" lecture (5 men, 5 women, marriage, incels) must surface lecture #1.
