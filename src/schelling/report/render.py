@@ -281,15 +281,17 @@ def _dl(pairs: dict[str, str]) -> str:
     return f"<dl>{rows}</dl>"
 
 
-def render_forecast(record: ForecastRecord) -> str:
+def render_forecast(record: ForecastRecord, *, rubric_source: str | None = None) -> str:
     """Render a ForecastRecord report.
 
-    When the question carries a committed :class:`ResolutionRubric`, render the two-audience
-    layered report (VERDICT / READING / ANALYST BRIEF / APPENDIX, D22.2); otherwise fall back to
-    the standard full-analysis layout so pre-rubric records render byte-identically (D22.5).
+    When the question carries a :class:`ResolutionRubric` (embedded, or resolved from its committed
+    grading file and injected by the caller — D24.1), render the two-audience layered report
+    (VERDICT / READING / ANALYST BRIEF / APPENDIX, D22.2); otherwise fall back to the standard
+    full-analysis layout so rubric-less records render byte-identically (D22.5). ``rubric_source``
+    is a human label stated in the appendix (e.g. the grading filename); None means embedded.
     """
     if record.game is not None and record.game.resolution_rubric is not None:
-        return render_forecast_narrative(record)
+        return render_forecast_narrative(record, rubric_source=rubric_source)
     return _render_forecast_standard(record)
 
 
@@ -361,12 +363,12 @@ def _render_forecast_standard(record: ForecastRecord) -> str:
 
 
 # --------------------------------------------------------------- two-audience narrative (D22.2)
-def render_forecast_narrative(record: ForecastRecord) -> str:
+def render_forecast_narrative(record: ForecastRecord, *, rubric_source: str | None = None) -> str:
     """The layered two-audience report: VERDICT / READING / ANALYST BRIEF / APPENDIX.
 
     All prose is deterministic template text composed from record fields plus the committed
     band and position-word vocabularies — no LLM anywhere (D22.3). Same record + same rubric =
-    byte-identical output.
+    byte-identical output. ``rubric_source`` labels the rubric's origin in the appendix (D24.1).
     """
     if record.game is None:  # nothing to read without a game; degrade to the standard layout
         return _render_forecast_standard(record)
@@ -376,7 +378,7 @@ def render_forecast_narrative(record: ForecastRecord) -> str:
         _narr_verdict(record, game, readout)
         + _narr_reading(record, game, readout)
         + _narr_brief(record, game, readout)
-        + _narr_appendix(record)
+        + _narr_appendix(record, rubric_source)
     )
     return _page(record.question_id, body, extra_css=_NARR_CSS)
 
@@ -689,8 +691,16 @@ def _narr_brief(record: ForecastRecord, game: GameSpec, readout: BandReadout) ->
     return "".join(parts)
 
 
-def _narr_appendix(record: ForecastRecord) -> str:
+def _narr_appendix(record: ForecastRecord, rubric_source: str | None = None) -> str:
     parts = ['<section class="narr"><h2>Appendix</h2>']
+    # State where the grading rubric came from (D24.1): embedded in the record, or resolved from the
+    # committed grading file at render time (the record itself is never modified).
+    src = (
+        "embedded in the record"
+        if rubric_source is None
+        else f"resolved at render time from {_esc(rubric_source)} (the record was not modified)"
+    )
+    parts.append(f"<h3>Rubric source</h3><p class='sub'>{src}.</p>")
     if record.sources_fetched:
         parts.append(
             f"<h3>Sources fetched ({len(record.sources_fetched)})</h3>"
@@ -1101,8 +1111,12 @@ def _looks_like_advise(data: dict[str, Any]) -> bool:
     return "advising_actor" in data and "own_moves" in data
 
 
-def render(data: dict[str, Any]) -> str:
-    """Detect the artifact type and render it. Raises ValueError with a named reason otherwise."""
+def render(data: dict[str, Any], *, rubric_source: str | None = None) -> str:
+    """Detect the artifact type and render it. Raises ValueError with a named reason otherwise.
+
+    ``rubric_source`` (forecast records only) labels a rubric resolved from a grading file at render
+    time so the appendix can state its origin (D24.1); None means the rubric was embedded.
+    """
     if _looks_like_backtest(data):
         try:
             return render_backtest(BacktestRecord.model_validate(data))
@@ -1119,7 +1133,7 @@ def render(data: dict[str, Any]) -> str:
             ) from exc
     if _looks_like_forecast(data):
         try:
-            return render_forecast(ForecastRecord.model_validate(data))
+            return render_forecast(ForecastRecord.model_validate(data), rubric_source=rubric_source)
         except ValidationError as exc:
             if "ensemble" not in data and "forecast_median" in data:
                 raise ValueError(
