@@ -602,6 +602,81 @@ def report(
 
 
 @app.command()
+def dossier(
+    record_path: Path = typer.Argument(..., help="A ForecastRecord JSON."),
+    advise_records: list[Path] = typer.Option(
+        [], "--advise-records", help="AdviseRecord JSON file(s) to fold into the strategy section."
+    ),
+    output: Path | None = typer.Option(None, "-o", "--output", help="Where to write the output."),
+    pdf: bool = typer.Option(False, "--pdf", help="Emit PDF (needs the pdf extra) not HTML."),
+    no_narrative: bool = typer.Option(
+        False, "--no-narrative", help="Skip the LLM narrative — fully deterministic dossier."
+    ),
+    llm_model: str = typer.Option("claude-opus-4-8", "--model", help="Narrative model."),
+    search: bool = typer.Option(
+        False, "--search/--no-search", help="Let the narrative model search."
+    ),
+) -> None:
+    """Assemble a researcher-grade dossier from a forecast record (+ advise records).
+
+    COMPUTED sections are deterministic; the five NARRATIVE sections are one tightly-constrained LLM
+    call whose model quantities are resolved from the record (never invented). ``--no-narrative``
+    yields a fully deterministic document. The record file is never modified.
+    """
+    from schelling.dossier.assemble import assemble_dossier, record_context
+    from schelling.dossier.narrative import NarrativeRejectedError, generate_narrative
+    from schelling.schemas.forecast import AdviseRecord, ForecastRecord
+
+    if not record_path.exists():
+        typer.echo(f"record not found: {record_path}", err=True)
+        raise typer.Exit(code=2)
+    try:
+        data = json.loads(record_path.read_text())
+        rubric_source = _resolve_rubric(data, record_path)
+        record = ForecastRecord.model_validate(data)
+    except (json.JSONDecodeError, ValueError) as exc:
+        typer.echo(f"could not load {record_path}: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    advise = [AdviseRecord.model_validate_json(p.read_text()) for p in advise_records]
+
+    narrative = None
+    if not no_narrative:
+        client = AnthropicClient(model=llm_model)
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            typer.echo(
+                "the narrative needs ANTHROPIC_API_KEY (or use --no-narrative for a deterministic "
+                "dossier).",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+        situation, sources = record_context(record)
+        try:
+            narrative = generate_narrative(
+                client, record, situation_text=situation, sources_text=sources, search=search
+            )
+        except (NarrativeRejectedError, WebSearchUnavailableError, IndexLeakageError) as exc:
+            typer.echo(f"narrative generation failed: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+
+    html = assemble_dossier(
+        record, advise_records=advise, narrative=narrative, rubric_source=rubric_source
+    )
+    if pdf:
+        from schelling.dossier.pdf import html_to_pdf
+
+        out_path = output or record_path.with_suffix(".dossier.pdf")
+        try:
+            html_to_pdf(html, out_path)
+        except RuntimeError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=2) from exc
+    else:
+        out_path = output or record_path.with_suffix(".dossier.html")
+        out_path.write_text(html)
+    typer.echo(f"Dossier written: {out_path}")
+
+
+@app.command()
 def advise(
     fixture: Path = typer.Argument(..., help="A GameSpec or DraftGameSpec JSON."),
     actor: str = typer.Option(..., "--actor", help="The advising actor's id."),
