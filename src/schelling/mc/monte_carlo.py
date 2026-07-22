@@ -170,7 +170,7 @@ def inputs_hash(
     elif hash_version != CURRENT_HASH_VERSION:
         raise ValueError(f"unknown hash_version {hash_version!r} (known: {KNOWN_HASH_VERSIONS})")
     payload = {
-        "game": game.model_dump(mode="json", exclude={"resolution_rubric"}),
+        "game": game.model_dump(mode="json", exclude={"resolution_rubric", "non_voting_actor_ids"}),
         "config": config_dump,
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
