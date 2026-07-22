@@ -30,6 +30,7 @@ from schelling.report.render import (
     _tornado,
     _verdict_strip,
     _what_would_change,
+    precedent_panel_html,
 )
 from schelling.report.vocab import load_vocab, phrase_for
 from schelling.schemas.forecast import AdviseRecord, ForecastRecord
@@ -270,12 +271,13 @@ def assemble_dossier(
         "<p class='sub'><em>This section is an analysis of how durable the resulting agreement is "
         "likely to be — an analysis of coalition durability, not a prescription.</em></p>",
     ]
-    # 10. Historical analogs (COMPUTED, when present)
+    # 10. Historical analogs + reference-class precedents (COMPUTED, when present; never blended)
     parts.append(_h2(10, "Historical analogs"))
     if record.analog_panel is not None:
         parts.append(_analog_panel(record.analog_panel))
     else:
         parts.append("<p class='sub'>No analog panel is attached to this record.</p>")
+    parts.append(precedent_panel_html(record))  # the outside view, guarded + never blended (D29.3)
     # 11. What would change this (COMPUTED)
     parts += [
         _h2(11, "What would change this"),
