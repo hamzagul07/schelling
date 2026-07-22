@@ -5,6 +5,13 @@ amendments; final after 2026-09-30.** Fixed in advance so the score cannot be re
 outcome. Referenced from [FORECASTS.md](FORECASTS.md); its rationale is on the record in
 [docs/questions/question-iaea-sep.md](docs/questions/question-iaea-sep.md).
 
+> **Analyst note (pre-resolution, 2026-07-23) — changes NO grading rule.** Design observation
+> recorded before resolution: this continuum places the no-action outcome at its midpoint (40-59).
+> Mean-based solvers land mid-scale mechanically when actors are dispersed, so their placement in
+> this band may reflect continuum geometry rather than a belief about inaction. The sealed forecasts
+> and all grading rules stand unchanged; this note exists so the observation is on record before the
+> outcome is known.
+
 **Binary criterion.** The question resolves on the formal output of the IAEA Board of Governors
 concerning Iran adopted on or before 2026-09-30 23:59 UTC, at its September regular session or any
 special session held within the window. Statements by individual member states, Director General
