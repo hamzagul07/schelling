@@ -8,9 +8,13 @@ missing-rubric path, determinism, and that resolution never modifies a record or
 
 from __future__ import annotations
 
+import itertools
 import json
+import re
 from pathlib import Path
 from typing import Any, cast
+
+import pytest
 
 from schelling.cli import _resolve_rubric
 from schelling.mc.monte_carlo import inputs_hash
@@ -181,6 +185,28 @@ def test_render_states_embedded_source() -> None:
     )
     html = render(_record_dict(rubric=embedded))  # rubric_source defaults to None -> embedded
     assert "embedded in the record" in html
+
+
+# --------------------------------------------------------------- committed grading files (D24.4)
+_REPO_ROOT = Path(__file__).parent.parent
+
+
+def _prose_ranges(mapping: str) -> list[tuple[int, int]]:
+    """The band boundaries stated in the ``outcome_mapping`` prose (``lo-hi`` before a ; or .)."""
+    return [(int(a), int(b)) for a, b in re.findall(r"(\d{1,3})\s*-\s*(\d{1,3})(?=[;.])", mapping)]
+
+
+@pytest.mark.parametrize("qid", ["Q-2026-USIRAN-STAGE2", "Q-2026-IAEA-SEP"])
+def test_committed_grading_bands_match_outcome_mapping_prose(qid: str) -> None:
+    """The structured ``bands`` array and the canonical ``outcome_mapping`` prose must state the
+    same seven boundaries — so the two representations can never silently drift (D24.4). A future
+    edit to one that does not match the other fails here."""
+    rubric = parse_rubric_block((_REPO_ROOT / f"GRADING-{qid}.md").read_text())
+    assert rubric is not None and rubric.bands
+    band_ranges = [(int(b.lo), int(b.hi)) for b in rubric.bands]
+    assert band_ranges == _prose_ranges(rubric.outcome_mapping)
+    assert band_ranges[0][0] == 0 and band_ranges[-1][1] == 100  # tile 0-100
+    assert all(hi + 1 == nlo for (_, hi), (nlo, _) in itertools.pairwise(band_ranges))  # contiguous
 
 
 # --------------------------------------------------------------- hash safety (item 3, 5)
