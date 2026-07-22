@@ -8,6 +8,7 @@ a given artifact (no wall-clock — CLAUDE.md rule 2). Opens offline and prints 
 from __future__ import annotations
 
 import html
+import re
 from typing import Any
 
 from pydantic import ValidationError
@@ -24,7 +25,15 @@ from schelling.report.bands import (
     map_bands,
 )
 from schelling.report.palette import load_palette
-from schelling.report.svg import ActorPoint, BandSeg, BarRow, ScatterPoint, TornadoRow, WActor
+from schelling.report.svg import (
+    ActorPoint,
+    BandSeg,
+    BarRow,
+    ScatterPoint,
+    TornadoRow,
+    WActor,
+    format_share,
+)
 from schelling.report.vocab import load_vocab, phrase_for
 from schelling.schemas.backtest import BacktestRecord
 from schelling.schemas.forecast import (
@@ -38,6 +47,13 @@ from schelling.schemas.forecast import (
     PersuasionTarget,
 )
 from schelling.schemas.question import GameSpec, RubricBand
+from schelling.schemas.stakeholders import Actor
+
+# Standing scope note shown beneath every verdict (D25.2): what the shares do and do not include.
+_SHARE_SCOPE = (
+    "These shares reflect uncertainty in the stated input ranges only. They exclude model error, "
+    "coding error, and events outside the modelled game."
+)
 
 _CSS = """
 :root { --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --panel:#f9fafb; --accent:#b45309; }
@@ -122,6 +138,7 @@ section.narr { margin:0 0 10px; }
 tr.modal td { background:#fff7ed; }
 .narr figure { margin:10px 0 4px; }
 .narr .legend { color:var(--muted); font-size:12px; margin:2px 0 6px; }
+.narr .scope { color:var(--muted); font-size:12px; font-style:italic; margin:2px 0 10px; }
 .band-pct { fill:#1f2937; font-size:11px; font-weight:650; }
 .band-lab { fill:#6b7280; font-size:10px; }
 .actor-dot-label { fill:#1f2937; font-size:10px; }
@@ -134,6 +151,18 @@ def _esc(text: str) -> str:
 
 def _rng(est: Any) -> str:
     return f"{est.low:g} / {est.mode:g} / {est.high:g}"
+
+
+def _derive_short(name: str) -> str:
+    """First clause of a name: text before the first parenthesis or spaced/en/em dash (D25.3)."""
+    head = re.split("\\s*[(\u2013\u2014]", name, maxsplit=1)[0]  # cut at "(", en/em dash
+    head = re.split(r"\s-\s", head, maxsplit=1)[0]  # cut at a spaced hyphen " - "
+    return head.strip() or name
+
+
+def _short_name(game: GameSpec, actor: Actor) -> str:
+    """The actor's short display name: a ``short_names`` override, else the derived first clause."""
+    return game.short_names.get(actor.id) or _derive_short(actor.name)
 
 
 def _actor_points(game: GameSpec) -> list[ActorPoint]:
@@ -386,11 +415,14 @@ def render_forecast_narrative(record: ForecastRecord, *, rubric_source: str | No
 def _what_would_change(record: ForecastRecord, game: GameSpec) -> str:
     """The single highest-swing parameter (tornado top), or a weight-based fallback for the
     compromise model, which has no tornado."""
+    by_id = {a.id: a for a in game.actors}
     if record.sensitivity:
         top = max(record.sensitivity, key=lambda s: abs(s.swing))
+        actor = by_id.get(top.actor_id)
+        who = _short_name(game, actor) if actor is not None else top.actor_id
         return (
-            f"<p><strong>What would change this:</strong> {_esc(top.parameter)} — moving it across "
-            f"its stated range swings the forecast by {top.swing:+.1f} points "
+            f"<p><strong>What would change this:</strong> {_esc(who)}'s {_esc(top.field)} — moving "
+            f"it across its stated range swings the forecast by {top.swing:+.1f} points "
             f"({top.forecast_at_low:.0f} to {top.forecast_at_high:.0f}).</p>"
         )
     # Fallback: the heaviest-weight actor whose position range is widest is the input to watch.
@@ -401,8 +433,9 @@ def _what_would_change(record: ForecastRecord, game: GameSpec) -> str:
     )
     a = ranked[0]
     return (
-        f"<p><strong>What would change this:</strong> {_esc(a.name)}'s position — it carries the "
-        f"heaviest weight, and its stated range runs {a.position.low:g} to {a.position.high:g}.</p>"
+        f"<p><strong>What would change this:</strong> {_esc(_short_name(game, a))}'s position — it "
+        f"carries the heaviest weight, and its stated range runs "
+        f"{a.position.low:g} to {a.position.high:g}.</p>"
     )
 
 
@@ -431,7 +464,7 @@ def _verdict_strip(record: ForecastRecord, readout: BandReadout) -> str:
         modal_label = modal.label if modal is not None else "the modal band"
         desc = (
             f"Band-probability strip: {modal_label} is the most likely outcome at "
-            f"{modal_prob:.0%} of {e.n_draws} draws; the median is {e.median:.0f} of 100."
+            f"{format_share(modal_prob)} of {e.n_draws} draws; the median is {e.median:.0f} of 100."
         )
         fig = svg.band_strip(
             _band_segments(readout), median=e.median, p10=e.p10, p90=e.p90, palette=pal, desc=desc
@@ -468,7 +501,7 @@ def _reading_diagram(record: ForecastRecord, game: GameSpec) -> str:
     non_voting = set(game.non_voting_actor_ids)
     actors = [
         WActor(
-            name=a.name,
+            name=_short_name(game, a),
             position=a.position.mode,
             weight=a.capability.mode * a.salience.mode,
             non_voting=a.id in non_voting,
@@ -481,21 +514,14 @@ def _reading_diagram(record: ForecastRecord, game: GameSpec) -> str:
         f"{e.median:.0f} of 100."
     )
     fig = svg.weighted_actors(actors, settlement=e.median, palette=pal, desc=desc)
-    c = game.continuum
-    lo_half, hi_half = _esc(_short(c.anchor_0)), _esc(_short(c.anchor_100))
+    # Fixed, direction-derived legend phrases — never truncated anchor prose (D25.4).
     legend_bits = [
         "Circle area &#8733; capability&times;salience.",
-        f"Amber = the {lo_half} half; teal = the {hi_half} half.",
+        "Amber = the low half (toward 0); teal = the high half (toward 100).",
     ]
     if non_voting:
         legend_bits.append("Dashed ring + * = non-voting / out-of-body influence.")
     return f"<figure>{fig}</figure><p class='legend'>{' '.join(legend_bits)}</p>"
-
-
-def _short(text: str, n: int = 40) -> str:
-    """Trim a continuum anchor to a short phrase for a legend (first clause / n chars)."""
-    head = text.split(" — ")[0].split(",")[0].strip()
-    return head if len(head) <= n else head[: n - 1].rstrip() + "…"
 
 
 def _narr_verdict(record: ForecastRecord, game: GameSpec, readout: BandReadout) -> str:
@@ -518,7 +544,7 @@ def _narr_verdict(record: ForecastRecord, game: GameSpec, readout: BandReadout) 
         mb = readout.median_band
         parts.append(
             f'<p class="lede">Most likely: <strong>{_esc(readout.modal_band.label)}</strong> — '
-            f"{modal_prob:.0%} of {e.n_draws} simulated draws. The forecast median is "
+            f"{format_share(modal_prob)} of {e.n_draws} simulated draws. The forecast median is "
             f"{e.median:.0f} on the 0-100 scale, in the band &ldquo;{_esc(mb.label)}&rdquo; "
             f"({mb.lo:g}&ndash;{mb.hi:g}).</p>"
         )
@@ -527,6 +553,7 @@ def _narr_verdict(record: ForecastRecord, game: GameSpec, readout: BandReadout) 
             f'<p class="lede">The forecast median is <strong>{e.median:.0f}</strong> on the 0-100 '
             f"scale (CI80 [{e.p10:.0f}, {e.p90:.0f}]). {_esc(readout.note)}</p>"
         )
+    parts.append(f'<p class="scope">{_SHARE_SCOPE}</p>')  # standing scope note (D25.2)
     parts.append(_verdict_strip(record, readout))
     parts.append(_what_would_change(record, game))
     parts.append("</section>")
@@ -534,14 +561,56 @@ def _narr_verdict(record: ForecastRecord, game: GameSpec, readout: BandReadout) 
 
 
 def _widest_inputs(game: GameSpec, k: int) -> list[tuple[str, str, float, float]]:
-    """The ``k`` widest input ranges (actor, field, low, high), most uncertain first."""
+    """The ``k`` widest input ranges (short name, field, low, high), most uncertain first."""
     rows: list[tuple[str, str, float, float]] = []
     for a in game.actors:
         fields = (("position", a.position), ("salience", a.salience), ("capability", a.capability))
         for field, est in fields:
-            rows.append((a.name, field, est.low, est.high))
+            rows.append((_short_name(game, a), field, est.low, est.high))
     rows.sort(key=lambda r: r[3] - r[2], reverse=True)
     return rows[:k]
+
+
+_COUNT_WORD = {2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six", 7: "Seven", 8: "Eight"}
+
+
+def _join(names: list[str]) -> str:
+    """Join names as ``A``, ``A and B``, ``A, B and C``."""
+    if len(names) == 1:
+        return names[0]
+    return ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def _player_items(game: GameSpec) -> str:
+    """The players list, grouped: actors sharing a side (position third) and salience tier become
+    one sentence instead of one identical sentence each (D25.5)."""
+    v = load_vocab()
+    groups: list[tuple[str, str, list[str]]] = []
+    index: dict[tuple[str, str], int] = {}
+    for a in game.actors:
+        pos = phrase_for(a.position.mode, v.position_thirds)
+        sal = phrase_for(a.salience.mode, v.salience_thirds)
+        key = (pos, sal)
+        if key not in index:
+            index[key] = len(groups)
+            groups.append((pos, sal, []))
+        groups[index[key]][2].append(_short_name(game, a))
+    items: list[str] = []
+    for pos, sal, names in groups:
+        if len(names) == 1:
+            items.append(
+                f"<li><strong>{_esc(names[0])}</strong> sits {_esc(pos)}; "
+                f"the outcome is {_esc(sal)}.</li>"
+            )
+        else:
+            count = _COUNT_WORD.get(len(names), str(len(names)))
+            joined = _join([_esc(n) for n in names])
+            sal_each = _esc(sal).replace(" for it", " for each")
+            items.append(
+                f"<li>{count} members sit {_esc(pos)}: <strong>{joined}</strong> "
+                f"&mdash; {sal_each}.</li>"
+            )
+    return "".join(items)
 
 
 def _narr_reading(record: ForecastRecord, game: GameSpec, readout: BandReadout) -> str:
@@ -554,19 +623,13 @@ def _narr_reading(record: ForecastRecord, game: GameSpec, readout: BandReadout) 
         f"<strong>100</strong> means {_esc(c.anchor_100)}. The forecast sits at {e.median:.0f} — "
         f"{_esc(phrase_for(e.median, v.position_thirds))}.</p>",
     ]
-    lis = "".join(
-        f"<li><strong>{_esc(a.name)}</strong> sits "
-        f"{_esc(phrase_for(a.position.mode, v.position_fifths))}; the outcome is "
-        f"{_esc(phrase_for(a.salience.mode, v.salience_thirds))}.</li>"
-        for a in game.actors
-    )
-    parts.append(f"<p>The players and where they stand:</p><ul>{lis}</ul>")
+    parts.append(f"<p>The players and where they stand:</p><ul>{_player_items(game)}</ul>")
     parts.append(_reading_diagram(record, game))
     weights = [(a, a.capability.mode * a.salience.mode) for a in game.actors]
     total = sum(w for _, w in weights) or 1.0
     heaviest = sorted(weights, key=lambda x: (-x[1], x[0].id))[:2]
     heavy_desc = " and ".join(
-        f"{_esc(a.name)} ({w / total:.0%} of the weight)" for a, w in heaviest
+        f"{_esc(_short_name(game, a))} ({w / total:.0%} of the weight)" for a, w in heaviest
     )
     cp = compromise_point(game)
     parts.append(
@@ -661,7 +724,7 @@ def _narr_brief(record: ForecastRecord, game: GameSpec, readout: BandReadout) ->
             rows += (
                 f"<tr{cls}><td>{_esc(bp.band.label)}{mark}</td>"
                 f"<td class='num'>{bp.band.lo:g}&ndash;{bp.band.hi:g}</td>"
-                f"<td class='num'>{bp.probability:.0%}</td></tr>"
+                f"<td class='num'>{format_share(bp.probability)}</td></tr>"
             )
         parts.append(
             "<h3>Band probabilities</h3><table><thead><tr><th>band</th><th>range</th>"

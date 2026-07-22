@@ -1,7 +1,7 @@
 {
   "question_id": "Q-DEMO-COMMITTEE",
   "run_id": "Q-DEMO-COMMITTEE-mc300-s42-ee2ecaf05921",
-  "engine_version": "1fef82d2e996227b4bc4cb07971b42552d200fdf",
+  "engine_version": "e8fc2c57dde42a4f9ba1c050c3c1d05e04f749e5",
   "inputs_hash": "ee2ecaf059211f77f1406889518bdffedd9b31facd49a44a97d6cd855ab697a6",
   "seed": 42,
   "model": "challenge",
@@ -185,7 +185,8 @@
     },
     "non_voting_actor_ids": [
       "subject_state"
-    ]
+    ],
+    "short_names": {}
   },
   "median_trajectory": [
     73.25508411945282,

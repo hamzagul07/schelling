@@ -44,6 +44,16 @@ def _esc(text: str) -> str:
     return html.escape(text, quote=True)
 
 
+def format_share(share: float) -> str:
+    """Display a probability share, capped so it never reads a false certainty (Session 25, D25.1):
+    ``>99%`` above 0.99, ``<1%`` below 0.01, otherwise the rounded percent."""
+    if share > 0.99:
+        return ">99%"
+    if share < 0.01:
+        return "<1%"
+    return f"{share:.0%}"
+
+
 def _nice_bounds(lo: float, hi: float, pad_frac: float = 0.05) -> tuple[float, float]:
     """A padded [lo, hi] that never collapses to a point."""
     if hi <= lo:
@@ -426,7 +436,8 @@ def band_strip(
                 f'stroke-width="1.5"/>'
             )
         cx = (lo + hi) / 2.0
-        parts.append(_text(cx, top + strip_h / 2.0 + 4.0, f"{seg.share:.0%}", "band-pct", "middle"))
+        pct = format_share(seg.share)
+        parts.append(_text(cx, top + strip_h / 2.0 + 4.0, pct, "band-pct", "middle"))
         label = _short(seg.label, max(4, int(w / 6.0)))
         parts.append(_text(cx, y1 + 12.0, label, "band-lab", "middle"))
     footer, height = _strip_footer(sx, y1 + 14.0, median, p10, p90, palette)

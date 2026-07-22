@@ -215,6 +215,12 @@ def test_attaching_rubric_and_non_voting_leaves_hash_unchanged() -> None:
     base = _game(rubric=None)
     rubric = parse_rubric_block(_GRADING_MD)
     assert rubric is not None
-    enriched = base.model_copy(update={"resolution_rubric": rubric, "non_voting_actor_ids": ["b"]})
-    # The rubric and the display coding are both excluded from the hash (D22.2 / D23.2).
+    enriched = base.model_copy(
+        update={
+            "resolution_rubric": rubric,
+            "non_voting_actor_ids": ["b"],
+            "short_names": {"a": "Ay", "b": "Bee"},  # D25.3 display field, also hash-excluded
+        }
+    )
+    # The rubric and all display coding are excluded from the hash (D22.2 / D23.2 / D25.3).
     assert inputs_hash(base, cfg) == inputs_hash(enriched, cfg)
