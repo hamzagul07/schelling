@@ -98,7 +98,14 @@ For every sealed record, before it is scored:
 ## Machine-readable rubric (canonical, embedded)
 
 The exact `ResolutionRubric` object for this question — the machine-readable form of everything above,
-byte-frozen with this pre-registration:
+byte-frozen with this pre-registration.
+
+**Structured bands added 2026-07-22 (pre-resolution, D24.2).** The optional `bands` array below is a
+verbatim structuring of the seven bands already committed in `outcome_mapping` — same boundaries,
+same meaning — so the two-audience report can render the band-probability strip for the grading
+brief. It changes no grading semantics: `outcome_mapping` remains canonical, and where any summary
+label differs from it the prose (and the sealed continuum text) governs. Excluded from `inputs_hash`,
+so no sealed record's hash is affected.
 
 ```json
 {
@@ -110,6 +117,15 @@ byte-frozen with this pre-registration:
     "Wire services of record (Reuters, Associated Press) corroborating the above"
   ],
   "outcome_mapping": "Place the settlement in force on 2026-08-31 in exactly one band (the bands tile 0-100 with no gaps or overlaps): full Iranian capitulation 0-10; no agreement / talks collapsed / hostilities resumed (status quo of maximal pressure) 11-30; interim or framework on largely US terms (long moratorium, minimal or heavily phased relief, intrusive verification) 31-44; signed interim/framework with mutual, reversible balanced steps 45-60; interim or framework on largely Iranian-leaning terms (short moratorium, substantial relief) 61-69; comprehensive deal on largely Iranian terms (enrichment retained, broad relief) 70-85; full US capitulation 86-100. Within a band the grade defaults to the band midpoint; any deviation must cite specific settlement terms in the justification. The sealed game's continuum text is canonical; these anchors summarize it; where they differ, the sealed text governs.",
-  "grading_formula": "The comparison metric is |median - actual| per record; the grade integer, its justification, and all cited sources are published in FORECASTS.md at grading."
+  "grading_formula": "The comparison metric is |median - actual| per record; the grade integer, its justification, and all cited sources are published in FORECASTS.md at grading.",
+  "bands": [
+    {"lo": 0, "hi": 10, "label": "Full Iranian capitulation"},
+    {"lo": 11, "hi": 30, "label": "No agreement / talks collapsed / hostilities resumed"},
+    {"lo": 31, "hi": 44, "label": "Interim or framework on largely US terms"},
+    {"lo": 45, "hi": 60, "label": "Signed interim/framework with mutual, reversible balanced steps"},
+    {"lo": 61, "hi": 69, "label": "Interim or framework on largely Iranian-leaning terms"},
+    {"lo": 70, "hi": 85, "label": "Comprehensive deal on largely Iranian terms"},
+    {"lo": 86, "hi": 100, "label": "Full US capitulation"}
+  ]
 }
 ```

@@ -546,19 +546,50 @@ def formalize(
     typer.echo("This is a DRAFT — edit the JSON, then run `schelling solve` to forecast.")
 
 
+def _resolve_rubric(data: dict[str, object], artifact: Path) -> str | None:
+    """If ``data`` is a forecast record whose game embeds no rubric, look one up from the committed
+    grading file and inject it in-memory (read-only; D24.1). Returns the source label, or None when
+    the rubric is embedded / no grading file exists / the artifact is not a forecast record.
+
+    Precedence: an embedded rubric always wins — we never overwrite one.
+    """
+    game = data.get("game")
+    qid = data.get("question_id")
+    is_forecast = "run_id" in data and "ensemble" in data
+    if not is_forecast or not isinstance(game, dict) or not isinstance(qid, str):
+        return None
+    if game.get("resolution_rubric"):  # embedded rubric wins; do not look up
+        return None
+    from schelling.report.rubric_lookup import lookup_rubric
+
+    found = lookup_rubric(qid, artifact.parent)
+    if found is None:
+        return None
+    rubric, source = found
+    # Inject into the in-memory copy only — the record file on disk is never touched.
+    game["resolution_rubric"] = rubric.model_dump(mode="json")
+    return source
+
+
 @app.command()
 def report(
     artifact: Path = typer.Argument(..., help="A DraftGameSpec or ForecastRecord JSON."),
     output: Path | None = typer.Option(None, "-o", "--output", help="Where to write the HTML."),
     open_browser: bool = typer.Option(False, "--open", help="Open the report in a browser."),
 ) -> None:
-    """Render an artifact to a single self-contained HTML report (offline, deterministic)."""
+    """Render an artifact to a single self-contained HTML report (offline, deterministic).
+
+    For a forecast record whose game embeds no ResolutionRubric, the rubric is resolved (read-only)
+    from the committed ``GRADING-<question_id>.md`` so the two-audience narrative renders — the
+    record file is never modified (D24.1). An embedded rubric always takes precedence.
+    """
     if not artifact.exists():
         typer.echo(f"artifact not found: {artifact}", err=True)
         raise typer.Exit(code=2)
     try:
         data = json.loads(artifact.read_text())
-        html = render_report(data)
+        rubric_source = _resolve_rubric(data, artifact)
+        html = render_report(data, rubric_source=rubric_source)
     except (json.JSONDecodeError, ValueError) as exc:
         typer.echo(f"could not render {artifact}: {exc}", err=True)
         raise typer.Exit(code=2) from exc
