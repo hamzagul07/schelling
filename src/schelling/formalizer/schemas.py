@@ -7,8 +7,8 @@ and provenance metadata (model, token usage, cost). The LLM structures; nothing 
 probability (CLAUDE.md rule 1), and every real-world claim must trace to the supplied situation
 text or sources (CLAUDE.md rule 6).
 
-``Assumption`` and ``DraftMetadata`` are core data contracts (they also ride inside a
-``ForecastRecord`` when solving a draft), so they live in ``schemas.forecast`` and are
+``Assumption``, ``DraftMetadata`` and ``FetchedSource`` are core data contracts (they also ride
+inside a ``ForecastRecord`` when solving a draft), so they live in ``schemas.forecast`` and are
 re-exported here for convenience.
 """
 
@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from schelling.schemas.forecast import Assumption, DraftMetadata
+from schelling.schemas.forecast import Assumption, DraftMetadata, FetchedSource
 from schelling.schemas.question import GameSpec
 
 __all__ = [
@@ -27,22 +27,6 @@ __all__ = [
     "FetchedSource",
     "TemplateClassification",
 ]
-
-
-class FetchedSource(BaseModel):
-    """One source Claude retrieved via live web search (``formalize --search``).
-
-    Evidence-river material: a fetched source may be cited in an evidence note exactly like a
-    supplied file. ``retrieved_at`` is data *about* the evidence (when it was fetched) — it does
-    not enter any hash and does not affect report determinism (D8.2).
-    """
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    url: str
-    title: str
-    retrieved_at: str  # ISO-8601 fetch date
-    snippet: str = ""
 
 
 class TemplateClassification(BaseModel):

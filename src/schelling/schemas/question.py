@@ -21,6 +21,22 @@ class Continuum(BaseModel):
     anchor_100: str
 
 
+class RubricBand(BaseModel):
+    """One band of a banded resolution rubric: an inclusive ``[lo, hi]`` slice of the 0-100
+    continuum with the outcome it denotes, in the rubric's own words (Session 22, D22.2).
+
+    Bands tile the continuum. Membership at report time uses the band's ``lo`` as a threshold (a
+    draw falls in the last band whose ``lo`` it clears), so float draws partition cleanly even
+    where the written ``hi``/``lo`` integers leave unit gaps.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    lo: float  # inclusive lower bound on the 0-100 continuum
+    hi: float  # inclusive upper bound
+    label: str  # what this band means, verbatim from the rubric
+
+
 class ResolutionRubric(BaseModel):
     """How a sealed forecast will be graded once its real-world event resolves (Session 17, D17.1).
 
@@ -36,6 +52,10 @@ class ResolutionRubric(BaseModel):
     adjudicating_sources: list[str] = Field(min_length=1)  # authoritative sources consulted
     outcome_mapping: str  # rule mapping the real-world outcome onto the 0-100 settlement continuum
     grading_formula: str  # e.g. "score = |forecast_median - actual| on the 0-100 continuum"
+    # Optional structured bands (D22.2): when present the report maps the MC draws through them for
+    # per-band probabilities; when absent the rubric is treated as arithmetic/linear (the grading
+    # formula maps the outcome onto the continuum directly). Excluded from the hash with the rubric.
+    bands: list[RubricBand] = Field(default_factory=list)
 
 
 class GameSpec(BaseModel):
