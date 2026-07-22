@@ -159,3 +159,27 @@ def assert_no_leakage(
     leaks = find_leaks(draft, allowed_text, concepts_text)
     if leaks:
         raise IndexLeakageError(leaks, draft)
+
+
+def scan_text(surface: str, allowed_text: str, concepts_text: str) -> list[str]:
+    """Distinctive concept-library fragments that leaked into free prose (Session 26, D26.2).
+
+    The text-level counterpart of :func:`find_leaks`, for the dossier's model-written narrative:
+    ``surface`` is the generated prose, ``allowed_text`` the legitimate provenance (situation +
+    fetched sources), ``concepts_text`` the concept framing shown to the model. Returns the leaked
+    shingles/codes (empty when ``concepts_text`` is empty — nothing to leak from).
+    """
+    if not concepts_text.strip():
+        return []
+    theory = _theory_vocab()
+    allowed_tokens = set(_tokens(allowed_text))
+    allowed_shingles = _shingles(_tokens(allowed_text))
+    concept_tokens = _tokens(concepts_text)
+    concept_only_shingles = {
+        s for s in (_shingles(concept_tokens) - allowed_shingles) if _is_distinctive(s, theory)
+    }
+    concept_only_codes = {t for t in concept_tokens if _is_code(t)} - allowed_tokens
+    toks = _tokens(surface)
+    leaks = sorted(_shingles(toks) & concept_only_shingles)
+    leaks += sorted(set(toks) & concept_only_codes)
+    return leaks

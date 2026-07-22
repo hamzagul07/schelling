@@ -319,6 +319,14 @@ _LEDGER_ROW = re.compile(
 )
 
 
+# The paper's `E-LEDGER` evidence covers exactly one question — its live pre-registration subject,
+# US-Iran stage two ("four forecasts on one ongoing geopolitical question", §8). Other questions
+# sealed into FORECASTS.md later (e.g. IAEA) are real ledger entries but NOT this paper's evidence,
+# so they are excluded here — otherwise a second question with the same (model, vintage) would
+# collide on the `E-LEDGER-{model}-{vintage}` tag and overwrite the paper's figures (D26.7).
+_PAPER_LEDGER_QUESTION = "Q-2026-USIRAN-STAGE2"
+
+
 def _ledger_items(repo_root: Path) -> tuple[list[EvidenceItem], list[str]]:
     path = repo_root / "FORECASTS.md"
     if not path.exists():
@@ -327,7 +335,7 @@ def _ledger_items(repo_root: Path) -> tuple[list[EvidenceItem], list[str]]:
     items: list[EvidenceItem] = []
     for line in path.read_text().splitlines():
         m = _LEDGER_ROW.match(line)
-        if not m:
+        if not m or m["q"] != _PAPER_LEDGER_QUESTION:
             continue
         items.append(
             EvidenceItem(
