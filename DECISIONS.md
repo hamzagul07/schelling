@@ -1639,3 +1639,48 @@ sits at the centre. **Lesson for future question design: site status-quo / no-ac
 pole (0 or 100), not the midpoint**, so that a mid-scale forecast is informative rather than the
 default a dispersed field produces. The sealed IAEA forecasts and all grading rules stand unchanged;
 this is guidance for the next question's continuum, not a change to this one.
+
+### D29.1 — `schelling precedents`: the outside view
+New command `schelling precedents <game-or-draft.json> [--search]` runs one LLM call that identifies
+prior comparable decisions — same body, same dyad, same institution, same decision type — and for each
+emits what happened, its date, a source citation, a PROPOSED placement on the current question's 0-100
+continuum, and one line of reasoning (`src/schelling/precedents/find.py`). It writes a precedents draft
+(`PrecedentSet`); **nothing is auto-accepted**. Replayable via any `LLMClient` (tested with a replay
+client; CI never calls the live API).
+
+### D29.2 — Ratification, same discipline as the case library
+Every placement is a **proposal until a human ratifies it** (`Precedent.ratified`, default False). A
+set is ratified only when the human sets `ratified: true` on accepted placements AND quotes their
+ratification in `PrecedentSet.ratification_note` (`is_ratified`); the ratification is quoted in the
+rendered panel. Each precedent is flagged **ex-ante-codable vs hindsight-coded**; only ex-ante
+precedents form the base rate, and hindsight-coded ratified ones are **reported separately**. The
+attach helpers refuse an unratified set.
+
+### D29.3 — Reference-class panel: separated, disclosed, NEVER blended
+`build_precedent_panel` maps the ratified ex-ante placements through the current rubric's bands into a
+`PrecedentPanel` (schemas/forecast.py) attached to the record like the ICB analog panel. The report and
+dossier render it as its OWN band strip beside the model's — a clearly-separated section headed
+"Reference class — the outside view", disclosing that it is a base rate, **not** a forecast, and
+**never blended** (`blend_weight = 0`, exactly the ICB rule, D11.2).
+
+### D29.4 — Feed the evidence river; firewall unchanged
+`formalize --precedents <ratified.json>` adds each ratified precedent to the formalizer's `sources`, so
+it joins `allowed_text` and the model may cite it for position/salience coding ("this actor voted X in
+the comparable 2024 decision"). Precedents are EVIDENCE; the concepts library still may not testify —
+the firewall is unchanged (a precedent in `allowed_text` is legitimate provenance, a concept phrase is
+not). Ratification-gated (`_precedent_evidence`).
+
+### D29.5 — Divergence diagnostic: outside view vs structural model
+When the model's median and the precedent base rate (the modal band of the panel) fall in **different**
+rubric bands, `divergence`/`divergence_line` produce a named diagnostic —
+"OUTSIDE VIEW DISAGREES WITH STRUCTURAL MODEL", stating both bands — printed in **solve** output, the
+**report** (a caveat in the panel section), and the **dossier**.
+
+### D29.6 — Tests
+`tests/test_precedents.py`: no auto-acceptance (finder proposals all unratified), parse rejection +
+skip-malformed, ratification gating (panel refuses unratified; ex-ante/hindsight split), panel
+separation (disclosed + `blend_weight = 0` + ratification quoted), divergence firing only across bands,
+determinism, the evidence-river ratification gate, and the CLI (`precedents` writes an unratified draft;
+`solve --precedents` attaches + prints divergence; `dossier --precedents` never modifies the record).
+Sealed records are untouched — a panel is attached post-hoc via `model_copy`, outside `inputs_hash`,
+and the dossier attaches read-only.

@@ -312,6 +312,46 @@ def analyze(
     typer.echo(f"5. assumptions flagged: {len(draft.assumptions)} — review before trusting")
 
 
+def _ratified_precedent_panel(path: Path, game: GameSpec) -> object:
+    """Load a ratified precedents file and build the outside-view panel; refuse if not ratified.
+
+    Enforces the ratification gate (D29.2): an unratified set never becomes a panel. Returns a
+    ``PrecedentPanel`` (typed ``object`` here to avoid importing the schema at module scope).
+    """
+    from schelling.precedents.panel import build_precedent_panel, is_ratified
+    from schelling.precedents.schemas import PrecedentSet
+
+    if not path.exists():
+        raise ValueError(f"precedents file not found: {path}")
+    pset = PrecedentSet.model_validate_json(path.read_text())
+    if not is_ratified(pset):
+        raise ValueError(
+            f"{path} is not ratified: set `ratified: true` on the placements you accept and quote "
+            "your ratification in `ratification_note` before attaching the outside-view panel."
+        )
+    return build_precedent_panel(pset, game)
+
+
+def _precedent_evidence(path: Path) -> dict[str, str]:
+    """Ratified precedents as citable evidence sources (name -> text) for the formalizer (D29.4)."""
+    from schelling.precedents.panel import is_ratified
+    from schelling.precedents.schemas import PrecedentSet
+
+    if not path.exists():
+        raise ValueError(f"precedents file not found: {path}")
+    pset = PrecedentSet.model_validate_json(path.read_text())
+    if not is_ratified(pset):
+        raise ValueError(f"{path} is not ratified; ratify before feeding precedents as evidence.")
+    return {
+        f"precedent:{p.id}": (
+            f"{p.what_happened} ({p.date}). Source: {p.source}. "
+            f"Placement ~{p.proposed_placement:g} on the continuum: {p.reasoning}"
+        )
+        for p in pset.precedents
+        if p.ratified
+    }
+
+
 @app.command()
 def solve(
     fixture: Path = typer.Argument(..., help="A GameSpec or DraftGameSpec JSON."),
@@ -338,6 +378,9 @@ def solve(
         "--analog",
         help="ICB base-rate panel tags, e.g. 'gravity=6,violence=3,actors=8' (off by default).",
     ),
+    precedents_file: Path | None = typer.Option(
+        None, "--precedents", help="A ratified precedents JSON — attaches the outside-view panel."
+    ),
     out_dir: Path = typer.Option(Path("runs"), "--out-dir", help="Where the record is written."),
 ) -> None:
     """Solve a game (bare GameSpec or DraftGameSpec) and write the ForecastRecord(s)."""
@@ -353,6 +396,7 @@ def solve(
             fixture
         )
         panel = _analog_panel(analog) if analog else None
+        prec_panel = _ratified_precedent_panel(precedents_file, game) if precedents_file else None
     except ValueError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
@@ -389,6 +433,8 @@ def solve(
             )
         if panel is not None:
             record = record.model_copy(update={"analog_panel": panel})
+        if prec_panel is not None:
+            record = record.model_copy(update={"precedent_panel": prec_panel})
         write_record(record, out_dir)
         records.append(record)
         e = record.ensemble
@@ -401,6 +447,11 @@ def solve(
             f"{model:<11} MC-median {e.median:.3f}   {mode_str}   mean {e.mean:.3f}   "
             f"CI80 [{e.p10:.3f}, {e.p90:.3f}]   (n={e.n_draws}, seed {seed})"
         )
+        from schelling.precedents.panel import divergence_line
+
+        div = divergence_line(record)
+        if div:
+            typer.echo(f"  ! {div}")
     typer.echo("")
     if records[0].sensitivity:
         typer.echo(format_tornado(records[0].sensitivity))
@@ -479,6 +530,9 @@ def formalize(
     max_searches: int = typer.Option(
         5, "--max-searches", min=1, help="Search budget for --search."
     ),
+    precedents_file: Path | None = typer.Option(
+        None, "--precedents", help="A ratified precedents JSON — adds them as citable evidence."
+    ),
 ) -> None:
     """Formalize a situation into a DraftGameSpec. NEVER auto-solves — review, then `solve`."""
     if not situation.exists():
@@ -494,6 +548,15 @@ def formalize(
         for path in sorted(sources.iterdir()):
             if path.is_file():
                 source_texts[path.name] = path.read_text(errors="replace")
+    # Ratified precedents feed the evidence river (D29.4): they join the allowed text as sources the
+    # model may cite for position/salience coding. The firewall is unchanged — precedents are
+    # evidence; the concepts library still may not testify.
+    if precedents_file is not None:
+        try:
+            source_texts.update(_precedent_evidence(precedents_file))
+        except ValueError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=2) from exc
 
     index = None if no_knowledge else (KnowledgeIndex.open(db_path) if db_path.exists() else None)
     if index is None and not no_knowledge:
@@ -612,6 +675,9 @@ def dossier(
     no_narrative: bool = typer.Option(
         False, "--no-narrative", help="Skip the LLM narrative — fully deterministic dossier."
     ),
+    precedents_file: Path | None = typer.Option(
+        None, "--precedents", help="A ratified precedents JSON — attaches the outside-view panel."
+    ),
     llm_model: str = typer.Option("claude-opus-4-8", "--model", help="Narrative model."),
     search: bool = typer.Option(
         False, "--search/--no-search", help="Let the narrative model search."
@@ -634,6 +700,10 @@ def dossier(
         data = json.loads(record_path.read_text())
         rubric_source = _resolve_rubric(data, record_path)
         record = ForecastRecord.model_validate(data)
+        if precedents_file is not None and record.game is not None:
+            record = record.model_copy(
+                update={"precedent_panel": _ratified_precedent_panel(precedents_file, record.game)}
+            )
     except (json.JSONDecodeError, ValueError) as exc:
         typer.echo(f"could not load {record_path}: {exc}", err=True)
         raise typer.Exit(code=2) from exc
@@ -746,6 +816,51 @@ def llm_forecast_cmd(
         typer.echo(f"  CONTAMINATION-RISK: {record.contamination_note}")
     typer.echo("  Non-deterministic: re-running produces different samples; the file SHA-256 is")
     typer.echo(f"  the commitment. Record written: {out_path}")
+
+
+@app.command()
+def precedents(
+    fixture: Path = typer.Argument(..., help="A GameSpec or DraftGameSpec JSON."),
+    search: bool = typer.Option(False, "--search/--no-search", help="Let the model search."),
+    llm_model: str = typer.Option("claude-opus-4-8", "--model"),
+    output: Path | None = typer.Option(None, "-o", "--output", help="Where to write the draft."),
+) -> None:
+    """Find prior comparable decisions — the outside view (D29.1). For each candidate the model
+    proposes a placement on this question's continuum with one line of reasoning. Writes a
+    precedents DRAFT; nothing is auto-accepted — a human ratifies (sets ``ratified: true`` and a
+    ratification note) before the set feeds the reference-class panel or the evidence river.
+    """
+    from schelling.precedents.find import PrecedentSearchError, find_precedents
+
+    if not fixture.exists():
+        typer.echo(f"input not found: {fixture}", err=True)
+        raise typer.Exit(code=2)
+    try:
+        game, _a, _fm, _ls, sources = _load_solve_input(fixture)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    client = AnthropicClient(model=llm_model)
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        typer.echo("precedents needs ANTHROPIC_API_KEY.", err=True)
+        raise typer.Exit(code=2)
+    sources_text = "\n".join(f"- {s.title or s.url} ({s.url})" for s in sources)
+    try:
+        pset = find_precedents(client, game, sources_text=sources_text, search=search)
+    except (PrecedentSearchError, WebSearchUnavailableError) as exc:
+        typer.echo(f"precedents failed: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    out_path = output or fixture.with_suffix(".precedents.json")
+    out_path.write_text(pset.model_dump_json(indent=2) + "\n")
+    typer.echo(f"Found {len(pset.precedents)} precedent proposal(s) — ALL unratified.")
+    for p in pset.precedents:
+        tag = "ex-ante" if p.ex_ante_codable else "HINDSIGHT"
+        typer.echo(f"  [{tag}] {p.date}  ~{p.proposed_placement:g}  {p.what_happened[:60]}")
+    typer.echo(
+        f"Draft written: {out_path}. Nothing is accepted yet — edit the file to set "
+        "`ratified: true` on the placements you accept and quote your ratification in "
+        "`ratification_note`, then pass it to `solve`/`dossier`/`formalize` with --precedents."
+    )
 
 
 @app.command()

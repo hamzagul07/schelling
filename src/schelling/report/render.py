@@ -408,9 +408,87 @@ def render_forecast_narrative(record: ForecastRecord, *, rubric_source: str | No
         _narr_verdict(record, game, readout)
         + _narr_reading(record, game, readout)
         + _narr_brief(record, game, readout)
+        + precedent_panel_html(record)
         + _narr_appendix(record, rubric_source)
     )
     return _page(record.question_id, body, extra_css=_NARR_CSS)
+
+
+def _precedent_segments(game: GameSpec, distribution: dict[str, float]) -> list[BandSeg]:
+    """Threshold-tiled strip segments carrying the PRECEDENT distribution shares (D29.3)."""
+    rubric = game.resolution_rubric
+    assert rubric is not None
+    bands = sorted(rubric.bands, key=lambda b: b.lo)
+    los = [b.lo for b in bands]
+    uppers = [*los[1:], 100.0]
+    modal = max(distribution.items(), key=lambda kv: (kv[1], kv[0]))[0] if distribution else None
+    return [
+        BandSeg(
+            lo=los[i],
+            hi=uppers[i],
+            share=distribution.get(b.label, 0.0),
+            label=b.label,
+            modal=(b.label == modal),
+        )
+        for i, b in enumerate(bands)
+    ]
+
+
+def precedent_panel_html(record: ForecastRecord) -> str:
+    """The reference-class (outside-view) panel: the ratified precedents' distribution as its OWN
+    strip beside the model's, clearly separated and NEVER blended (D29.3), plus the divergence
+    diagnostic when the two disagree (D29.5). Guarded — empty when no panel is attached."""
+    from schelling.precedents.panel import divergence_line
+
+    panel = record.precedent_panel
+    game = record.game
+    if panel is None or game is None or game.resolution_rubric is None:
+        return ""
+    pal = load_palette()
+    parts = ['<section class="narr"><h2>Reference class — the outside view</h2>']
+    parts.append(
+        "<p class='sub'>The empirical distribution of "
+        f"<strong>{len(panel.precedents)}</strong> ratified, ex-ante-codable precedents. "
+        "This is a base rate, <strong>not</strong> a forecast, and is "
+        "<strong>never blended</strong> "
+        f"into the model (weight {panel.blend_weight:g}) — shown beside the model strip for "
+        "comparison only.</p>"
+    )
+    diverge = divergence_line(record)
+    if diverge:
+        parts.append(f'<div class="caveat"><strong>{_esc(diverge)}</strong></div>')
+    if panel.band_distribution:
+        desc = "Distribution of ratified precedents across the rubric bands (outside view)."
+        strip = svg.band_strip(
+            _precedent_segments(game, panel.band_distribution),
+            median=panel.median_placement if panel.median_placement is not None else 50.0,
+            p10=min((p.proposed_placement for p in panel.precedents), default=0.0),
+            p90=max((p.proposed_placement for p in panel.precedents), default=100.0),
+            palette=pal,
+            desc=desc,
+        )
+        parts.append(f"<figure>{strip}</figure>")
+    rows = "".join(
+        f"<tr><td>{_esc(p.what_happened)}</td><td class='num'>{_esc(p.date)}</td>"
+        f"<td class='num'>{p.proposed_placement:g}</td><td>{_esc(p.source)}</td>"
+        f"<td class='ev'>{_esc(p.reasoning)}</td></tr>"
+        for p in panel.precedents
+    )
+    parts.append(
+        "<table><thead><tr><th>what happened</th><th>date</th><th>placement</th><th>source</th>"
+        f"<th>why</th></tr></thead><tbody>{rows}</tbody></table>"
+    )
+    if panel.hindsight_precedents:
+        parts.append(
+            f"<p class='sub'><strong>Reported separately — {len(panel.hindsight_precedents)} "
+            "hindsight-coded precedent(s)</strong> (coded with knowledge of their own outcome; "
+            "excluded from the base rate): "
+            + "; ".join(_esc(p.what_happened) for p in panel.hindsight_precedents)
+            + ".</p>"
+        )
+    parts.append(f"<p class='sub'>Ratification: <em>{_esc(panel.ratification_note)}</em></p>")
+    parts.append("</section>")
+    return "".join(parts)
 
 
 def _what_would_change(record: ForecastRecord, game: GameSpec) -> str:
