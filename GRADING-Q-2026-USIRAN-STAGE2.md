@@ -100,12 +100,12 @@ For every sealed record, before it is scored:
 The exact `ResolutionRubric` object for this question — the machine-readable form of everything above,
 byte-frozen with this pre-registration.
 
-**Structured bands added 2026-07-22 (pre-resolution, D24.2).** The optional `bands` array below is a
-verbatim structuring of the seven bands already committed in `outcome_mapping` — same boundaries,
-same meaning — so the two-audience report can render the band-probability strip for the grading
-brief. It changes no grading semantics: `outcome_mapping` remains canonical, and where any summary
-label differs from it the prose (and the sealed continuum text) governs. Excluded from `inputs_hash`,
-so no sealed record's hash is affected.
+> **Provenance of the `bands` array — ratified by Hassan, 2026-07-22 (D24.4):** Bands array added
+> 2026-07-22 as a structured restatement of the seven bands already committed in outcome_mapping —
+> identical boundaries and meaning, no semantic change, added so the report renders the probability
+> strip. The prose outcome_mapping and the sealed continuum text remain canonical; if the array and
+> the prose ever disagree, the prose governs. Pre-resolution; rubric is excluded from inputs_hash so
+> no sealed record, ledger entry, or timestamp is affected.
 
 ```json
 {

@@ -47,8 +47,14 @@ OpenTimestamps proof checked with `ots verify` to confirm the commitment predate
 
 The exact `ResolutionRubric` object (schema: `schemas/question.py` → `ResolutionRubric`) — the
 machine-readable form of everything above, added 2026-07-22 (pre-resolution, D24.2) so
-`schelling report` can resolve it and render the two-audience report. Its `bands` are a verbatim
-structuring of the seven bands in the table above; the prose and the sealed continuum text govern.
+`schelling report` can resolve it and render the two-audience report.
+
+> **Provenance of the `bands` array — 2026-07-22 (D24.4):** Bands array added 2026-07-22 as a
+> structured restatement of the seven bands already committed in outcome_mapping — identical
+> boundaries and meaning, no semantic change, added so the report renders the probability strip. The
+> prose outcome_mapping and the sealed continuum text remain canonical; if the array and the prose
+> ever disagree, the prose governs. Pre-resolution; rubric is excluded from inputs_hash so no sealed
+> record, ledger entry, or timestamp is affected.
 
 ```json
 {
