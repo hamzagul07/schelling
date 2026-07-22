@@ -180,6 +180,9 @@ class ForecastRecord(BaseModel):
     # Optional ICB base-rate panel (Session 11, D11.2): historical outcome frequencies for
     # structurally similar crises. Off by default; never blended into the solver line.
     analog_panel: AnalogPanel | None = None
+    # Optional reference-class panel of ratified precedents (Session 29, D29.3): the outside view,
+    # clearly separated and never blended, exactly like the analog panel.
+    precedent_panel: PrecedentPanel | None = None
 
     outcome_distribution: list[float] = Field(default_factory=list)  # raw draws (cache, D4.1)
     convergence_stats: dict[str, float] = Field(default_factory=dict)
@@ -403,6 +406,47 @@ class AdviseRecord(BaseModel):
     packages: list[MovePackage] = Field(default_factory=list)
 
     game: GameSpec | None = None  # for the report's baseline actor map
+
+
+class Precedent(BaseModel):
+    """One prior comparable decision — the outside view (Session 29, D29.1).
+
+    What happened, when, a source citation, and a PROPOSED placement on the current question's 0-100
+    continuum with one line of reasoning. **A proposal until a human ratifies it** (D29.2). Flagged
+    ``ex_ante_codable`` when it could be coded from information available before its own outcome was
+    known; hindsight-coded precedents (``ex_ante_codable = False``) are reported separately.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    id: str
+    what_happened: str
+    date: str
+    source: str  # a citation for the precedent (a fetched source or supplied reference)
+    proposed_placement: float  # where it would sit on the current 0-100 continuum
+    reasoning: str  # one line: why it maps there
+    ex_ante_codable: bool  # True = codable before the outcome was known; False = hindsight
+    ratified: bool = False  # a human ratified this placement (never auto-accepted)
+
+
+class PrecedentPanel(BaseModel):
+    """The reference-class (outside-view) panel: ratified precedents' empirical distribution across
+    the rubric bands (Session 29, D29.3).
+
+    NOT a forecast and **NEVER blended** into the solver line — ``blend_weight`` is disclosed and
+    defaults to 0, exactly as the ICB analog layer (D11.2). The base rate is computed over the
+    ex-ante-codable ratified precedents; hindsight-coded ones are carried separately.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    source_model: str  # the model that proposed the precedents
+    ratification_note: str  # the human ratification, quoted
+    precedents: list[Precedent] = Field(default_factory=list)  # ratified, ex-ante-codable
+    hindsight_precedents: list[Precedent] = Field(default_factory=list)  # ratified but hindsight
+    band_distribution: dict[str, float] = Field(default_factory=dict)  # band label -> fraction
+    median_placement: float | None = None  # median of the ex-ante placements
+    blend_weight: float = 0.0  # disclosed: the base rate is never mixed into the forecast
 
 
 class LLMSample(BaseModel):
