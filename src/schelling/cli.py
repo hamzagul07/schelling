@@ -46,7 +46,7 @@ from schelling.knowledge.index import (
     DEFAULT_TRANSCRIPTS,
     KnowledgeIndex,
 )
-from schelling.mc.monte_carlo import forecast, write_record
+from schelling.mc.monte_carlo import engine_version, forecast, write_record
 from schelling.mc.sensitivity import format_tornado, zero_swing_warning
 from schelling.report.render import render as render_report
 from schelling.schemas.forecast import (
@@ -674,6 +674,109 @@ def dossier(
         out_path = output or record_path.with_suffix(".dossier.html")
         out_path.write_text(html)
     typer.echo(f"Dossier written: {out_path}")
+
+
+@app.command(name="llm-forecast")
+def llm_forecast_cmd(
+    fixture: Path = typer.Argument(..., help="A GameSpec or DraftGameSpec JSON."),
+    samples: int = typer.Option(5, "--samples", min=1, help="Independent judgment samples."),
+    temperature: float = typer.Option(1.0, "--temperature", min=0.0, max=2.0),
+    llm_model: str = typer.Option("claude-opus-4-8", "--model"),
+    out_dir: Path = typer.Option(Path("runs"), "--out-dir"),
+    contamination_risk: bool | None = typer.Option(
+        None,
+        "--contamination-risk/--live-question",
+        help="Force/clear the contamination flag (default: auto-detect DEU / coercive inputs).",
+    ),
+) -> None:
+    """The LLM judgment baseline: ask a model directly for a settlement point, an 80% interval, and
+    band probabilities — no solver, no game math (D27.1). Samples n times; the headline is the
+    median of the sampled points and the spread is its self-consistency. Non-deterministic:
+    re-running gives different samples, so the record's file SHA-256 is the commitment.
+    """
+    from schelling.llm_forecast.forecast import LLMForecastError, llm_forecast
+    from schelling.report.rubric_lookup import lookup_rubric
+
+    if not fixture.exists():
+        typer.echo(f"input not found: {fixture}", err=True)
+        raise typer.Exit(code=2)
+    try:
+        game, _assumptions, _fm, _ls, sources = _load_solve_input(fixture)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    if game.resolution_rubric is None:  # resolve the rubric (read-only) so band probs can be asked
+        found = lookup_rubric(game.question_id, fixture.parent)
+        if found is not None:
+            game = game.model_copy(update={"resolution_rubric": found[0]})
+    client = AnthropicClient(model=llm_model)
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        typer.echo("llm-forecast needs ANTHROPIC_API_KEY.", err=True)
+        raise typer.Exit(code=2)
+    sources_text = "\n".join(f"- {s.title or s.url} ({s.url})" for s in sources)
+    try:
+        record = llm_forecast(
+            client,
+            game,
+            sources_text=sources_text,
+            source_path=fixture,
+            n_samples=samples,
+            temperature=temperature,
+            contamination_override=contamination_risk,
+            engine_version=engine_version(),
+        )
+    except (LLMForecastError, WebSearchUnavailableError) as exc:
+        typer.echo(f"llm-forecast failed: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"{record.run_id}.json"
+    out_path.write_text(record.model_dump_json(indent=2) + "\n")
+    e = record.ensemble
+    typer.echo(f"LLM judgment [{record.judge_model}]  {record.question_id}")
+    typer.echo(
+        f"  headline (median of {record.n_samples} samples): {e.median:.1f}  ·  "
+        f"80% interval [{e.p10:.0f}, {e.p90:.0f}]  ·  "
+        f"self-consistency spread {record.self_consistency:.1f}"
+    )
+    if record.band_probabilities:
+        top = max(record.band_probabilities, key=lambda k: record.band_probabilities[k])
+        typer.echo(f"  modal band: {top} ({record.band_probabilities[top]:.0%})")
+    if record.contamination_risk:
+        typer.echo(f"  CONTAMINATION-RISK: {record.contamination_note}")
+    typer.echo("  Non-deterministic: re-running produces different samples; the file SHA-256 is")
+    typer.echo(f"  the commitment. Record written: {out_path}")
+
+
+@app.command()
+def compare(
+    ledger: Path = typer.Option(Path("FORECASTS.md"), "--ledger", help="The sealed ledger file."),
+    grades: Path | None = typer.Option(
+        None, "--grades", help="JSON mapping question_id -> actual (graded outcomes)."
+    ),
+) -> None:
+    """Pre-registered comparison of |median - actual| across challenge, compromise, and llm-judgment
+    on the live ledger (D27.4). Exploratory until 10 graded questions — the harness REFUSES to print
+    a ranking before then, the same discipline as the coercive reading.
+    """
+    from schelling.llm_forecast.compare import compare_baselines
+
+    if not ledger.exists():
+        typer.echo(f"ledger not found: {ledger}", err=True)
+        raise typer.Exit(code=2)
+    grade_map: dict[str, float] = {}
+    if grades is not None:
+        if not grades.exists():
+            typer.echo(f"grades file not found: {grades}", err=True)
+            raise typer.Exit(code=2)
+        grade_map = {str(k): float(v) for k, v in json.loads(grades.read_text()).items()}
+    result = compare_baselines(ledger.read_text(), grade_map)
+    if not result.ready:
+        typer.echo(result.note)
+        return
+    typer.echo(result.note)
+    for i, s in enumerate(result.scores, 1):
+        typer.echo(f"  {i}. {s.family:<12} MAE {s.mae:.3f}  (n={s.n})")
 
 
 @app.command()

@@ -43,6 +43,7 @@ from schelling.schemas.forecast import (
     AnalogPanel,
     Assumption,
     ForecastRecord,
+    LLMForecastRecord,
     OwnMove,
     PersuasionTarget,
 )
@@ -1160,10 +1161,77 @@ def _fmt_err(exc: ValidationError) -> str:
     return f"{loc}: {err.get('msg', 'invalid')}"
 
 
+def _looks_like_llm_forecast(data: dict[str, Any]) -> bool:
+    return "judge_model" in data and "samples" in data
+
+
 def _looks_like_forecast(data: dict[str, Any]) -> bool:
     return "run_id" in data and any(
         k in data for k in ("ensemble", "forecast_median", "outcome_distribution")
     )
+
+
+def render_llm_forecast(record: LLMForecastRecord) -> str:
+    """Render an LLM judgment baseline: headline, samples, band probabilities, provenance appendix.
+
+    The appendix states plainly that this is a model judgment and that re-running produces different
+    samples — the file SHA-256 is the commitment (D27.2)."""
+    e = record.ensemble
+    parts = [
+        '<div class="kicker">LLM judgment baseline — direct model forecast (no solver)</div>',
+        f"<h1>{_esc(record.question_id)}</h1>",
+        f'<p class="sub">{_esc(record.judge_model)} · {record.n_samples} samples · '
+        f"temperature {record.temperature:g}</p>",
+    ]
+    if record.contamination_risk:
+        parts.append(
+            f'<div class="caveat"><strong>Contamination risk.</strong> '
+            f"{_esc(record.contamination_note)}</div>"
+        )
+    parts += [
+        "<h2>Headline</h2>",
+        '<div class="metrics">'
+        + _metric(f"{e.median:.1f}", f"median of {record.n_samples} samples")
+        + _metric(f"[{e.p10:.0f}, {e.p90:.0f}]", "80% interval")
+        + _metric(f"{record.self_consistency:.1f}", "self-consistency (spread)")
+        + "</div>",
+    ]
+    if record.band_probabilities:
+        rows = "".join(
+            f"<tr><td>{_esc(k)}</td><td class='num'>{v:.0%}</td></tr>"
+            for k, v in sorted(record.band_probabilities.items(), key=lambda kv: -kv[1])
+        )
+        parts.append(
+            "<h2>Band probabilities (model's own)</h2><table><thead><tr><th>band</th>"
+            f"<th>P</th></tr></thead><tbody>{rows}</tbody></table>"
+        )
+    srows = "".join(
+        f"<tr><td class='num'>{i + 1}</td><td class='num'>{s.point:g}</td>"
+        f"<td class='num'>[{s.p10:g}, {s.p90:g}]</td></tr>"
+        for i, s in enumerate(record.samples)
+    )
+    parts.append(
+        "<h2>Samples</h2><table><thead><tr><th>#</th><th>point</th><th>80% interval</th></tr>"
+        f"</thead><tbody>{srows}</tbody></table>"
+    )
+    prov = _dl(
+        {
+            "judge model": record.judge_model,
+            "temperature": f"{record.temperature:g}",
+            "n_samples": str(record.n_samples),
+            "prompt_hash": record.prompt_hash,
+            "inputs_hash": record.inputs_hash,
+            "engine (git SHA)": record.engine_version,
+            "cost": f"${record.cost_usd:.4f}",
+        }
+    )
+    parts.append(
+        '<div class="prov"><p><strong>This is a model judgment, not a computed forecast.</strong> '
+        "It is non-deterministic: re-running produces different samples. The commitment is the "
+        "SHA-256 of this record file (as <code>schelling seal</code> records).</p>"
+        f"Provenance{prov}</div>"
+    )
+    return _page(f"LLM judgment — {record.question_id}", "".join(parts))
 
 
 def _looks_like_draft(data: dict[str, Any]) -> bool:
@@ -1186,6 +1254,14 @@ def render(data: dict[str, Any], *, rubric_source: str | None = None) -> str:
         except ValidationError as exc:
             raise ValueError(
                 f"this looks like a BacktestRecord but does not match the schema ({_fmt_err(exc)})."
+            ) from exc
+    if _looks_like_llm_forecast(data):
+        try:
+            return render_llm_forecast(LLMForecastRecord.model_validate(data))
+        except ValidationError as exc:
+            raise ValueError(
+                f"this looks like an LLMForecastRecord but does not match the schema "
+                f"({_fmt_err(exc)})."
             ) from exc
     if _looks_like_advise(data):
         try:
