@@ -55,6 +55,7 @@ from schelling.schemas.forecast import (
     AnalogPanel,
     Assumption,
     DraftMetadata,
+    FetchedSource,
 )
 from schelling.schemas.question import GameSpec
 from schelling.schemas.stakeholders import TriangularEstimate
@@ -90,11 +91,11 @@ def _first_error(exc: ValidationError) -> str:
 
 def _load_solve_input(
     path: Path,
-) -> tuple[GameSpec, list[Assumption], DraftMetadata | None, bool]:
+) -> tuple[GameSpec, list[Assumption], DraftMetadata | None, bool, list[FetchedSource]]:
     """Load a GameSpec or a DraftGameSpec; raises ValueError with a one-sentence friendly reason.
 
-    Returns ``(game, assumptions, formalizer_metadata, live_searched)``; the last three are empty
-    for a bare GameSpec.
+    Returns ``(game, assumptions, formalizer_metadata, live_searched, sources_fetched)``; the last
+    four are empty for a bare GameSpec.
     """
     try:
         data = json.loads(path.read_text())
@@ -111,9 +112,15 @@ def _load_solve_input(
                 f"{path} looks like a DraftGameSpec (formalizer output) but does not match the "
                 f"schema ({_first_error(exc)}); re-run `schelling formalize` to regenerate it."
             ) from exc
-        return draft.game, list(draft.assumptions), draft.metadata, draft.live_searched
+        return (
+            draft.game,
+            list(draft.assumptions),
+            draft.metadata,
+            draft.live_searched,
+            list(draft.sources_fetched),
+        )
     try:
-        return GameSpec.model_validate(data), [], None, False
+        return GameSpec.model_validate(data), [], None, False, []
     except ValidationError as exc:
         shape = "a DraftGameSpec" if isinstance(data, dict) and "game" in data else "a GameSpec"
         raise ValueError(
@@ -272,6 +279,7 @@ def analyze(
             assumptions=draft.assumptions,
             formalizer_metadata=draft.metadata,
             live_searched=draft.live_searched,
+            sources_fetched=draft.sources_fetched,
             model=m,
         )
         for m in models
@@ -341,7 +349,9 @@ def solve(
         typer.echo(f"--solver must be one of {', '.join(valid)}.", err=True)
         raise typer.Exit(code=2)
     try:
-        game, assumptions, formalizer_metadata, live_searched = _load_solve_input(fixture)
+        game, assumptions, formalizer_metadata, live_searched, sources_fetched = _load_solve_input(
+            fixture
+        )
         panel = _analog_panel(analog) if analog else None
     except ValueError as exc:
         typer.echo(str(exc), err=True)
@@ -374,6 +384,7 @@ def solve(
                 assumptions=assumptions,
                 formalizer_metadata=formalizer_metadata,
                 live_searched=live_searched,
+                sources_fetched=sources_fetched,
                 model=model,
             )
         if panel is not None:
@@ -599,7 +610,7 @@ def advise(
         )
         raise typer.Exit(code=2)
     try:
-        game, _assumptions, _fm, _ls = _load_solve_input(fixture)
+        game, _assumptions, _fm, _ls, _sf = _load_solve_input(fixture)
         record, baseline = run_advise(
             game,
             actor,

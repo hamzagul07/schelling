@@ -83,6 +83,24 @@ class Assumption(BaseModel):
     why: str  # why it had to be assumed (what evidence was missing)
 
 
+class FetchedSource(BaseModel):
+    """One source Claude retrieved via live web search (``formalize --search``).
+
+    Evidence-river material: a fetched source may be cited in an evidence note exactly like a
+    supplied file. ``retrieved_at`` is data *about* the evidence (when it was fetched) — it does
+    not enter any hash and does not affect report determinism (D8.2). A core contract (it also
+    rides inside a ``ForecastRecord`` when solving a live-searched draft, D22.3), re-exported by
+    ``formalizer.schemas``.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    url: str
+    title: str
+    retrieved_at: str  # ISO-8601 fetch date
+    snippet: str = ""
+
+
 class DraftMetadata(BaseModel):
     """Provenance for one formalize call — model, token usage, cost, retries.
 
@@ -156,6 +174,9 @@ class ForecastRecord(BaseModel):
     # True when the source draft was grounded on a live web search (carried from the draft, D9.0a):
     # the report then prints a caveat that the inputs rest on a live search, not a frozen snapshot.
     live_searched: bool = False
+    # The live-web sources the draft was grounded on (carried from the draft, D22.3), so the
+    # two-audience report's appendix can list them. Empty when solving a bare GameSpec / no search.
+    sources_fetched: list[FetchedSource] = Field(default_factory=list)
     # Optional ICB base-rate panel (Session 11, D11.2): historical outcome frequencies for
     # structurally similar crises. Off by default; never blended into the solver line.
     analog_panel: AnalogPanel | None = None
