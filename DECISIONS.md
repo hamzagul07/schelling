@@ -1279,3 +1279,41 @@ the transcripts). Each was guarded with the project's established idiom —
 `_HAS_TRANSCRIPTS = TRANSCRIPTS.exists() and any(TRANSCRIPTS.glob("*.txt"))`. Locally (transcripts
 present) all seven still run and pass; on CI they skip. No production code touched. CI now runs the
 full gate green for the first time since D20.
+
+### D22.0 — Second sealed-ledger question pre-registered: Q-2026-IAEA-SEP (IAEA Board vote)
+A second sealed-ledger question on the same underlying conflict, deliberately in a **different game
+and different domain** from the coercive Q-2026-USIRAN-STAGE2 bilateral bargain: what the IAEA Board
+of Governors (35 members) decides to do about Iran at its September 2026 meeting — a multilateral
+committee vote, i.e. the **DEU family**, the one domain where the compromise model is validated to
+the extractable-signal ceiling (Sessions 9-11). Sealing both tests the machine where its evidence is
+strongest (committee voting) and where it has none (coercion), on one conflict; a divergence between
+the two forecasts is then diagnostic rather than noise (the shared-failure-mode caveat is stated in
+the question package, on the record before any forecast exists). **Pre-registration made public:**
+`GRADING-Q-2026-IAEA-SEP.md` (the rubric — 7 bands tiling 0-100, canonical-text clause, midpoint
+default, `schelling verify` + `ots verify` integrity checks; header stamped pre-registered 2026-07-22
+before the 2026-09-30 resolution, awaiting Hassan's ratification, final after 2026-09-30) and
+`docs/questions/question-iaea-sep.md` (the approved question package + rationale) are **committed** —
+the pre-registration must not sit in gitignored `analyses/`. Resolution 2026-09-30 23:59 UTC, grading
+2026-10-05. The situation text (`analyses/iaea/situation.txt`) is the paste-ready block from the
+package, de-indented, and stays gitignored.
+
+### D22.1 — The IAEA formalize draft (live-searched; NOT solved, NOT sealed)
+`schelling formalize analyses/iaea/situation.txt --search --max-searches 6 -o analyses/iaea/iaea.json`
+produced the draft: `claude-opus-4-8`, 4 searches used, **35 sources fetched**, in=76,432 / out=12,465
+tok, **$0.7338**, 0 retries; `frozen_at`/`live_searched` stamped today per rule 7 (a live question, not
+a backtest). The draft models **7 actors** — `united_states` (pos 15/35/65, cap 100), `e3_uk_france_
+germany` (25, cap 70), `western_aligned` (32, cap 62), `russia_china_niger` (72, cap 55),
+`nonaligned_abstainers` (52, cap 68), `director_general_secretariat` (63, cap 60), and
+`iran_subject_influence_only` (88, cap 45, off-Board influence only) — with 9 assumptions and per-value
+evidence notes, all traced to the June 10 2026 Board vote (21-3-10) and the parallel US-Iran track.
+Three formalizer choices flagged for Hassan's review: **(a) capability rule** — it did NOT use the
+Board's one-member-one-vote rule; it chose a penholder/diplomatic-leverage weighting (US 100, E3 70,
+down to the abstainer bloc), explicitly disclosed as a modelling choice not established by any source
+(assumption 5) — arguably under-weights the 10-abstainer blocking numbers; **(b) bloc aggregation** —
+only the four penholders and the three no-voters are source-grouped; the yes-voters→`western_aligned`
+and abstainers→`nonaligned_abstainers` groupings, and folding Niger with Russia/China, are analyst
+aggregations disclosed as assumptions 2-3; **(c) Iran** — included only as an off-Board influence
+(not a voting member), preferred point near "close the file", magnitude inferred from its
+cooperation-suspension law and June 2026 re-invite, per assumption 7. **STOP: not solved, not sealed —
+the human review gate applies; Hassan reviews the draft with Claude before anything is solved** (per
+the question package's workflow). `analyses/iaea/` stays gitignored.
