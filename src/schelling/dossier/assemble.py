@@ -267,8 +267,8 @@ def assemble_dossier(
         _strategy_by_actor(advise),
         # 9. Enforceability and compliance (NARRATIVE; analysis only)
         _narrative_section(9, "Enforceability and compliance", "enforceability", narrative, values),
-        "<p class='sub'><em>Analysis only — canon C8/D1/D5 framing; never a defection "
-        "playbook.</em></p>",
+        "<p class='sub'><em>This section is an analysis of how durable the resulting agreement is "
+        "likely to be — an analysis of coalition durability, not a prescription.</em></p>",
     ]
     # 10. Historical analogs (COMPUTED, when present)
     parts.append(_h2(10, "Historical analogs"))
