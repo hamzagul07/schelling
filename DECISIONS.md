@@ -1519,3 +1519,49 @@ phrase switches "for it" -> "for each" in a group. Deterministic (groups keyed o
 first-appearance order). New `tests/test_narrative.py` cases cover the cap boundaries, the always-on
 scope line, short-name derivation + override + prose/figure/table split, the fixed legend text, and
 the grouping; sealed hashes confirmed untouched. 387 tests green; full gate + paper-evidence pass.
+
+### D26.1 — `schelling dossier`: a researcher-grade document from a record
+New command `schelling dossier <record.json> [--advise-records …] [--pdf] [--no-narrative]` assembles a
+dossier from a forecast record plus, when present, its advise records, analog panel, and grading
+rubric (resolved read-only from the grading file as in D24.1 — the record is never modified). HTML by
+default; PDF with `--pdf`. Package `src/schelling/dossier/` (assemble/narrative/pdf).
+
+### D26.2 — The HARD WALL: COMPUTED vs NARRATIVE, with tag resolution
+COMPUTED sections (verdict + band strip, formal game table with evidence, assumptions split, the
+distribution + both solvers, diagnostics, strategy tables from advise records, analog base rates,
+sensitivity, provenance appendix) are deterministic template text from the existing renderer. The five
+NARRATIVE sections (history, present state, interpretation, enforceability, limitations) are ONE
+tightly-constrained LLM call: the model writes ``{{tags}}`` for every model quantity and the assembler
+resolves them from the record — it may never emit a bare numeral for a model quantity. `validate_narrative`
+rejects a generation with (a) an unresolved tag, (b) an invented model numeral (a percent other than the
+fixed 80% CI level, or a model term glued to a number), or (c) a concept-library leak (new firewall
+`scan_text`, the text-level counterpart of `find_leaks`); `generate_narrative` retries with a correction
+up to a cap, then raises `NarrativeRejectedError`. Every factual world-claim must cite a fetched source;
+the concepts firewall applies unchanged. Replayable via any `LLMClient` (tested with `ReplayClient`).
+
+### D26.3 — Section order + the record as sole provenance
+Thirteen sections in the fixed order (Executive verdict · Question and scale · How we got here · Present
+state · The formal game · The forecast · Why this outcome · Strategy by actor · Enforceability and
+compliance [canon C8/D1/D5, ANALYSIS ONLY] · Historical analogs · What would change this · Limitations ·
+Provenance appendix). `record_context` derives the narrative's situation + sources FROM the record
+(continuum, notes, actor evidence, assumptions, sources_fetched) — self-contained, and the only
+provenance the narrative may cite.
+
+### D26.4 — Determinism and disclosure
+COMPUTED sections + `--no-narrative` are byte-identical on re-run (tested). The narrative is not
+deterministic — the dossier records its SHA-256, model, and cost in the appendix and states in the
+document that narrative sections are model-written and source-cited while every figure is computed;
+`--no-narrative` yields a fully deterministic dossier (placeholder in the narrative slots).
+
+### D26.5 — PDF
+`--pdf` renders via WeasyPrint (lazy-imported, optional — NOT added to the synced extras, so CI never
+installs it and the PDF test skips cleanly). The dossier carries `@page` CSS: A4, page numbers, a
+running header (question id · freeze date via a `string-set` off-screen element), figures inline,
+appendix last. A missing WeasyPrint gives a friendly error, not a traceback.
+
+### D26.6 — Tests
+`tests/test_dossier.py`: tag resolution + unresolved-tag failure, numeral rejection (incl. the CI-level
+exception), narrative retry-then-accept and reject-after-cap, the firewall leak rejection, section
+order, computed-section + fixed-narrative determinism, `--no-narrative` mode, advise-record integration,
+the read-only guarantee (CLI never rewrites the record), the api-key guard, and a gated PDF build. All
+dossier tests pass; sealed hashes are untouched (the dossier never hashes or writes a record).
