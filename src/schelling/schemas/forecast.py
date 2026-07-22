@@ -403,3 +403,56 @@ class AdviseRecord(BaseModel):
     packages: list[MovePackage] = Field(default_factory=list)
 
     game: GameSpec | None = None  # for the report's baseline actor map
+
+
+class LLMSample(BaseModel):
+    """One independent LLM judgment sample (Session 27, D27.1): a point, an 80% interval, band
+    probabilities (when the rubric is banded), and the model's verbatim output."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    point: float  # the settlement point on the 0-100 continuum
+    p10: float  # the 80% interval lower bound
+    p90: float  # the 80% interval upper bound
+    band_probabilities: dict[str, float] = Field(default_factory=dict)  # band label -> probability
+    raw_text: str  # the model's verbatim response for this sample
+
+
+class LLMForecastRecord(BaseModel):
+    """A direct-judgment baseline (Session 27, D27.2): a model given the SAME situation text,
+    sources, and continuum the solver received, asked for a settlement point, an 80% interval, and
+    band probabilities — with no solver and no game math.
+
+    Sampled ``n`` times independently; the headline is the median of the sampled points and the
+    self-consistency is their spread. **Non-deterministic by nature** — re-running produces
+    different samples — so the commitment is the SHA-256 of this record file (as seal computes).
+    Structurally seal-compatible: ``model = "llm-judgment"`` labels the ledger row, ``ensemble``
+    holds the aggregate headline, and ``game`` carries the frozen date + rubric the seal requires.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    question_id: str
+    run_id: str
+    engine_version: str
+    inputs_hash: str  # SHA-256 of the (game, judge config) — for reference; not a determinism claim
+    created_at: str | None = None
+
+    model: str = "llm-judgment"  # the ledger family label (seal reads this)
+    judge_model: str  # the actual LLM that produced the judgment, e.g. "claude-opus-4-8"
+    temperature: float
+    n_samples: int
+    prompt_hash: str  # SHA-256 of the exact prompt shown to the model
+    cost_usd: float
+
+    ensemble: Ensemble  # aggregate: median (headline) / mean / p10 / p90 / n_draws = n_samples
+    band_probabilities: dict[str, float] = Field(default_factory=dict)  # mean over samples
+    self_consistency: float  # spread of the sampled points (max - min) — the honest instability
+    samples: list[LLMSample]
+
+    # Contamination guard (D27.5): a run against a dataset whose outcomes the model may know
+    # (DEU, the coercive library) is flagged and reported separately from the live sealed ledger.
+    contamination_risk: bool = False
+    contamination_note: str = ""
+
+    game: GameSpec | None = None  # frozen_at + resolution_rubric, so `schelling seal` accepts it
