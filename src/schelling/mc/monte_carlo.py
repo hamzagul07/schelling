@@ -24,6 +24,7 @@ from schelling.schemas.forecast import (
     Assumption,
     DraftMetadata,
     Ensemble,
+    FetchedSource,
     ForecastRecord,
     SensitivityEntry,
     StoppingRule,
@@ -185,6 +186,7 @@ def build_forecast_record(
     assumptions: list[Assumption] | None = None,
     formalizer_metadata: DraftMetadata | None = None,
     live_searched: bool = False,
+    sources_fetched: list[FetchedSource] | None = None,
     model: str = MODEL_CHALLENGE,
     analog_panel: AnalogPanel | None = None,
 ) -> ForecastRecord:
@@ -229,6 +231,7 @@ def build_forecast_record(
         assumptions=list(assumptions or []),
         formalizer_metadata=formalizer_metadata,
         live_searched=live_searched,
+        sources_fetched=list(sources_fetched or []),
         analog_panel=analog_panel,
         outcome_distribution=[float(v) for v in dist],
         convergence_stats=convergence_stats(mc),
@@ -256,6 +259,7 @@ def forecast(
     assumptions: list[Assumption] | None = None,
     formalizer_metadata: DraftMetadata | None = None,
     live_searched: bool = False,
+    sources_fetched: list[FetchedSource] | None = None,
     model: str = MODEL_CHALLENGE,
     analog_panel: AnalogPanel | None = None,
 ) -> ForecastRecord:
@@ -278,6 +282,7 @@ def forecast(
         assumptions=assumptions,
         formalizer_metadata=formalizer_metadata,
         live_searched=live_searched,
+        sources_fetched=sources_fetched,
         model=model,
         analog_panel=analog_panel,
     )

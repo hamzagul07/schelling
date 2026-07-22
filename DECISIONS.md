@@ -1317,3 +1317,55 @@ aggregations disclosed as assumptions 2-3; **(c) Iran** — included only as an 
 cooperation-suspension law and June 2026 re-invite, per assumption 7. **STOP: not solved, not sealed —
 the human review gate applies; Hassan reviews the draft with Claude before anything is solved** (per
 the question package's workflow). `analyses/iaea/` stays gitignored.
+
+### D22.2 — Band mapping: `RubricBand` + `report/bands.py` (the two-audience report, item 1)
+`ResolutionRubric` gains an optional structured `bands: list[RubricBand]` (each an inclusive `[lo, hi]`
+slice of the 0-100 continuum with its outcome label, verbatim). The whole rubric is already excluded
+from `inputs_hash` (D17.1), so adding a field changes no forecast, no content-address, and no sealed
+record. `report/bands.py` (`map_bands`) is pure, deterministic, LLM-free: it classifies every cached
+MC draw (`outcome_distribution`) into the bands and returns per-band probabilities, the modal band,
+and the band the ensemble median lands in. **Interpretive choices, logged:** (1) band membership uses
+each band's `lo` as a **threshold** — a draw falls in the last band whose `lo` it clears — so float
+draws partition [0,100] with no gaps even where the written integer ranges leave unit holes (0-9 then
+10-24); (2) the **modal band** breaks ties by lowest index for determinism. A rubric with **no**
+structured bands is treated as **arithmetic/linear** (the grading formula maps the outcome directly;
+`kind=LINEAR`); **no rubric at all** returns `kind=NONE` — both carry a plain-language note so the
+report can degrade gracefully and say so. Works identically for either solver's record.
+
+### D22.3 — `sources_fetched` carried into the ForecastRecord (appendix provenance)
+`FetchedSource` moved to core `schemas.forecast` (re-exported from `formalizer.schemas`, exactly as
+`Assumption`/`DraftMetadata` were), and `ForecastRecord` gained `sources_fetched: list[FetchedSource]`
+(optional, default `[]`). The solve paths (`build_forecast_record`/`forecast`, and the CLI's
+`_load_solve_input` → solve/analyze) now carry a live-searched draft's sources into the record, so the
+report's APPENDIX can list them. Additive and defaulted — existing records/goldens are unaffected.
+
+### D22.4 — Position-to-words vocabulary in a committed YAML (item 4)
+`report/position_words.yaml` maps a 0-100 position (and salience) to an auditable phrase, keyed to
+continuum **thirds** (coarse) and **fifths** (fine); `report/vocab.py` loads it. The phrasing lives in
+the YAML, never hardcoded in report strings, so it is editable and reviewable. Phrasing is generic and
+direction-based ("toward the low end", "close to the midpoint") because the continuum's own
+`anchor_0`/`anchor_100` text supplies the *meaning* of the ends; the vocabulary supplies the *location*.
+Positions are 0-100 by contract (`schemas.stakeholders`), so the buckets are fixed thresholds.
+
+### D22.5 — The two-audience layered report + rubric-presence dispatch (items 2, 3, 6)
+`render_forecast_narrative` composes four sections in order — **VERDICT** (modal band in the rubric's
+own words + its probability, the median and its band, and the single highest-swing parameter as "what
+would change this"), **READING** (what 0/100 mean, each actor in a sentence with position-in-words, the
+capability×salience weight arithmetic naming the heaviest actors + the closed-form compromise point,
+and the 2-3 widest input ranges), **ANALYST BRIEF** (band-probability table; **both solvers side by
+side** — this run's median+band vs the compromise closed-form point+band, with their disagreement
+stated and **never blended**; full stakeholder table with evidence; inputs split **sourced** (actors
+with evidence notes) vs **inferred** (the assumptions list); the tornado as "what to watch"; and
+diagnostics incl. degenerate-lock + mode-vs-MC gap), and **APPENDIX** (sources fetched, inputs hash,
+engine SHA, seed, and the exact reproduce command). **HARD CONSTRAINT met (item 3):** every line is
+deterministic template text composed from record fields + the committed band/word vocabularies — no
+LLM anywhere; a byte-identical re-run is tested. **Dispatch (item 5):** `render_forecast` routes a
+record whose game carries a committed rubric to the narrative layout, and everything else to the
+unchanged pre-D22 standard layout — so existing report goldens stay **byte-identical** (the forecast
+golden has `resolution_rubric: None`). The narrative's extra CSS is injected via a defaulted
+`_page(..., extra_css)` argument so no other report's stylesheet changes. The "both solvers" cross-check
+is realized by computing the compromise weighted-mean point closed-form from the embedded game (a full
+two-record pairing is a possible future enhancement). New fixture + golden (`forecast_narrative.json`
+/ `.html`) and `tests/test_narrative.py` cover band arithmetic (sum-to-1 vs a hand-computed fixture),
+modal/median bands, the linear and no-rubric graceful paths, verdict text, determinism, the dispatch
+both ways, and the vocabulary. 359 tests green.

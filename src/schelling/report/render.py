@@ -16,7 +16,15 @@ from schelling.backtest.context import CITATIONS, CONTEXT_PROSE, PUBLISHED_RESUL
 from schelling.formalizer.schemas import DraftGameSpec, FetchedSource
 from schelling.mc.sensitivity import zero_swing_warning
 from schelling.report import svg
+from schelling.report.bands import (
+    BANDED,
+    BandReadout,
+    band_containing,
+    compromise_point,
+    map_bands,
+)
 from schelling.report.svg import ActorPoint, BarRow, ScatterPoint, TornadoRow
+from schelling.report.vocab import load_vocab, phrase_for
 from schelling.schemas.backtest import BacktestRecord
 from schelling.schemas.forecast import (
     ADVISE_CAVEAT,
@@ -28,7 +36,7 @@ from schelling.schemas.forecast import (
     OwnMove,
     PersuasionTarget,
 )
-from schelling.schemas.question import GameSpec
+from schelling.schemas.question import GameSpec, RubricBand
 
 _CSS = """
 :root { --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --panel:#f9fafb; --accent:#b45309; }
@@ -97,6 +105,22 @@ ul.sources .snip { color:var(--ink); font-size:12px; margin-top:4px; }
   .wrap { max-width:none; padding:0 12px; } h2 { margin-top:24px; } }
 """
 
+# Extra styles injected ONLY by the two-audience narrative report (D22.2), so every other report's
+# stylesheet — and thus its golden — stays byte-identical.
+_NARR_CSS = """
+section.narr { margin:0 0 10px; }
+.narr .lede { font-size:17px; line-height:1.5; margin:10px 0 12px; }
+.narr h3 { font-size:12px; font-weight:650; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--muted); margin:22px 0 8px; }
+.narr ul { margin:6px 0; padding-left:20px; } .narr li { margin:3px 0; }
+.narr dl { display:grid; grid-template-columns:170px 1fr; gap:3px 14px; margin:6px 0;
+  font-size:13px; }
+.narr dt { color:#9ca3af; } .narr dd { margin:0; }
+.narr pre { background:var(--panel); border:1px solid var(--line); border-radius:6px;
+  padding:10px 12px; font-size:12px; overflow-x:auto; margin:6px 0; }
+tr.modal td { background:#fff7ed; }
+"""
+
 
 def _esc(text: str) -> str:
     return html.escape(str(text), quote=True)
@@ -148,11 +172,13 @@ def _actor_table(game: GameSpec, *, with_evidence: bool) -> str:
     )
 
 
-def _page(title: str, body: str) -> str:
+def _page(title: str, body: str, extra_css: str = "") -> str:
+    # extra_css defaults to "" so every existing caller renders byte-identically; only the
+    # narrative report passes _NARR_CSS (D22.5).
     return (
         '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        f"<title>{_esc(title)}</title><style>{_CSS}</style></head>"
+        f"<title>{_esc(title)}</title><style>{_CSS}{extra_css}</style></head>"
         f'<body><div class="wrap">{body}</div></body></html>\n'
     )
 
@@ -179,7 +205,10 @@ def render_draft(draft: DraftGameSpec) -> str:
         _assumptions(draft),
     ]
     if draft.sources_fetched:
-        parts += ["<h2>Sources fetched — live web search</h2>", _sources_list(draft)]
+        parts += [
+            "<h2>Sources fetched — live web search</h2>",
+            _sources_list(draft.sources_fetched),
+        ]
     m = draft.metadata
     prov = _dl(
         {
@@ -207,14 +236,14 @@ def _assumptions(draft: DraftGameSpec) -> str:
     return _assumptions_html(list(draft.assumptions))
 
 
-def _sources_list(draft: DraftGameSpec) -> str:
+def _sources_list(sources: list[FetchedSource]) -> str:
     """A linked list of fetched sources with retrieval dates (data about the evidence, D8.2).
 
     Hyperlinks reference the source pages; the report loads no external resource on open, so it
     stays self-contained and offline (D8.4).
     """
     items: list[str] = []
-    for s in _sorted_sources(draft.sources_fetched):
+    for s in _sorted_sources(sources):
         title = _esc(s.title or s.url)
         link = f'<a href="{_esc(s.url)}" rel="noopener noreferrer">{title}</a>'
         meta = f'<div class="meta">{_esc(s.url)} · retrieved {_esc(s.retrieved_at)}</div>'
@@ -247,7 +276,19 @@ def _dl(pairs: dict[str, str]) -> str:
 
 
 def render_forecast(record: ForecastRecord) -> str:
-    """Render a ForecastRecord full-analysis report."""
+    """Render a ForecastRecord report.
+
+    When the question carries a committed :class:`ResolutionRubric`, render the two-audience
+    layered report (VERDICT / READING / ANALYST BRIEF / APPENDIX, D22.2); otherwise fall back to
+    the standard full-analysis layout so pre-rubric records render byte-identically (D22.5).
+    """
+    if record.game is not None and record.game.resolution_rubric is not None:
+        return render_forecast_narrative(record)
+    return _render_forecast_standard(record)
+
+
+def _render_forecast_standard(record: ForecastRecord) -> str:
+    """Render a ForecastRecord full-analysis report (the pre-D22 layout, unchanged)."""
     e = record.ensemble
     cv = record.convergence_stats
     frozen = record.game.frozen_at if record.game else "—"
@@ -311,6 +352,276 @@ def render_forecast(record: ForecastRecord) -> str:
         ]
     parts.append(_forecast_provenance(record))
     return _page(record.question_id, "".join(parts))
+
+
+# --------------------------------------------------------------- two-audience narrative (D22.2)
+def render_forecast_narrative(record: ForecastRecord) -> str:
+    """The layered two-audience report: VERDICT / READING / ANALYST BRIEF / APPENDIX.
+
+    All prose is deterministic template text composed from record fields plus the committed
+    band and position-word vocabularies — no LLM anywhere (D22.3). Same record + same rubric =
+    byte-identical output.
+    """
+    if record.game is None:  # nothing to read without a game; degrade to the standard layout
+        return _render_forecast_standard(record)
+    game = record.game
+    readout = map_bands(record)
+    body = (
+        _narr_verdict(record, game, readout)
+        + _narr_reading(record, game, readout)
+        + _narr_brief(record, game, readout)
+        + _narr_appendix(record)
+    )
+    return _page(record.question_id, body, extra_css=_NARR_CSS)
+
+
+def _what_would_change(record: ForecastRecord, game: GameSpec) -> str:
+    """The single highest-swing parameter (tornado top), or a weight-based fallback for the
+    compromise model, which has no tornado."""
+    if record.sensitivity:
+        top = max(record.sensitivity, key=lambda s: abs(s.swing))
+        return (
+            f"<p><strong>What would change this:</strong> {_esc(top.parameter)} — moving it across "
+            f"its stated range swings the forecast by {top.swing:+.1f} points "
+            f"({top.forecast_at_low:.0f} to {top.forecast_at_high:.0f}).</p>"
+        )
+    # Fallback: the heaviest-weight actor whose position range is widest is the input to watch.
+    ranked = sorted(
+        game.actors,
+        key=lambda a: (a.capability.mode * a.salience.mode) * (a.position.high - a.position.low),
+        reverse=True,
+    )
+    a = ranked[0]
+    return (
+        f"<p><strong>What would change this:</strong> {_esc(a.name)}'s position — it carries the "
+        f"heaviest weight, and its stated range runs {a.position.low:g} to {a.position.high:g}.</p>"
+    )
+
+
+def _narr_verdict(record: ForecastRecord, game: GameSpec, readout: BandReadout) -> str:
+    e = record.ensemble
+    parts = [
+        '<section class="narr verdict-sec"><div class="kicker">Verdict</div>',
+        f"<h1>{_esc(record.question_id)}</h1>",
+        f'<p class="sub">frozen {_esc(game.frozen_at)} · {_esc(record.model)} model · '
+        f"run {_esc(record.run_id)}</p>",
+    ]
+    if record.live_searched:
+        parts.append(
+            '<div class="caveat"><strong>Live-searched inputs.</strong> Formalized with web search '
+            "on, so the inputs reflect the web as of the freeze date — not a clean historical "
+            "backtest.</div>"
+        )
+    banded = readout.kind == BANDED and readout.modal_band is not None
+    if banded and readout.median_band is not None and readout.modal_band is not None:
+        modal_prob = next(bp.probability for bp in readout.per_band if bp.is_modal)
+        mb = readout.median_band
+        parts.append(
+            f'<p class="lede">Most likely: <strong>{_esc(readout.modal_band.label)}</strong> — '
+            f"{modal_prob:.0%} of {e.n_draws} simulated draws. The forecast median is "
+            f"{e.median:.0f} on the 0-100 scale, in the band &ldquo;{_esc(mb.label)}&rdquo; "
+            f"({mb.lo:g}&ndash;{mb.hi:g}).</p>"
+        )
+    else:
+        parts.append(
+            f'<p class="lede">The forecast median is <strong>{e.median:.0f}</strong> on the 0-100 '
+            f"scale (CI80 [{e.p10:.0f}, {e.p90:.0f}]). {_esc(readout.note)}</p>"
+        )
+    parts.append(_what_would_change(record, game))
+    parts.append("</section>")
+    return "".join(parts)
+
+
+def _widest_inputs(game: GameSpec, k: int) -> list[tuple[str, str, float, float]]:
+    """The ``k`` widest input ranges (actor, field, low, high), most uncertain first."""
+    rows: list[tuple[str, str, float, float]] = []
+    for a in game.actors:
+        fields = (("position", a.position), ("salience", a.salience), ("capability", a.capability))
+        for field, est in fields:
+            rows.append((a.name, field, est.low, est.high))
+    rows.sort(key=lambda r: r[3] - r[2], reverse=True)
+    return rows[:k]
+
+
+def _narr_reading(record: ForecastRecord, game: GameSpec, readout: BandReadout) -> str:
+    v = load_vocab()
+    c = game.continuum
+    e = record.ensemble
+    parts = [
+        '<section class="narr"><h2>Reading</h2>',
+        f"<p>The scale runs 0 to 100. <strong>0</strong> means {_esc(c.anchor_0)}. "
+        f"<strong>100</strong> means {_esc(c.anchor_100)}. The forecast sits at {e.median:.0f} — "
+        f"{_esc(phrase_for(e.median, v.position_thirds))}.</p>",
+    ]
+    lis = "".join(
+        f"<li><strong>{_esc(a.name)}</strong> sits "
+        f"{_esc(phrase_for(a.position.mode, v.position_fifths))}; the outcome is "
+        f"{_esc(phrase_for(a.salience.mode, v.salience_thirds))}.</li>"
+        for a in game.actors
+    )
+    parts.append(f"<p>The players and where they stand:</p><ul>{lis}</ul>")
+    weights = [(a, a.capability.mode * a.salience.mode) for a in game.actors]
+    total = sum(w for _, w in weights) or 1.0
+    heaviest = sorted(weights, key=lambda x: (-x[1], x[0].id))[:2]
+    heavy_desc = " and ".join(
+        f"{_esc(a.name)} ({w / total:.0%} of the weight)" for a, w in heaviest
+    )
+    cp = compromise_point(game)
+    parts.append(
+        f"<p>The settlement is a capability&times;salience weighted average of these positions. "
+        f"The heaviest weights sit with {heavy_desc}, pulling the result "
+        f"{_esc(phrase_for(heaviest[0][0].position.mode, v.position_thirds))}. The closed-form "
+        f"weighted mean lands at {cp:.0f}.</p>"
+    )
+    unc = "; ".join(
+        f"{_esc(name)}'s {field} (anywhere from {lo:g} to {hi:g})"
+        for name, field, lo, hi in _widest_inputs(game, 3)
+    )
+    parts.append(f"<p><strong>Genuinely uncertain:</strong> {unc}.</p></section>")
+    return "".join(parts)
+
+
+def _narr_solvers(record: ForecastRecord, game: GameSpec, readout: BandReadout) -> str:
+    """The two solvers side by side — never blended (D22.5)."""
+    e = record.ensemble
+    rubric = game.resolution_rubric
+    cp = compromise_point(game)
+    this_band = readout.median_band
+    cp_band = band_containing(cp, rubric)
+
+    def band_label(b: RubricBand | None) -> str:
+        return _esc(b.label) if b is not None else "—"
+
+    rows = (
+        f"<tr><td>this run ({_esc(record.model)})</td><td class='num'>{e.median:.1f}</td>"
+        f"<td>{band_label(this_band)}</td></tr>"
+        f"<tr><td>compromise weighted-mean (closed form)</td><td class='num'>{cp:.1f}</td>"
+        f"<td>{band_label(cp_band)}</td></tr>"
+    )
+    gap = abs(e.median - cp)
+    same = this_band is not None and cp_band is not None and this_band.lo == cp_band.lo
+    agree = "land in the same band" if same else "land in different bands"
+    return (
+        "<h3>Both solvers, side by side</h3><table><thead><tr><th>model</th><th>median</th>"
+        f"<th>band</th></tr></thead><tbody>{rows}</tbody></table>"
+        f"<p class='sub'>The two solvers differ by {gap:.1f} points and {agree}. Their outputs are "
+        "shown side by side, never blended into one number.</p>"
+    )
+
+
+def _narr_assumptions_split(record: ForecastRecord, game: GameSpec) -> str:
+    """Inputs split into what a source establishes vs what was inferred (rule 6)."""
+    sourced = [a for a in game.actors if a.evidence]
+    parts = ["<h3>What rests on sources vs inference</h3>"]
+    if sourced:
+        li = "".join(
+            f"<li><strong>{_esc(a.name)}</strong> — {len(a.evidence)} evidence note(s)</li>"
+            for a in sourced
+        )
+        parts.append(
+            "<p><strong>Sourced</strong> — traces to fetched sources or supplied text:</p>"
+            f"<ul>{li}</ul>"
+        )
+    else:
+        parts.append(
+            "<p><strong>Sourced:</strong> <span class='sub'>none — no evidence notes on any "
+            "actor.</span></p>"
+        )
+    parts.append("<p><strong>Inferred</strong> — asserted where the sources were silent:</p>")
+    parts.append(_assumptions_html(list(record.assumptions)))
+    return "".join(parts)
+
+
+def _narr_diagnostics(record: ForecastRecord) -> str:
+    e = record.ensemble
+    cv = record.convergence_stats
+    mode = record.median_trajectory[-1] if record.median_trajectory else None
+    degen = zero_swing_warning(record.sensitivity)
+    pairs = {
+        "converged fraction": f"{cv.get('converged_fraction', 0.0) * 100:.0f}%",
+        "mode-game median": (
+            f"{mode:.1f} (gap {e.median - mode:+.1f})" if mode is not None else "—"
+        ),
+        "degenerate lock": degen or "none",
+    }
+    return "<h3>Diagnostics</h3>" + _dl(pairs)
+
+
+def _narr_brief(record: ForecastRecord, game: GameSpec, readout: BandReadout) -> str:
+    e = record.ensemble
+    parts = ['<section class="narr"><h2>Analyst brief</h2>']
+    if readout.kind == BANDED:
+        rows = ""
+        for bp in readout.per_band:
+            marks = [m for m, on in (("modal", bp.is_modal), ("median", bp.is_median)) if on]
+            mark = f" <span class='ev'>({', '.join(marks)})</span>" if marks else ""
+            cls = " class='modal'" if bp.is_modal else ""
+            rows += (
+                f"<tr{cls}><td>{_esc(bp.band.label)}{mark}</td>"
+                f"<td class='num'>{bp.band.lo:g}&ndash;{bp.band.hi:g}</td>"
+                f"<td class='num'>{bp.probability:.0%}</td></tr>"
+            )
+        parts.append(
+            "<h3>Band probabilities</h3><table><thead><tr><th>band</th><th>range</th>"
+            f"<th>P(draws)</th></tr></thead><tbody>{rows}</tbody></table>"
+        )
+    else:
+        parts.append(f"<h3>Band probabilities</h3><p class='sub'>{_esc(readout.note)}</p>")
+    parts.append(_narr_solvers(record, game, readout))
+    parts.append(
+        "<h3>Outcome distribution</h3><figure>"
+        + svg.histogram(record.outcome_distribution, p10=e.p10, p90=e.p90, median=e.median)
+        + "</figure>"
+    )
+    parts.append("<h3>Stakeholders &amp; evidence</h3>" + _actor_table(game, with_evidence=True))
+    parts.append(_narr_assumptions_split(record, game))
+    parts.append("<h3>What to watch — sensitivity</h3>")
+    parts.append(_sensitivity_warning(record))
+    if record.sensitivity:
+        parts.append(f"<figure>{_tornado(record)}</figure>")
+    else:
+        parts.append(
+            "<p class='sub'>The compromise weighted-mean model has no round-by-round tornado; "
+            "see the widest input ranges under Reading.</p>"
+        )
+    parts.append(_narr_diagnostics(record))
+    parts.append("</section>")
+    return "".join(parts)
+
+
+def _narr_appendix(record: ForecastRecord) -> str:
+    parts = ['<section class="narr"><h2>Appendix</h2>']
+    if record.sources_fetched:
+        parts.append(
+            f"<h3>Sources fetched ({len(record.sources_fetched)})</h3>"
+            + _sources_list(record.sources_fetched)
+        )
+    else:
+        parts.append(
+            "<h3>Sources fetched</h3><p class='sub'>None carried into this record "
+            "(bare GameSpec, or the draft was not live-searched).</p>"
+        )
+    cmd = (
+        f"schelling solve &lt;game&gt;.json --seed {record.seed} "
+        f"--solver {record.model} --draws {record.ensemble.n_draws}"
+    )
+    parts.append(f"<h3>Reproduce</h3><pre>{cmd}</pre>")
+    pairs = {
+        "inputs_hash": record.inputs_hash,
+        "engine (git SHA)": record.engine_version,
+        "seed": str(record.seed),
+        "model": record.model,
+        "n_draws": str(record.ensemble.n_draws),
+    }
+    parts.append(_dl(pairs))
+    fm = record.formalizer_metadata
+    if fm is not None:
+        parts.append(
+            f"<p class='sub'>Formalized by {_esc(fm.model)} · {fm.searches_used} search(es) · "
+            f"${fm.cost_usd:.4f}</p>"
+        )
+    parts.append("</section>")
+    return "".join(parts)
 
 
 def _analog_panel(panel: AnalogPanel) -> str:
