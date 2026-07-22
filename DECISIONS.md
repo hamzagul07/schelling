@@ -1565,3 +1565,16 @@ exception), narrative retry-then-accept and reject-after-cap, the firewall leak 
 order, computed-section + fixed-narrative determinism, `--no-narrative` mode, advise-record integration,
 the read-only guarantee (CLI never rewrites the record), the api-key guard, and a gated PDF build. All
 dossier tests pass; sealed hashes are untouched (the dossier never hashes or writes a record).
+
+### D26.7 — Restore green: scope the paper's `E-LEDGER` evidence to its one question
+An out-of-band commit (`c1b27bc`, "Seal Q-2026-IAEA-SEP v1") added IAEA rows to the FORECASTS.md
+ledger and turned `main` red: `paper.evidence._ledger_items` tagged rows `E-LEDGER-{model}-{vintage}`
+without the question id, so IAEA's `challenge v1` (45.837) collided with US-Iran's (34.576) and both
+overwrote the paper's figures (breaking `test_paper` and the evidence-drift check). The paper is
+explicitly about **one** live question — US-Iran stage two ("four forecasts on one ongoing
+geopolitical question", §8) — so `_ledger_items` now scopes its `E-LEDGER-*` evidence to
+`_PAPER_LEDGER_QUESTION = Q-2026-USIRAN-STAGE2`. IAEA and any later-sealed question remain real ledger
+entries in FORECASTS.md but are not this paper's evidence. **The frozen paper, EVIDENCE.md, and the
+four sealed US-Iran figures are byte-unchanged**; the test and `paper-evidence --check` pass again
+(only pre-existing provenance/test-count warnings remain). Ratified by Hassan ("Fix ledger, then
+merge"). Sealed records and the ledger itself are untouched.
