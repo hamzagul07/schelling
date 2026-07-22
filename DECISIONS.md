@@ -1262,3 +1262,20 @@ failing): the Model Three work introduced 23 `E501` over-length lines (in `backt
 All were wrapped mechanically — string literals via adjacent-literal concatenation (byte-identical
 output, so `paper-evidence --check` and every golden are unaffected) and comments/dividers by
 re-wrapping. No behaviour changed. This restores the green-before-commit invariant.
+
+### D21.8 — Housekeeping: made the transcript-dependent tests CI-hermetic
+With ruff unblocked (D21.7), `pytest` ran on CI for the first time since D20 and surfaced **seven
+pre-existing failures** — all environmental: the lecture transcripts under `data/transcripts/` are
+gitignored (not redistributable), so on CI they are absent, and seven tests that assert on real
+lecture content failed (`test_chunker::test_real_transcripts_yield_29_lectures` /
+`::test_chunks_carry_lecture_provenance`; `test_knowledge::test_search_returns_chunks_with_refs` /
+`::test_seeded_relevance_dating_game`; `test_templates::test_transcript_refs_are_real_lectures`;
+`test_cli::test_knowledge_build_then_search` / `::test_knowledge_build_missing_extra_is_friendly`).
+These had been red on CI latently — the ruff failure short-circuited the job before pytest ran, so
+nobody saw them; "N tests green" in prior sessions was always the **local** count (Hassan's env has
+the transcripts). Each was guarded with the project's established idiom —
+`@pytest.mark.skipif(not _HAS_TRANSCRIPTS, ...)`, matching the seven existing `skipif(not
+<data>.exists())` guards for the gitignored DEU/ICB data — where
+`_HAS_TRANSCRIPTS = TRANSCRIPTS.exists() and any(TRANSCRIPTS.glob("*.txt"))`. Locally (transcripts
+present) all seven still run and pass; on CI they skip. No production code touched. CI now runs the
+full gate green for the first time since D20.
