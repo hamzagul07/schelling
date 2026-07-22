@@ -1467,3 +1467,19 @@ sections. New `tests/test_rubric_lookup.py` (12 tests: parse, walk-up lookup, em
 inject-without-rewrite, missing-rubric unchanged, determinism, source labels, hash-unchanged). The
 narrative golden was updated for the new "Rubric source" appendix line. 378 tests green; ruff/format/
 mypy clean; paper-evidence --check passes.
+
+### D24.4 — US-Iran band structuring ratified; provenance hardened; drift-guarded
+Hassan ratified the D24.2 band structuring. His verbatim ratification note now sits **beside the
+`bands` array** in `GRADING-Q-2026-USIRAN-STAGE2.md` (and, dated, in the IAEA grading file): "Bands
+array added 2026-07-22 as a structured restatement of the seven bands already committed in
+outcome_mapping — identical boundaries and meaning, no semantic change, added so the report renders
+the probability strip. The prose outcome_mapping and the sealed continuum text remain canonical; if
+the array and the prose ever disagree, the prose governs. Pre-resolution; rubric is excluded from
+inputs_hash so no sealed record, ledger entry, or timestamp is affected." A **drift-guard test**
+(`test_committed_grading_bands_match_outcome_mapping_prose`, parametrized over both grading files)
+asserts the structured `bands` boundaries exactly equal the boundaries stated in the `outcome_mapping`
+prose (and that they tile 0-100 contiguously) — so the two representations can never silently diverge;
+any future edit to one that does not match the other fails CI. **Confirmed:** all four sealed US-Iran
+records still `schelling verify` 4/4 (ledger-match, inputs-hash, determinism), and `FORECASTS.md` +
+`ledger-proofs/` are byte-untouched (the OTS-anchored ledger is unaffected — only the grading files
+changed). Full gate green.
