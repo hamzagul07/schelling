@@ -1,0 +1,39 @@
+# Move vocabulary v1 (Advise 2.0, Session 21). Named diplomatic actions -> typed parameter deltas.
+# Extend by adding entries here. `sense` is directional: toward_settlement / toward_advisor pull a
+# position toward the current settlement or the advisor's ideal; increase / decrease step salience.
+# `magnitude` is the delta size (clamped to the actor's stated range).
+#
+# DEFERRED (D21): flag-based moves through MT-1.0 mechanics (guarantor, trap, cohesion, endurance)
+# are intentionally NOT here — advice may not use an unscored model. They return only after the
+# MT-1.0 coercive reading.
+moves:
+  - name: phased_concession
+    dimension: position
+    scope: self
+    sense: toward_settlement
+    magnitude: 10
+    rationale: Give ground incrementally toward the emerging settlement to unlock agreement.
+  - name: escalate_commitment
+    dimension: salience
+    scope: self
+    sense: increase
+    magnitude: 15
+    rationale: Raise own salience to weight the outcome toward your position.
+  - name: deescalate_signal
+    dimension: salience
+    scope: self
+    sense: decrease
+    magnitude: 15
+    rationale: Lower own salience to signal flexibility and de-risk the standoff.
+  - name: coalition_pull
+    dimension: position
+    scope: target
+    sense: toward_advisor
+    magnitude: 15
+    rationale: Persuade a pivotal actor to move toward your position, shifting the weighted centre.
+  - name: side_payment
+    dimension: salience
+    scope: target
+    sense: decrease
+    magnitude: 15
+    rationale: Trade a concession to lower an opponent's salience, defusing its pull.

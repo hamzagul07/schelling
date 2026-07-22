@@ -216,6 +216,10 @@ def advise(
     grid_step: float | None = None,
     salience_floor: float = 20.0,
     created_at: str | None = None,
+    strategy: bool = False,
+    mode: str = "levers",
+    robustness_draws: int = 400,
+    response_draws: int = 500,
 ) -> tuple[AdviseRecord, ForecastRecord]:
     """Run the advise search and return ``(AdviseRecord, baseline ForecastRecord)``.
 
@@ -238,6 +242,28 @@ def advise(
     pos_hi = max(a.position.high for a in game.actors)
     pos_step = grid_step if grid_step is not None else max(round((pos_hi - pos_lo) / 20.0, 6), _EPS)
     sal_step = grid_step if grid_step is not None else 5.0
+
+    def _maybe_enhance(lens: AdviseLens, settle: Settle, exact: bool) -> AdviseLens:
+        if not strategy:
+            return lens
+        from schelling.advise.strategy import enhance_lens
+
+        return enhance_lens(
+            lens,
+            game,
+            advisor_idx,
+            ideal,
+            settle=settle,
+            exact=exact,
+            cfg=cfg,
+            pos_step=pos_step,
+            sal_step=sal_step,
+            salience_floor=salience_floor,
+            robustness_draws=robustness_draws,
+            response_draws=response_draws,
+            seed=seed,
+            mode=mode,
+        )
 
     def challenge_lens() -> tuple[AdviseLens, ForecastRecord]:
         base_rec = forecast(game, cfg, n_draws=target_draws, seed=seed, write=False)
@@ -263,6 +289,7 @@ def advise(
             top_moves=tm,
             persuasion_targets=tg,
         )
+        lens = _maybe_enhance(lens, lambda g: _median(g, cfg, response_draws, seed), exact=False)
         return lens, base_rec
 
     def compromise_lens() -> tuple[AdviseLens, ForecastRecord]:
@@ -290,6 +317,7 @@ def advise(
             top_moves=tm,
             persuasion_targets=tg,
         )
+        lens = _maybe_enhance(lens, _compromise_settlement, exact=True)
         return lens, base_rec
 
     second: AdviseLens | None = None
@@ -303,14 +331,32 @@ def advise(
 
     advise_cfg: dict[str, str | float | int | bool | None] = {
         "model": model,
+        "mode": mode,
+        "strategy": strategy,
         "draws_per_candidate": draws_per_candidate,
         "target_draws": target_draws,
         "grid_step": pos_step,
         "salience_step": sal_step,
         "salience_floor": salience_floor,
+        "robustness_draws": robustness_draws,
+        "response_draws": response_draws,
     }
     hashed = _inputs_hash(game, cfg, advise_cfg, advising_actor)
     run_id = f"{game.question_id}-advise-{model}-{advising_actor}-s{seed}-{hashed[:12]}"
+
+    brief = ""
+    if strategy:
+        from schelling.advise.strategy import strategy_brief
+
+        brief = strategy_brief(
+            advising_actor,
+            ideal,
+            primary.baseline_median,
+            primary.top_moves[0] if primary.top_moves else None,
+            primary.persuasion_targets[0] if primary.persuasion_targets else None,
+            primary.equilibrium,
+        )
+
     record = AdviseRecord(
         question_id=game.question_id,
         run_id=run_id,
@@ -330,6 +376,10 @@ def advise(
         top_moves=primary.top_moves,
         persuasion_targets=primary.persuasion_targets,
         second_lens=second,
+        mode=mode,
+        strategy_brief=brief,
+        equilibrium=primary.equilibrium,
+        packages=primary.packages,
         game=game,
     )
     return record, baseline_record

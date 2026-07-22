@@ -1186,3 +1186,79 @@ wired into any model now. The knowledge index rebuilt to 99 chunks (70 transcrip
 retrievable (top hit for intelligence-advantage/decapitation queries). Firewall unchanged and green —
 its whitelist is `templates.yaml` only, so C7's phrases stay catchable as leaks and its new theorist
 names (Jordan, Johnston) do not false-positive. Card-count tests updated 28 → 29. 321 tests green.
+
+### D21.1 — One-ply response preview (item 1)
+For each top recommended move, `response_preview` (in `advise/strategy.py`) reports the move's
+un-countered **gross** benefit and the **net** benefit after the most-affected opponent's best single
+counter-response. "Most-affected" is defined operationally: we let *every* opponent take its
+adversarial best response (the one that maximizes the settlement's distance from the advisor's ideal,
+objective `-|s - ideal|`) and pick the opponent whose response leaves the advisor worst off (minimal
+net). Net can never exceed gross (the opponent always has "do nothing" available), which is asserted in
+the tests. **Interpretive choice, logged:** the paper gives no one-ply-response construction — this is
+our own decision-analytic overlay on the compromise settlement, not a Scholz/BdM equation. Under the
+exact (compromise) lens the response is a closed form on the weighted mean; under the challenge lens it
+is simulated at reduced draws and flagged `simulated=True` (the report/CLI print "(sim)").
+
+### D21.2 — `--mode equilibrium` (exact lens only, item 2)
+`equilibrium_exact` iterates best responses across all actors (each moves its position within its
+stated range and salience within bounds toward its **own** ideal, objective `|s - ideal|`) to a fixed
+point, capped at 25 iterations. A fixed point (no actor changes) is reported `converged=True`; a
+settlement value that recurs in the path is reported honestly as a `cycle` (closed on itself) rather
+than a false convergence; hitting the cap without either is `converged=False, cycle=[]`. The output
+carries the settled settlement, each actor's equilibrium move (position/salience from→to), and the full
+convergence path. Equilibrium is **exact-lens only** — the simulated challenge lens has no closed form
+to iterate cheaply; the CLI refuses `--mode equilibrium --solver challenge` with a friendly error. In
+this mode the standing one-sided caveat is replaced by the **successor caveat**: "assumes model-optimal
+play by all actors — an upper bound on adaptation, not a prophecy" (`SUCCESSOR_CAVEAT`). **Interpretive
+choice, logged:** best-response-toward-own-ideal is our reading; the paper models a single expected
+settlement, not an iterated-best-response dynamic. On the monotone weighted-mean dynamics used here the
+process converges in practice (actors walk to their range bounds), so the cycle branch is defensive.
+
+### D21.3 — Robustness grading across the MC draws (item 3)
+Every recommended move's (and top-3 target's) benefit is recomputed across the Monte-Carlo draws:
+`robustness_exact` samples the triangular inputs with `sample_game`/`derive_rng` and evaluates the
+closed-form benefit per draw; `robustness_challenge` uses paired `run_monte_carlo` median distributions
+(baseline vs moved, same seed). `_grade` reports the p10/p90 benefit CI and the **sign-stable
+fraction** (share of draws whose benefit shares the point estimate's sign), grading **ROBUST** when
+≥ 0.90 else **KNIFE-EDGE**. Applies to both lenses. This is pure Monte-Carlo bookkeeping over the
+deterministic solver — no LLM, no estimate (rules 1–2).
+
+### D21.4 — Move vocabulary v1 (item 4) + the deferred flag-based moves
+`advise/moves.yaml` maps named diplomatic actions to typed parameter deltas: `phased_concession`
+(position → settlement), `escalate_commitment` / `deescalate_signal` (own salience ±),
+`coalition_pull(target)` (target position → advisor), `side_payment` (target salience −), each with a
+one-line rationale; `advise/moves.py` resolves a move to a concrete `(field, value, MoveAction)` clamped
+to the actor's stated range. The vocabulary is extended by editing the YAML. `advise` searches over
+vocabulary moves alongside the sweep and renders recommendations as named actions with their deltas.
+**Explicitly deferred (item 4, logged here and in the YAML header): flag-based moves through MT-1.0
+mechanics — `guarantor`, `trap`, and the cohesion/endurance levers — are NOT in the vocabulary.**
+Advice may not use an unscored model: MT-1.0 is scored once, at the pre-registered 8-verified-case
+reading (D20.0), and until then no recommendation may turn a knob only MT-1.0 prices. These moves
+return only after that reading. A test asserts the vocabulary is disjoint from `{guarantor, trap,
+cohesion, endurance}`.
+
+### D21.5 — Package search (item 5, exact lens only)
+`package_search` exhaustively evaluates the best two-move bundles over the vocabulary + sweep moves at a
+coarse grid (position/salience step doubled), keeping benefit and cost separated as always and grading
+each bundle's robustness. Bundles are returned best-benefit-first. Exact-lens only (the exhaustive
+closed-form evaluation is cheap; the simulated lens is not).
+
+### D21.6 — Strategy brief + report/CLI surfaces (item 6)
+`strategy_brief` emits one deterministic, readable paragraph per advised actor — best own move (as an
+action), its net-after-response, robustness grade, best persuasion target, and the equilibrium picture
+when computed. The report (`report/render.py`) gains guarded sections — response preview & robustness,
+best two-move packages, equilibrium, and the strategy brief — all behind presence checks so the
+pre-2.0 `advise.json` golden renders **byte-identically** (its records carry none of the new fields);
+the successor caveat swaps in only when `record.mode == "equilibrium"`. New goldens
+(`advise_strategy.json/.html`) cover every new render path; determinism is pinned with a byte-identical
+re-run test. All new advise fields are optional/defaulted and `advise(strategy=False)` is the library
+default, so Session-7 tests and goldens are untouched. **344 tests green.**
+
+### D21.7 — Housekeeping: restored CI to green (pre-existing E501 from D20)
+While gating this session I found `main` had been **red on CI since D20** (`uv run ruff check .`
+failing): the Model Three work introduced 23 `E501` over-length lines (in `backtest/writeup.py`,
+`backtest/verify.py`, `knowledge/chunker.py`, `knowledge/index.py`, `paper/assemble.py`,
+`paper/evidence.py`, and five test files) that were merged red across D20 and D21.0, contra rule 5.
+All were wrapped mechanically — string literals via adjacent-literal concatenation (byte-identical
+output, so `paper-evidence --check` and every golden are unaffected) and comments/dividers by
+re-wrapping. No behaviour changed. This restores the green-before-commit invariant.
