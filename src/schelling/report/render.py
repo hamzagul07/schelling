@@ -438,7 +438,7 @@ def precedent_panel_html(record: ForecastRecord) -> str:
     """The reference-class (outside-view) panel: the ratified precedents' distribution as its OWN
     strip beside the model's, clearly separated and NEVER blended (D29.3), plus the divergence
     diagnostic when the two disagree (D29.5). Guarded — empty when no panel is attached."""
-    from schelling.precedents.panel import divergence_line
+    from schelling.precedents.panel import coverage_fraction, divergence_line
 
     panel = record.precedent_panel
     game = record.game
@@ -446,18 +446,31 @@ def precedent_panel_html(record: ForecastRecord) -> str:
         return ""
     pal = load_palette()
     parts = ['<section class="narr"><h2>Reference class — the outside view</h2>']
-    parts.append(
-        "<p class='sub'>The empirical distribution of "
-        f"<strong>{len(panel.precedents)}</strong> ratified, ex-ante-codable precedents. "
-        "This is a base rate, <strong>not</strong> a forecast, and is "
-        "<strong>never blended</strong> "
-        f"into the model (weight {panel.blend_weight:g}) — shown beside the model strip for "
-        "comparison only.</p>"
-    )
-    diverge = divergence_line(record)
-    if diverge:
-        parts.append(f'<div class="caveat"><strong>{_esc(diverge)}</strong></div>')
-    if panel.band_distribution:
+    if panel.reference_class:
+        parts.append(f"<p class='sub'>Reference class: {_esc(panel.reference_class)}.</p>")
+    if not panel.complete:
+        # Sessions-at-risk could not be fully sourced: report coverage, NOT a base rate (D30.1).
+        frac = coverage_fraction(panel)
+        denom = str(panel.sessions_at_risk) if panel.sessions_at_risk is not None else "unknown"
+        cov = f" ({frac:.0%} of the class)" if frac is not None else ""
+        parts.append(
+            f'<div class="caveat"><strong>INCOMPLETE reference class.</strong> {panel.n_covered} '
+            f"of {denom} sessions-at-risk are covered{cov}. The reference class is sessions-at-risk"
+            " (every decision opportunity, including sessions that decided nothing), not notable "
+            "outcomes. Because the full population could not be sourced, <strong>no base rate is "
+            "computed</strong> — a distribution over a biased sample would overstate action.</div>"
+        )
+    else:
+        parts.append(
+            f"<p class='sub'>The empirical distribution over the full sessions-at-risk class of "
+            f"<strong>{panel.n_covered}</strong> ratified, ex-ante-codable decision opportunities "
+            "(including no-action sessions). This is a base rate, <strong>not</strong> a forecast, "
+            f"and is <strong>never blended</strong> (weight {panel.blend_weight:g}) — "
+            "shown beside the model strip for comparison only.</p>"
+        )
+        diverge = divergence_line(record)
+        if diverge:
+            parts.append(f'<div class="caveat"><strong>{_esc(diverge)}</strong></div>')
         desc = "Distribution of ratified precedents across the rubric bands (outside view)."
         strip = svg.band_strip(
             _precedent_segments(game, panel.band_distribution),
