@@ -1,12 +1,12 @@
-"""Render the static site from :class:`SiteData` and diff it against the committed pages (D31, D33).
+"""Render the static site from :class:`SiteData` and diff it against the committed pages (D31-D35).
 
 Every page is plain, self-contained HTML linking one relative stylesheet (``site.css``); the only
-external references are navigational ``<a href>`` links to the public repo (rubrics, the draft, the
-source) — never embedded resources, so each page renders fully offline. No figure is written by
-hand: the page builders interpolate only fields of :class:`SiteData`, which are parsed from
-artifacts. The markup structure and classes follow Hassan's approved ``site-reference-index.html``
-(D33): a nav, a two-line serif ``h1`` whose second line carries the accent, stat cards, and a
-div-based ledger where every full SHA-256 sits on its own monospace line beneath the row.
+external references are navigational ``<a href>`` links to the public repo — never embedded
+resources, so each page renders fully offline. No figure is written by hand: the page builders
+interpolate only fields of :class:`SiteData`, parsed from artifacts. The layout follows Hassan's
+approved ``site-reference-vast.html`` (D35): a sticky 260px sidebar with a numbered section index,
+a full-bleed content column, and the index restructured into eight sections that deep-link to the
+existing pages.
 """
 
 from __future__ import annotations
@@ -16,17 +16,21 @@ import re
 from pathlib import Path
 
 from schelling.site.css import SITE_CSS
-from schelling.site.data import SiteData, gather
+from schelling.site.data import SiteData, gather, trial_gates
 from schelling.site.figures import forecast_landscape, trials
 
 DEFAULT_REPO_URL = "https://github.com/hamzagul07/schelling"
 
-# nav order (the brand links home; Source is external) — labels double as the aria-current key.
-_NAVLINKS = [
-    ("ledger.html", "Ledger"),
-    ("findings.html", "Findings"),
-    ("paper.html", "Paper"),
-    ("reports/", "Reports"),
+# The eight sections of the index, in order — the sidebar index and the section ordinals follow it.
+_SECTIONS = [
+    ("finding", "The finding"),
+    ("ledger", "The sealed ledger"),
+    ("trials", "The trials"),
+    ("apparatus", "The apparatus"),
+    ("canon", "The canon"),
+    ("record", "The record"),
+    ("paper", "The paper"),
+    ("verify", "Verify it yourself"),
 ]
 _NUM = re.compile(r"[-+]?\d+(?:\.\d+)?")
 
@@ -40,52 +44,55 @@ def _first_num(text: str) -> str:
     return m.group(0) if m else ""
 
 
-def _two_nums(text: str) -> str:
-    """The first two numbers in a compound evidence value, joined ``a / b`` (e.g. ``23.84 vs
-    22.99`` -> ``23.84 / 22.99``). Empty if fewer than two are present."""
-    nums = _NUM.findall(text)
-    return " / ".join(nums[:2]) if len(nums) >= 2 else ""
-
-
-def _delta_num(cells: list[str]) -> str:
-    """The signed delta from a leaderboard row — the first cell that begins with + or - (its number
-    only, e.g. ``+0.83 [-0.15, +1.91]`` -> ``+0.83``). Empty when the row carries no delta cell."""
-    for cell in cells:
-        c = cell.strip()
-        if c[:1] in "+-":
-            return _first_num(c)
-    return ""
-
-
 def _blob(repo_url: str, path: str, text: str) -> str:
-    """A navigational link to a repository file (rubrics, DRAFT.md — they live above ``docs/`` and
-    are not served by the host, so they are linked at the public repo, not relatively)."""
+    """A navigational link to a repository file (canon.md, DECISIONS.md — above ``docs/``, linked at
+    the public repo, not relatively)."""
     return f'<a href="{_esc(repo_url)}/blob/main/{_esc(path)}">{_esc(text)}</a>'
 
 
-def _nav(current: str, prefix: str, repo_url: str) -> str:
-    brand = f'<a class="brand" href="{prefix}index.html">schelling</a>'
+def _deep(href: str, text: str) -> str:
+    return f'<a class="deep" href="{_esc(href)}">{_esc(text)} →</a>'
+
+
+def _figure(svg: str, caption: str) -> str:
+    if not svg:
+        return ""
+    return f"<figure>{svg}<figcaption>{_esc(caption)}</figcaption></figure>"
+
+
+def _sidebar(current: str, prefix: str, data: SiteData) -> str:
     links = []
-    for href, label in _NAVLINKS:
-        cur = ' aria-current="page"' if label == current else ""
-        links.append(f'<a href="{prefix}{href}"{cur}>{_esc(label)}</a>')
-    links.append(f'<a href="{_esc(repo_url)}">Source</a>')
+    for anchor, label in _SECTIONS:
+        cur = ' aria-current="page"' if anchor == current else ""
+        links.append(
+            f'<a href="{prefix}index.html#{anchor}"{cur}><span class="n"></span>{_esc(label)}</a>'
+        )
+    foot = (
+        f"research preview<br>agpl-3.0<br>{data.graded_count} graded · {data.sealed_count} sealed"
+    )
     return (
-        '<nav><div class="wrap">'
-        + brand
-        + '<span class="navlinks">'
-        + "".join(links)
-        + "</span></div></nav>"
+        "<aside>"
+        '<div class="mark">SCHELLING</div>'
+        f'<nav class="idx">{"".join(links)}</nav>'
+        f'<div class="asidefoot">{foot}</div>'
+        "</aside>"
     )
 
 
 def _shell(
-    *, title: str, description: str, current: str, body: str, repo_url: str, prefix: str
+    *,
+    title: str,
+    description: str,
+    body: str,
+    current: str,
+    prefix: str,
+    data: SiteData,
+    repo_url: str,
 ) -> str:
-    host = repo_url.split("://", 1)[-1]
+    host = repo_url.split("://", 1)[-1].upper()
     footer = (
-        "<footer>Every figure on this site regenerates from repository artifacts — no number is "
-        f'hand-typed. · <a href="{_esc(repo_url)}">{_esc(host)}</a></footer>'
+        f'<div class="bleed"><footer>SCHELLING · RESEARCH PREVIEW · {data.sealed_count} SEALED · '
+        f"{data.graded_count} GRADED · {_esc(host)}</footer></div>"
     )
     return (
         "<!doctype html>"
@@ -95,182 +102,227 @@ def _shell(
         f"<title>{_esc(title)}</title>"
         f'<link rel="stylesheet" href="{prefix}site.css">'
         "</head><body>"
-        + _nav(current, prefix, repo_url)
-        + f'<div class="wrap">{body}{footer}</div>'
-        + "</body></html>"
+        '<div class="shell">'
+        + _sidebar(current, prefix, data)
+        + f"<main>{body}{footer}</main>"
+        + "</div></body></html>"
     )
 
 
-def _hero(eyebrow: str, line1: str, turn: str, lede: str, actions: str) -> str:
+def _hero(mark: str, line1: str, turn: str, lede: str, cta: str) -> str:
     return (
-        f'<p class="eyebrow">{_esc(eyebrow)}</p>'
+        '<div class="bleed hero">'
+        f'<div class="mark">{_esc(mark)}</div>'
         f'<h1>{_esc(line1)}<span class="turn">{_esc(turn)}</span></h1>'
         f'<p class="lede">{_esc(lede)}</p>'
-        + (f'<div class="actions">{actions}</div>' if actions else "")
+        + (f'<div class="cta">{cta}</div>' if cta else "")
+        + "</div>"
     )
 
 
-def _stat(k: str, v: str, *, date: bool = False) -> str:
-    cls = "v date" if date else "v"
-    return f'<div class="stat"><p class="k">{_esc(k)}</p><p class="{cls}">{_esc(v)}</p></div>'
-
-
-def _stats(data: SiteData, *, tests: bool) -> str:
-    cards = (
-        _stat("Forecasts sealed", str(data.sealed_count))
-        + _stat("Graded", str(data.graded_count))
-        + _stat("First grading", data.grading_date, date=True)
-        + (_stat("Tests", data.test_count) if tests else "")
-    )
-    return f'<div class="stats">{cards}</div>'
-
-
-def _numbered(sections: list[str]) -> str:
-    """Wrap each section body in a numbered ``<section>``: a hairline rule above (the section's
-    border-top) with its section number in monospace at the left (D34.4). The number itself is a
-    CSS counter (``.snum::before``), so no ordinal is hand-typed into the HTML."""
-    return "".join(f'<section><p class="snum"></p>{inner}</section>' for inner in sections)
-
-
-def _figure(svg: str, caption: str) -> str:
-    """A figure with its monospace caption. Empty string when the figure could not be generated."""
-    if not svg:
-        return ""
+def _section(anchor: str, title: str, inner: str, *, rule: bool = True) -> str:
+    cls = "bleed rule" if rule else "bleed"
     return (
-        f'<figure class="figure">{svg}'
-        f'<figcaption class="fig-cap">{_esc(caption)}</figcaption></figure>'
+        f'<section id="{anchor}" class="{cls}">'
+        f'<div class="sechead"><span class="n"></span><h2>{_esc(title)}</h2></div>'
+        f"{inner}</section>"
     )
 
 
-def _honesty_note(data: SiteData) -> str:
-    """The ledger note — the graded count sits beside the sealed count in the stat cards above; this
-    states plainly that nothing is graded, so no accuracy is claimed (D31.5)."""
-    if data.graded_count == 0:
-        tail = "Nothing here has been graded yet, so no accuracy is claimed."
-    else:
-        tail = f"{data.graded_count} of {data.sealed_count} sealed forecasts are now graded."
-    return (
-        '<p class="note">Each row is the SHA-256 of a complete forecast record, committed to this '
-        "public repository before its event resolved and anchored in the bitcoin blockchain by "
-        f"OpenTimestamps. {tail}</p>"
-    )
+def _cell(k: str, v: str, s: str) -> str:
+    return f'<div class="cell"><p class="k">{_esc(k)}</p><p class="v">{_esc(v)}</p><p class="s">{_esc(s)}</p></div>'
 
 
-def _ledger(data: SiteData) -> str:
-    """The div-based ledger: a metadata line per row, with the full SHA-256 on its own monospace
-    line beneath (D33) — never inside a table cell. Shows every sealed row."""
-    head = (
-        '<div class="lhead"><span class="q">Question</span><span class="m">Model</span>'
-        '<span class="v">Median</span><span class="d">Resolves</span></div>'
-    )
+def _ledger_rows(data: SiteData) -> str:
     rows = []
     for r in data.ledger:
-        graded = r.question in data.graded_questions
-        chip = "graded" if graded else "sealed"
-        resolves = data.questions.get(r.question)
-        date = resolves.resolution_date if resolves else ""
+        info = data.questions.get(r.question)
+        date = info.resolution_date if info else ""
         rows.append(
-            '<div class="lrow"><div class="lmain">'
-            f'<span class="q"><code>{_esc(r.question)}</code> '
-            f'<span class="chip">{chip}</span></span>'
+            '<div class="row">'
+            f'<span class="q"><code>{_esc(r.question)}</code></span>'
             f'<span class="m">{_esc(r.model)}</span>'
             f'<span class="v">{_esc(r.median)}</span>'
-            f'<span class="d">{_esc(date)}</span></div>'
-            f'<p class="hash">{_esc(r.sha256)}</p></div>'
+            f'<span class="d">{_esc(date)}</span>'
+            f'<span class="h">{_esc(r.sha256)}</span>'
+            "</div>"
         )
-    return '<div class="ledger">' + head + "".join(rows) + "</div>"
+    return f'<div class="rows">{"".join(rows)}</div>'
 
 
-def _gate_rows(data: SiteData) -> str:
-    """The pre-registered gates and their numbers — every figure pulled from the evidence table and
-    the leaderboard. A gate whose numbers cannot be sourced is dropped, never invented (D33.2)."""
-    failed = (data.gate_verdict or "").lower() or "failed"
-    deltas = [_delta_num(cells) for cells in data.leaderboard_rows]
-    successor = " / ".join(d for d in deltas if d)
-    gates = [
-        ("Replication of the published reference case", data.fig("E-REPL-MEDIAN"), "passed"),
-        (
-            "Challenge model vs the weighted mean",
-            _join(data.fig("E-DEU-MAE-r1"), data.fig("E-BASE-WMEAN-r1")),
-            failed,
-        ),
-        (
-            "The same fight with real capabilities",
-            _join(
-                _first_num(data.fig("E-METHOD-challenge_rp")),
-                _first_num(data.fig("E-METHOD-baseline_wmean")),
-            ),
-            failed,
-        ),
-        ("Two successor models, held-out test split", successor, failed),
-        ("Flexible oracle — is there signal left?", _two_nums(data.fig("E-ORACLE-MAE")), "ceiling"),
-    ]
-    out = []
-    for label, numbers, verdict in gates:
-        if not numbers:
-            continue  # no artifact source for this figure — drop the element
-        out.append(
-            f'<div class="gate"><span class="g">{_esc(label)}</span>'
-            f'<span class="n">{_esc(numbers)}</span>'
-            f'<span class="r">{_esc(verdict)}</span></div>'
-        )
-    return '<div class="gates">' + "".join(out) + "</div>"
-
-
-def _join(a: str, b: str) -> str:
-    return f"{a} / {b}" if a and b else ""
-
-
-# --------------------------------------------------------------------------- index
+# ============================================================================ index
 def _index_body(data: SiteData, repo_url: str) -> str:
-    actions = (
-        '<a class="btn primary" href="paper.html">Read the paper</a>'
-        '<a class="btn" href="ledger.html">The sealed ledger</a>'
-        f'<a class="btn" href="{_esc(repo_url)}">Source</a>'
-    )
     hero = _hero(
-        "open forecasting engine · agpl · research preview",
+        "an open forecasting engine",
         "The CIA's forecasting model was never checkable.",
         "Now it is.",
-        "An open replication of the Bueno de Mesquita group decision model, with a measured "
-        "predictability ceiling, a pre-registered successor search, and every forecast sealed by "
-        "cryptographic hash before the event resolves.",
-        actions,
+        "A complete open replication of the Bueno de Mesquita group decision model — the engine the "
+        "CIA ran as Policon — evaluated against the benchmark it was never tested on, with every "
+        "live forecast sealed by cryptographic hash before its event resolves.",
+        '<a class="p" href="#paper">Read the paper</a>'
+        '<a href="#ledger">The sealed ledger</a>'
+        '<a href="#verify">Verify it yourself</a>',
     )
-    landscape = (
-        "<h2>The forecast landscape</h2>"
-        '<p class="sub">Every sealed forecast on its own continuum — median and 80% interval, with '
-        "the rubric bands behind.</p>"
+
+    cells = [
+        _cell(
+            "FORECASTS SEALED",
+            str(data.sealed_count),
+            f"across {data.question_count} live questions",
+        ),
+        _cell("GRADED", str(data.graded_count), f"first grading {data.grading_date}"),
+    ]
+    if data.gate_count:
+        cells.append(_cell("GATES PRE-REGISTERED", str(data.gate_count), "none moved"))
+    cells.append(_cell("DECISIONS LOGGED", str(data.decisions_count), "every interpretive choice"))
+    if data.test_count:
+        cells.append(_cell("TESTS", data.test_count, "green on every commit"))
+    grid = f'<div class="grid">{"".join(cells)}</div>'
+
+    deu_n = data.fig("E-DEU-N") or "the DEU"
+    finding = _section(
+        "finding",
+        "The finding",
+        '<div class="two">'
+        '<p class="big">The famous model loses to the average of its own inputs — and nothing else '
+        "beats that average either.</p>"
+        "<div>"
+        f'<p class="body">Evaluated on {_esc(deu_n)} expert-coded European legislative controversies '
+        "with sourced capabilities and reference points, the challenge model fails a gate fixed in "
+        "writing before the result existed. A pre-registered search for a successor — its data split "
+        "committed to version control before any model was written — produced two candidates that "
+        "both failed on held-out data.</p>"
+        '<p class="body">A deliberately overfit-capable probe then found no signal left to extract. '
+        "The simple weighted mean is not merely hard to beat; it sits at the ceiling of what these "
+        "inputs can predict. What made the lineage work was never the equations. It was the "
+        "discipline of turning expert judgement into structured numbers — structure, not magic.</p>"
+        + _deep("findings.html", "The trials and the ceiling")
+        + "</div></div>",
+        rule=False,
+    )
+
+    ledger = _section(
+        "ledger",
+        "The sealed ledger",
+        '<p class="body">Every forecast below was committed to a public repository and anchored in '
+        "the bitcoin blockchain before its event resolved. Nothing has been graded yet, so no "
+        "accuracy is claimed.</p>"
         + _figure(
             forecast_landscape(data),
-            "Fig. 1 — the forecast landscape, generated from the "
-            "sealed ledger and its interval snapshot.",
+            "Fig. 1 — sealed forecast landscape · generated from FORECASTS.md",
         )
+        + _deep("ledger.html", f"The full ledger — all {data.sealed_count} forecasts"),
     )
-    verify = (
-        "<pre>schelling verify runs/&lt;record&gt;.json\n"
-        "ots verify ledger-proofs/FORECASTS.md-&lt;hash&gt;.ots -f FORECASTS.md</pre>"
+
+    n_gates = data.gate_count
+    trials_sec = _section(
+        "trials",
+        "The trials",
+        f'<p class="body">{n_gates} gates, each fixed in writing before the result existed. None '
+        "was moved. Mean absolute error against the outcome, model versus baseline, on the same "
+        "scale.</p>"
+        + _figure(
+            trials(data),
+            "Fig. 2 — pre-registered trials, in run order · generated from BACKTEST.md",
+        )
+        + _deep("findings.html", "Every gate and its verdict"),
     )
-    ledger = (
-        "<h2>The sealed ledger</h2>"
-        '<p class="sub">Committed before resolution. Anchored in bitcoin. Verifiable by anyone.</p>'
-        + _ledger(data)
-        + _honesty_note(data)
-        + verify
+
+    apparatus = _section(
+        "apparatus",
+        "The apparatus",
+        '<p class="body">A question in plain language becomes a formal game, a distribution over '
+        "outcomes, a strategy brief for every actor, and a sealed record that a stranger can "
+        "re-run.</p>"
+        '<div class="cards">'
+        '<div class="card"><p class="t">I · READ</p><h3>Formalize</h3><p>A language model reads the '
+        "evidence and drafts the game — every actor's position, salience and capability, each with a "
+        "cited source, each guess disclosed. A firewall keeps the concept library from ever "
+        "supplying a fact.</p></div>"
+        '<div class="card"><p class="t">II · PREDICT</p><h3>Solve</h3><p>Two solvers run side by side '
+        "across ten thousand sampled worlds — the replicated challenge model and the weighted mean "
+        "that beat it — producing a distribution, not a guess.</p></div>"
+        '<div class="card"><p class="t">III · ADVISE</p><h3>Strategy</h3><p>An exhaustive lever '
+        "search per actor: best own moves, what survives the opponent's answer, who to persuade, and "
+        "which recommendations are robust rather than knife-edge.</p></div>"
+        '<div class="card"><p class="t">IV · SEAL</p><h3>Commit</h3><p>Every forecast is '
+        "deterministic, so its hash is a complete commitment. Published before the event, anchored in "
+        "bitcoin, graded in public against a rubric written in advance.</p></div>"
+        "</div>",
     )
-    gates = (
-        "<h2>What the tests found</h2>"
-        '<p class="sub">Every gate fixed in writing before the result existed. None was moved.</p>'
-        + _gate_rows(data)
-        + '<p class="note">The celebrated model loses to the average of its own inputs, and an '
-        "overfit-capable probe finds nothing beyond that average to extract. What made the lineage "
-        "work was never the equations — it was the discipline of turning expert judgement into "
-        "structured numbers. Structure, not magic.</p>"
+
+    canon = _canon_section(data, repo_url)
+    record = _record_section(data, repo_url)
+
+    paper = _section(
+        "paper",
+        "The paper",
+        '<p class="big">Structure, Not Magic: An Open Replication and '
+        "Predictability Ceiling for the Bueno de Mesquita Forecasting Model</p>"
+        '<p class="body">Every figure in the manuscript regenerates from a repository artifact by a '
+        "single command. Zero unresolved citations.</p>"
+        + _deep("paper.html", "Abstract, draft, and bibliography"),
     )
-    return hero + _stats(data, tests=True) + _numbered([landscape, ledger, gates])
+
+    verify = _section(
+        "verify",
+        "Verify it yourself",
+        '<p class="body">Nothing here asks for trust. Clone the repository and check any forecast '
+        "against its hash, then check the hash against the blockchain.</p>"
+        f"<pre>git clone {_esc(repo_url)}\n"
+        "schelling verify runs/&lt;record&gt;.json\n"
+        "ots verify ledger-proofs/FORECASTS.md-&lt;hash&gt;.ots -f FORECASTS.md</pre>",
+    )
+
+    return hero + grid + finding + ledger + trials_sec + apparatus + canon + record + paper + verify
 
 
-# --------------------------------------------------------------------------- ledger
+def _canon_section(data: SiteData, repo_url: str) -> str:
+    if not data.canon_cards:
+        return _section(
+            "canon",
+            "The canon",
+            '<p class="body">A concept library informs how a situation is read; it may never testify '
+            "about one.</p>",
+        )
+    families = ", ".join(name for _letter, name in data.canon_families)
+    fam_clause = f" across the families of {_esc(families)}" if families else ""
+    return _section(
+        "canon",
+        "The canon",
+        '<div class="two">'
+        f'<p class="big">{data.canon_cards} findings from a century of conflict research, each with '
+        "its evidence strength and a rule for coding it.</p>"
+        f'<p class="body">Every card{fam_clause} carries a citation, an honesty tag — robust, '
+        "supported, contested, theory — and the observable evidence that would instantiate it. The "
+        "library may classify a situation. It may never testify about one."
+        + _deep(f"{repo_url}/blob/main/data/concepts/canon.md", "The concept library")
+        + "</p></div>",
+    )
+
+
+def _record_section(data: SiteData, repo_url: str) -> str:
+    counts = []
+    if data.decisions_count:
+        counts.append(f"{data.decisions_count} interpretive choices")
+    if data.gate_count:
+        counts.append(f"{data.gate_count} pre-registered gates")
+    lead = " and ".join(counts)
+    body = (
+        f'<p class="body">{lead.capitalize()} — logged, dated, and public. Corrections are made on '
+        "top, never by erasure.</p>"
+        if lead
+        else '<p class="body">Every interpretive choice, logged, dated, and public. Corrections are '
+        "made on top, never by erasure.</p>"
+    )
+    return _section(
+        "record",
+        "The record",
+        body + _deep(f"{repo_url}/blob/main/DECISIONS.md", "The decisions log"),
+    )
+
+
+# ============================================================================ ledger page
 def _ledger_body(data: SiteData, repo_url: str) -> str:
     hero = _hero(
         "the sealed ledger",
@@ -281,55 +333,47 @@ def _ledger_body(data: SiteData, repo_url: str) -> str:
         "outcome is known.",
         "",
     )
-    landscape = (
-        "<h2>The forecast landscape</h2>"
-        '<p class="sub">Every sealed forecast on its own continuum — median and 80% interval, with '
-        "the rubric bands behind and the modal band labelled.</p>"
-        + _figure(
-            forecast_landscape(data),
-            "Fig. 1 — the forecast landscape, generated from the "
-            "sealed ledger and its interval snapshot.",
+    grid = (
+        '<div class="grid">'
+        + _cell(
+            "FORECASTS SEALED", str(data.sealed_count), f"across {data.question_count} questions"
         )
+        + _cell("GRADED", str(data.graded_count), f"first grading {data.grading_date}")
+        + "</div>"
     )
-    ledger = (
-        "<h2>Every sealed forecast</h2>"
-        '<p class="sub">All rows, committed to this public repository ahead of resolution.</p>'
-        + _ledger(data)
-        + _honesty_note(data)
+    honesty = (
+        '<p class="body">Nothing here has been graded yet, so no accuracy is claimed. Each row is '
+        "the SHA-256 of a complete forecast record, anchored in the bitcoin blockchain before its "
+        "event resolved.</p>"
     )
-    q_items = []
+    ledger = _section("ledger", "Every sealed forecast", honesty + _ledger_rows(data), rule=False)
+    q_cards = []
     for info in data.questions.values():
-        graded = info.question_id in data.graded_questions
-        chip = "graded" if graded else "sealed"
-        q_items.append(
-            f'<li class="ritem">{_blob(repo_url, info.rubric_file, info.question_id)}'
-            f'<p class="rf">resolves {_esc(info.resolution_date)} · {chip} · '
-            "pre-registered grading rubric</p></li>"
+        graded = "graded" if info.question_id in data.graded_questions else "sealed"
+        q_cards.append(
+            '<div class="card">'
+            f'<p class="t">{_esc(graded).upper()} · RESOLVES {_esc(info.resolution_date)}</p>'
+            f"<h3>{_esc(info.question_id)}</h3>"
+            f"<p>Pre-registered grading rubric, fixed in writing before resolution. "
+            f"{_blob(repo_url, info.rubric_file, 'Read the rubric')}.</p></div>"
         )
-    questions = (
-        "<h2>Questions and rubrics</h2>"
-        '<p class="sub">Each question&rsquo;s resolution criterion was fixed in writing before '
-        "resolution.</p>"
-        f'<ul class="rlist">{"".join(q_items)}</ul>'
+    questions = _section(
+        "questions", "Questions and rubrics", f'<div class="cards">{"".join(q_cards)}</div>'
     )
-    verify = (
-        "<h2>How to verify</h2>"
-        '<p class="sub">Anyone can audit a sealed forecast without trusting us.</p>'
-        "<h3>Recompute and match</h3>"
-        "<pre>schelling verify runs/&lt;record&gt;.json</pre>"
-        '<p class="note">Recomputes the record file&rsquo;s SHA-256 and matches it to the row '
-        "above, recomputes the canonical inputs hash, and re-solves the embedded game with the "
-        "record&rsquo;s own seed to confirm the forecast reproduces byte-for-byte.</p>"
-        "<h3>External time anchor</h3>"
-        "<pre>ots verify ledger-proofs/FORECASTS.md-&lt;hash&gt;.ots -f FORECASTS.md</pre>"
-        '<p class="note">Each seal timestamps the ledger in the bitcoin blockchain, which cannot '
-        f"be backdated. The full ledger document is "
-        f"{_blob(repo_url, 'FORECASTS.md', 'FORECASTS.md')}.</p>"
+    verify = _section(
+        "verify",
+        "How to verify",
+        '<p class="body">Anyone can audit a sealed forecast without trusting us: recompute the '
+        "record's SHA-256, match it to the row, and re-solve the embedded game to confirm the "
+        "forecast reproduces byte-for-byte. Then check the ledger's timestamp against bitcoin.</p>"
+        "<pre>schelling verify runs/&lt;record&gt;.json\n"
+        "ots verify ledger-proofs/FORECASTS.md-&lt;hash&gt;.ots -f FORECASTS.md</pre>"
+        f'<p class="body">The full ledger document is {_blob(repo_url, "FORECASTS.md", "FORECASTS.md")}.</p>',
     )
-    return hero + _stats(data, tests=False) + _numbered([landscape, ledger, questions, verify])
+    return hero + grid + ledger + questions + verify
 
 
-# --------------------------------------------------------------------------- findings
+# ============================================================================ findings page
 def _findings_body(data: SiteData, repo_url: str) -> str:
     hero = _hero(
         "the method, and its negative results",
@@ -339,99 +383,98 @@ def _findings_body(data: SiteData, repo_url: str) -> str:
         "prominence whether it passes or fails. It fails, and that is the finding.",
         "",
     )
-    trials_sec = (
-        "<h2>The trials</h2>"
-        '<p class="sub">Each pre-registered gate, in the order it ran: the model&rsquo;s error '
-        "against the baseline&rsquo;s, on one scale.</p>"
+    trials_sec = _section(
+        "trials",
+        "The trials",
+        '<p class="body">Each gate fixed in writing before the result existed. None was moved. Mean '
+        "absolute error against the outcome, model versus baseline, on the same scale.</p>"
         + _figure(
             trials(data),
-            "Fig. 2 — the trials, generated from the backtest and evidence table; lower is better.",
-        )
+            "Fig. 2 — pre-registered trials, in run order · generated from BACKTEST.md",
+        ),
+        rule=False,
     )
-    gates = (
-        "<h2>What the tests found</h2>"
-        '<p class="sub">Every gate fixed in writing before the result existed. None was moved.</p>'
-        + _gate_rows(data)
+    gate_rows = []
+    for label, model_mae, base_mae, verdict in trial_gates(data):
+        gate_rows.append(
+            '<div class="row">'
+            f'<span class="g">{_esc(label)}</span>'
+            f'<span class="v">{model_mae:g} / {base_mae:g}</span>'
+            '<span class="d"></span>'
+            f'<span class="r">{_esc(verdict)}</span></div>'
+        )
+    gates = _section(
+        "gates",
+        "Every gate and its verdict",
+        f'<div class="rows">{"".join(gate_rows)}</div>'
+        if gate_rows
+        else '<p class="body">No gate figures could be sourced.</p>',
     )
     oracle = data.fig("E-ORACLE-MAE")
     gap = data.fig("E-ORACLE-GAP")
-    ceiling = ""
+    sections = [trials_sec, gates]
     if oracle and gap:
-        ceiling = (
-            "<h2>The ceiling</h2>"
-            f'<p class="body">A deliberately flexible, cross-validated oracle scores '
-            f"{_esc(oracle)} against the compromise mean — a gap of {_esc(gap)}. Even an "
-            "optimistic flexible model does not beat the mean: there is essentially no signal "
-            "beyond the "
-            "influence-weighted average, which is why every model tried fails to beat it.</p>"
-        )
-    # successor leaderboard, rendered as gate-style rows (no table — hashes never live in a table,
-    # and the same rhythm carries across pages)
-    lb_rows = []
-    for cells in data.leaderboard_rows:
-        name = cells[0] if cells else ""
-        delta = _delta_num(cells)
-        if not name or not delta:
-            continue
-        lb_rows.append(
-            f'<div class="gate"><span class="g">{_esc(name)}</span>'
-            f'<span class="n">Δ {_esc(delta)}</span>'
-            '<span class="r">no</span></div>'
-        )
-    successor = ""
-    if lb_rows:
-        successor = (
-            "<h2>Successor search</h2>"
-            '<p class="sub">A pre-registered train/dev/test split, committed before any fitting; '
-            "each candidate scored once on the untouched test split.</p>"
-            '<div class="gates">'
-            + "".join(lb_rows)
-            + "</div>"
-            + (
-                f'<p class="note">{_esc(data.successor_verdict)}</p>'
-                if data.successor_verdict
-                else ""
+        sections.append(
+            _section(
+                "ceiling",
+                "The ceiling",
+                f'<p class="big">A flexible, cross-validated oracle scores {_esc(oracle)} against '
+                f"the compromise mean — a gap of {_esc(gap)}. There is essentially no signal beyond "
+                "the influence-weighted average.</p>"
+                '<p class="body">Even an optimistic overfit-capable probe does not beat the mean, '
+                "which is why every model tried fails to beat it.</p>",
             )
-            + f'<p class="note">The full backtest is '
-            f"{_blob(repo_url, 'BACKTEST.md', 'BACKTEST.md')}.</p>"
         )
-    sections = [gates, trials_sec]
-    if ceiling:
-        sections.append(ceiling)
-    if successor:
-        sections.append(successor)
-    return hero + _numbered(sections)
+    if data.successor_verdict:
+        sections.append(
+            _section(
+                "successor",
+                "Successor search",
+                '<p class="body">A pre-registered train/dev/test split, committed before any '
+                f"fitting. {_esc(data.successor_verdict)} "
+                f"The full backtest is {_blob(repo_url, 'BACKTEST.md', 'BACKTEST.md')}.</p>",
+            )
+        )
+    return hero + "".join(sections)
 
 
-# --------------------------------------------------------------------------- paper
+# ============================================================================ paper page
 def _paper_body(data: SiteData, repo_url: str) -> str:
     hero = _hero(
         "the paper",
         "Structure,",
         "not magic.",
         "An open replication and predictability ceiling for the Bueno de Mesquita forecasting "
-        "model. Every cited number regenerates from repository artifacts by a single command.",
-        f'<a class="btn primary" href="{_esc(repo_url)}/blob/main/paper/DRAFT.md">'
-        "Read the draft</a>"
-        f'<a class="btn" href="{_esc(repo_url)}">Source</a>',
+        "model. Every cited number regenerates from a repository artifact by a single command.",
+        f'<a class="p" href="{_esc(repo_url)}/blob/main/paper/DRAFT.md">Read the draft</a>'
+        f'<a href="{_esc(repo_url)}">Source</a>',
     )
     sections = []
     if data.abstract:
-        sections.append(f'<h2>Abstract</h2><p class="body">{_esc(data.abstract)}</p>')
+        sections.append(
+            _section(
+                "abstract", "Abstract", f'<p class="body">{_esc(data.abstract)}</p>', rule=False
+            )
+        )
     sections.append(
-        "<h2>Read the draft</h2>"
-        f'<p class="body">The full working draft — assembled deterministically from the section '
-        "files and the evidence table, every cited number carrying a per-claim provenance footnote "
-        f"— is {_blob(repo_url, 'paper/DRAFT.md', 'paper/DRAFT.md')}. Regenerate the evidence base "
-        "with <code>schelling paper-evidence</code>.</p>"
+        _section(
+            "draft",
+            "Read the draft",
+            '<p class="body">The full working draft — assembled deterministically from the section '
+            "files and the evidence table, every cited number carrying a per-claim provenance "
+            f"footnote — is {_blob(repo_url, 'paper/DRAFT.md', 'paper/DRAFT.md')}. Regenerate the "
+            "evidence base with <code>schelling paper-evidence</code>.</p>",
+        )
     )
     if data.bibliography:
         items = "".join(f"<li>{_esc(entry)}</li>" for entry in data.bibliography)
-        sections.append(f'<h2>Bibliography</h2><ul class="bib">{items}</ul>')
-    return hero + _numbered(sections)
+        sections.append(
+            _section("bibliography", "Bibliography", f'<ul class="biblist">{items}</ul>')
+        )
+    return hero + "".join(sections)
 
 
-# --------------------------------------------------------------------------- reports
+# ============================================================================ reports page
 def _reports_body(data: SiteData, repo_url: str) -> str:
     hero = _hero(
         "rendered dossiers and reports",
@@ -442,19 +485,20 @@ def _reports_body(data: SiteData, repo_url: str) -> str:
         "",
     )
     if data.reports:
-        items = "".join(
-            f'<li class="ritem"><a href="{_esc(r.filename)}">{_esc(r.title)}</a>'
-            f'<p class="rf">{_esc(r.filename)}</p></li>'
+        cards = "".join(
+            f'<div class="card"><p class="t">REPORT</p>'
+            f'<h3><a href="{_esc(r.filename)}">{_esc(r.title)}</a></h3>'
+            f'<p><a href="{_esc(r.filename)}">{_esc(r.filename)}</a></p></div>'
             for r in data.reports
         )
-        listing = f'<h2>Published reports</h2><ul class="rlist">{items}</ul>'
+        inner = f'<div class="cards">{cards}</div>'
     else:
-        listing = (
-            '<h2>Published reports</h2><p class="note">No rendered reports are published yet. '
-            "Reports are generated with <code>schelling report</code> / "
-            "<code>schelling dossier</code> and copied into docs/reports/.</p>"
+        inner = (
+            '<p class="body">No rendered reports are published yet. Reports are generated with '
+            "<code>schelling report</code> / <code>schelling dossier</code> and copied into "
+            "docs/reports/.</p>"
         )
-    return hero + _numbered([listing])
+    return hero + _section("reports", "Published reports", inner, rule=False)
 
 
 def build_site(
@@ -469,35 +513,35 @@ def build_site(
         "index.html": (
             _index_body(d, repo_url),
             "Schelling — an open forecasting engine",
-            "The thesis",
+            "",
             "",
             "An open, continuously-audited replication of the Bueno de Mesquita forecasting model.",
         ),
         "ledger.html": (
             _ledger_body(d, repo_url),
             "Ledger — Schelling",
-            "Ledger",
+            "ledger",
             "",
             "The sealed commit-reveal forecast ledger, with verification instructions.",
         ),
         "findings.html": (
             _findings_body(d, repo_url),
             "Findings — Schelling",
-            "Findings",
+            "trials",
             "",
             "The pre-registered evaluation, the ceiling result, and the successor search.",
         ),
         "paper.html": (
             _paper_body(d, repo_url),
             "Paper — Schelling",
-            "Paper",
+            "paper",
             "",
             "Abstract, draft, and bibliography of the open replication paper.",
         ),
         "reports/index.html": (
             _reports_body(d, repo_url),
             "Reports — Schelling",
-            "Reports",
+            "",
             "../",
             "Index of rendered dossiers and reports.",
         ),
@@ -507,10 +551,11 @@ def build_site(
         out[path] = _shell(
             title=title,
             description=desc,
-            current=current,
             body=body,
-            repo_url=repo_url,
+            current=current,
             prefix=prefix,
+            data=d,
+            repo_url=repo_url,
         )
     return out
 
