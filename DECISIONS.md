@@ -1940,3 +1940,53 @@ so every column of digits lines up. No stamps, no fake classification markings �
 comes from precision, not costume. 448 tests green; `site build --check` in sync; `docs/`
 regenerated; the honesty rule, drift check, no-hand-typed test, and offline-cleanliness all still
 pass.
+
+### D35.0 — The full-scale layout: adopt the vast reference (structure and CSS only)
+Hassan dropped `site-reference-vast.html` at the repo root as the approved target. `site.css` and the
+page shell now follow it — the data layer, the drift check, the honesty rule, and the
+no-hand-typed-figures test are unchanged (item 5 does add two new *sources*, below). A sticky 260px
+left sidebar carries the numbered section index and a sealed/graded line in its footer; the content
+column is full-bleed with `clamp(28px,5vw,96px)` side padding and collapses to a horizontal bar under
+900px. The type scale is the reference's: hero `clamp(40px,7.2vw,104px)`, section headings
+`clamp(22px,2.2vw,30px)`, the `.big` pull-quote `clamp(20px,2vw,27px)`, tabular figures throughout,
+new palette (warm `#faf9f6` ground, accent `#a8480d`, teal `#0f6e56`), dark mode via
+`prefers-color-scheme`. Section ordinals are CSS counters (`.sechead .n::before`, `.idx .n::before`),
+so no ordinal is hand-typed. The **index is restructured into the reference's eight sections** —
+finding, ledger, trials, apparatus, canon, record, paper, verify — and the existing pages
+(`ledger.html`, `findings.html`, `paper.html`, `reports/`) are kept and deep-linked from each section
+(and re-housed in the same sidebar shell).
+
+### D35.1 — Figures rescaled full-bleed to a 1200-unit viewBox
+Both instrument SVGs regenerate at a 1200-unit viewBox and render full-bleed at the content width
+(not inside a text column). The forecast landscape is now coloured by **model family** — challenge
+amber, compromise teal, llm-judgment grey, all three drawn from the report renderer's palette (the
+palette's dark structural colours would vanish on a dark ground, so only the data marks use it;
+axes, rules and labels use the site's CSS variables and flip with dark mode). The trials figure keeps
+the model-vs-baseline bar pairs on a shared scale with the verdict as a monospace label. Both stay
+pure functions of the artifacts, byte-identical on re-run, `role="img"` with a generated title/desc,
+and script/asset-free. The landscape headlines the index ledger section and the trials headline both
+the index trials section and the findings page.
+
+### D35.2 — The two new data sources; sourced values win over the reference's illustrations
+Every figure in the reference is hand-typed for illustration; the generator sources them. Two
+sections that previously had no data source now do (item 5): the **canon** section reads its card
+count (29) and family names from `data/concepts/canon.md` (one card per `**X#.` marker, one family per
+`## Family X — name` header), and the **record** section reads the decisions count from `DECISIONS.md`
+and the pre-registered-gate count from the backtest/evidence (via `trial_gates`, the same set the
+trials figure plots). Both feed a new **grid** of stat cells alongside the sealed/graded/first-grading
+figures. Where the generator's sourced value differs from the reference's illustration, the sourced
+value wins: **gates render 5** (the enumerable MAE gates), not the reference's 6; **tests render 297**
+(the committed `E-TESTS`), not 448; dates render ISO; question labels render the canonical id. A stat
+whose count can't be sourced is dropped, not hand-typed (`gate_count`/`test_count` are guarded).
+
+### D35.3 — Honesty and the no-hand-typed rule, in the new markup
+The graded count still sits beside the sealed count — now as adjacent `GRADED` / `FORECASTS SEALED`
+grid cells on the index and ledger pages, and the sidebar footer states both (`0 graded · 8 sealed`).
+While `graded == 0` the ledger prose claims no accuracy; no page asserts forecast accuracy. The
+no-hand-typed-figures test is unchanged in intent — every number in the HTML traces to
+`SiteData.provenance()` (extended with the question, gate, and canon counts) — with `"3.0"` (the
+AGPL-3.0 licence) joining the small structural whitelist. `test_reference_design_structure_holds` now
+locks the sidebar shell, the eight-section index, the accented two-line h1, no tables, and the full
+64-char SHA-256 on its own `.h` line. 448 tests green; `site build --check` in sync; dark mode and
+offline-cleanliness verified on every section; `render.py` gains a per-file E501 ignore as a dense
+HTML-template generator (as `css.py` already has).
