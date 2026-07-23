@@ -193,10 +193,38 @@ schelling paper-evidence
 # Assemble paper/DRAFT.md from paper/draft/*.md + EVIDENCE.md: resolve every [E-tag] inline to its
 # value with a provenance footnote, place the figures, append the bibliography. Deterministic.
 schelling paper-assemble
+
+# Regenerate the static site under docs/ from repository artifacts (ledger, backtest, evidence,
+# decisions, test count) — no figure is hand-typed. --check fails if the committed site is stale.
+schelling site build
 ```
 
 The DEU dataset is not redistributed here; download the four open-access DEU III files
 (`doi:10.34810/data53`) into `data/deu/` before running the backtest — see [`BACKTEST.md`](BACKTEST.md).
+
+## Deployment
+
+The deployable artifact is the static [`docs/`](docs/) folder produced by `schelling site build` —
+plain HTML and one CSS file, no framework and no build step. To publish an update:
+
+```sh
+schelling site build          # regenerate docs/ from the current repository artifacts
+git add docs && git commit     # commit the regenerated pages
+git push                       # the host republishes automatically
+```
+
+The site is served two ways, both from `docs/`:
+
+- **GitHub Pages** — enable once under Settings → Pages → Deploy from a branch → `main` / `/docs`.
+- **Vercel** — `vercel.json` and `.vercelignore` configure it as a static site: install and build
+  are both skipped (empty-string commands) and only `docs/` is exposed, so Vercel's Python
+  framework detection never fires (it would otherwise look for a serverless entrypoint and fail).
+  `outputDirectory` is `docs/`; `cleanUrls` drops the `.html` suffix.
+
+CI runs `schelling site build --check` on every push, so a stale published site cannot slip
+through: the drift check guarantees the committed `docs/` matches a fresh regeneration from the
+artifacts. (The Vercel/Pages config files are hand-authored root files, outside `docs/`, and are
+not part of the generated site — the drift check ignores them.)
 
 ## Development
 

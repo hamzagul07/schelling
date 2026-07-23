@@ -1,0 +1,13 @@
+# Vercel serves only the static site in docs/. Hide everything else so framework
+# detection cannot fire (a visible pyproject.toml makes Vercel assume a Python
+# serverless app and fail with "No python entrypoint found"). Nothing outside
+# docs/ is needed to serve the site.
+src
+tests
+pyproject.toml
+uv.lock
+data
+runs
+paper
+analyses
+docs/papers
