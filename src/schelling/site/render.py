@@ -17,6 +17,7 @@ from pathlib import Path
 
 from schelling.site.css import SITE_CSS
 from schelling.site.data import SiteData, gather
+from schelling.site.figures import forecast_landscape, trials
 
 DEFAULT_REPO_URL = "https://github.com/hamzagul07/schelling"
 
@@ -114,6 +115,33 @@ def _stat(k: str, v: str, *, date: bool = False) -> str:
     return f'<div class="stat"><p class="k">{_esc(k)}</p><p class="{cls}">{_esc(v)}</p></div>'
 
 
+def _stats(data: SiteData, *, tests: bool) -> str:
+    cards = (
+        _stat("Forecasts sealed", str(data.sealed_count))
+        + _stat("Graded", str(data.graded_count))
+        + _stat("First grading", data.grading_date, date=True)
+        + (_stat("Tests", data.test_count) if tests else "")
+    )
+    return f'<div class="stats">{cards}</div>'
+
+
+def _numbered(sections: list[str]) -> str:
+    """Wrap each section body in a numbered ``<section>``: a hairline rule above (the section's
+    border-top) with its section number in monospace at the left (D34.4). The number itself is a
+    CSS counter (``.snum::before``), so no ordinal is hand-typed into the HTML."""
+    return "".join(f'<section><p class="snum"></p>{inner}</section>' for inner in sections)
+
+
+def _figure(svg: str, caption: str) -> str:
+    """A figure with its monospace caption. Empty string when the figure could not be generated."""
+    if not svg:
+        return ""
+    return (
+        f'<figure class="figure">{svg}'
+        f'<figcaption class="fig-cap">{_esc(caption)}</figcaption></figure>'
+    )
+
+
 def _honesty_note(data: SiteData) -> str:
     """The ledger note — the graded count sits beside the sealed count in the stat cards above; this
     states plainly that nothing is graded, so no accuracy is claimed (D31.5)."""
@@ -143,7 +171,8 @@ def _ledger(data: SiteData) -> str:
         date = resolves.resolution_date if resolves else ""
         rows.append(
             '<div class="lrow"><div class="lmain">'
-            f'<span class="q">{_esc(r.question)} <span class="chip">{chip}</span></span>'
+            f'<span class="q"><code>{_esc(r.question)}</code> '
+            f'<span class="chip">{chip}</span></span>'
             f'<span class="m">{_esc(r.model)}</span>'
             f'<span class="v">{_esc(r.median)}</span>'
             f'<span class="d">{_esc(date)}</span></div>'
@@ -208,36 +237,37 @@ def _index_body(data: SiteData, repo_url: str) -> str:
         "cryptographic hash before the event resolves.",
         actions,
     )
-    stats = (
-        '<section><div class="stats">'
-        + _stat("Forecasts sealed", str(data.sealed_count))
-        + _stat("Graded", str(data.graded_count))
-        + _stat("First grading", data.grading_date, date=True)
-        + _stat("Tests", data.test_count)
-        + "</div></section>"
+    landscape = (
+        "<h2>The forecast landscape</h2>"
+        '<p class="sub">Every sealed forecast on its own continuum — median and 80% interval, with '
+        "the rubric bands behind.</p>"
+        + _figure(
+            forecast_landscape(data),
+            "Fig. 1 — the forecast landscape, generated from the "
+            "sealed ledger and its interval snapshot.",
+        )
     )
     verify = (
         "<pre>schelling verify runs/&lt;record&gt;.json\n"
         "ots verify ledger-proofs/FORECASTS.md-&lt;hash&gt;.ots -f FORECASTS.md</pre>"
     )
     ledger = (
-        "<section><h2>The sealed ledger</h2>"
+        "<h2>The sealed ledger</h2>"
         '<p class="sub">Committed before resolution. Anchored in bitcoin. Verifiable by anyone.</p>'
         + _ledger(data)
         + _honesty_note(data)
         + verify
-        + "</section>"
     )
     gates = (
-        "<section><h2>What the tests found</h2>"
+        "<h2>What the tests found</h2>"
         '<p class="sub">Every gate fixed in writing before the result existed. None was moved.</p>'
         + _gate_rows(data)
         + '<p class="note">The celebrated model loses to the average of its own inputs, and an '
         "overfit-capable probe finds nothing beyond that average to extract. What made the lineage "
         "work was never the equations — it was the discipline of turning expert judgement into "
-        "structured numbers. Structure, not magic.</p></section>"
+        "structured numbers. Structure, not magic.</p>"
     )
-    return hero + stats + ledger + gates
+    return hero + _stats(data, tests=True) + _numbered([landscape, ledger, gates])
 
 
 # --------------------------------------------------------------------------- ledger
@@ -251,19 +281,21 @@ def _ledger_body(data: SiteData, repo_url: str) -> str:
         "outcome is known.",
         "",
     )
-    stats = (
-        '<section><div class="stats">'
-        + _stat("Forecasts sealed", str(data.sealed_count))
-        + _stat("Graded", str(data.graded_count))
-        + _stat("First grading", data.grading_date, date=True)
-        + "</div></section>"
+    landscape = (
+        "<h2>The forecast landscape</h2>"
+        '<p class="sub">Every sealed forecast on its own continuum — median and 80% interval, with '
+        "the rubric bands behind and the modal band labelled.</p>"
+        + _figure(
+            forecast_landscape(data),
+            "Fig. 1 — the forecast landscape, generated from the "
+            "sealed ledger and its interval snapshot.",
+        )
     )
     ledger = (
-        "<section><h2>Every sealed forecast</h2>"
+        "<h2>Every sealed forecast</h2>"
         '<p class="sub">All rows, committed to this public repository ahead of resolution.</p>'
         + _ledger(data)
         + _honesty_note(data)
-        + "</section>"
     )
     q_items = []
     for info in data.questions.values():
@@ -275,13 +307,13 @@ def _ledger_body(data: SiteData, repo_url: str) -> str:
             "pre-registered grading rubric</p></li>"
         )
     questions = (
-        "<section><h2>Questions and rubrics</h2>"
+        "<h2>Questions and rubrics</h2>"
         '<p class="sub">Each question&rsquo;s resolution criterion was fixed in writing before '
         "resolution.</p>"
-        f'<ul class="rlist">{"".join(q_items)}</ul></section>'
+        f'<ul class="rlist">{"".join(q_items)}</ul>'
     )
     verify = (
-        "<section><h2>How to verify</h2>"
+        "<h2>How to verify</h2>"
         '<p class="sub">Anyone can audit a sealed forecast without trusting us.</p>'
         "<h3>Recompute and match</h3>"
         "<pre>schelling verify runs/&lt;record&gt;.json</pre>"
@@ -292,9 +324,9 @@ def _ledger_body(data: SiteData, repo_url: str) -> str:
         "<pre>ots verify ledger-proofs/FORECASTS.md-&lt;hash&gt;.ots -f FORECASTS.md</pre>"
         '<p class="note">Each seal timestamps the ledger in the bitcoin blockchain, which cannot '
         f"be backdated. The full ledger document is "
-        f"{_blob(repo_url, 'FORECASTS.md', 'FORECASTS.md')}.</p></section>"
+        f"{_blob(repo_url, 'FORECASTS.md', 'FORECASTS.md')}.</p>"
     )
-    return hero + stats + ledger + questions + verify
+    return hero + _stats(data, tests=False) + _numbered([landscape, ledger, questions, verify])
 
 
 # --------------------------------------------------------------------------- findings
@@ -307,24 +339,31 @@ def _findings_body(data: SiteData, repo_url: str) -> str:
         "prominence whether it passes or fails. It fails, and that is the finding.",
         "",
     )
+    trials_sec = (
+        "<h2>The trials</h2>"
+        '<p class="sub">Each pre-registered gate, in the order it ran: the model&rsquo;s error '
+        "against the baseline&rsquo;s, on one scale.</p>"
+        + _figure(
+            trials(data),
+            "Fig. 2 — the trials, generated from the backtest and evidence table; lower is better.",
+        )
+    )
     gates = (
-        "<section><h2>What the tests found</h2>"
+        "<h2>What the tests found</h2>"
         '<p class="sub">Every gate fixed in writing before the result existed. None was moved.</p>'
         + _gate_rows(data)
-        + "</section>"
     )
     oracle = data.fig("E-ORACLE-MAE")
     gap = data.fig("E-ORACLE-GAP")
     ceiling = ""
     if oracle and gap:
         ceiling = (
-            "<section><h2>The ceiling</h2>"
+            "<h2>The ceiling</h2>"
             f'<p class="body">A deliberately flexible, cross-validated oracle scores '
             f"{_esc(oracle)} against the compromise mean — a gap of {_esc(gap)}. Even an "
             "optimistic flexible model does not beat the mean: there is essentially no signal "
             "beyond the "
-            "influence-weighted average, which is why every model tried fails to beat it."
-            "</p></section>"
+            "influence-weighted average, which is why every model tried fails to beat it.</p>"
         )
     # successor leaderboard, rendered as gate-style rows (no table — hashes never live in a table,
     # and the same rhythm carries across pages)
@@ -342,7 +381,7 @@ def _findings_body(data: SiteData, repo_url: str) -> str:
     successor = ""
     if lb_rows:
         successor = (
-            "<section><h2>Successor search</h2>"
+            "<h2>Successor search</h2>"
             '<p class="sub">A pre-registered train/dev/test split, committed before any fitting; '
             "each candidate scored once on the untouched test split.</p>"
             '<div class="gates">'
@@ -354,9 +393,14 @@ def _findings_body(data: SiteData, repo_url: str) -> str:
                 else ""
             )
             + f'<p class="note">The full backtest is '
-            f"{_blob(repo_url, 'BACKTEST.md', 'BACKTEST.md')}.</p></section>"
+            f"{_blob(repo_url, 'BACKTEST.md', 'BACKTEST.md')}.</p>"
         )
-    return hero + gates + ceiling + successor
+    sections = [gates, trials_sec]
+    if ceiling:
+        sections.append(ceiling)
+    if successor:
+        sections.append(successor)
+    return hero + _numbered(sections)
 
 
 # --------------------------------------------------------------------------- paper
@@ -371,21 +415,20 @@ def _paper_body(data: SiteData, repo_url: str) -> str:
         "Read the draft</a>"
         f'<a class="btn" href="{_esc(repo_url)}">Source</a>',
     )
-    abstract = ""
+    sections = []
     if data.abstract:
-        abstract = f'<section><h2>Abstract</h2><p class="body">{_esc(data.abstract)}</p></section>'
-    draft = (
-        "<section><h2>Read the draft</h2>"
+        sections.append(f'<h2>Abstract</h2><p class="body">{_esc(data.abstract)}</p>')
+    sections.append(
+        "<h2>Read the draft</h2>"
         f'<p class="body">The full working draft — assembled deterministically from the section '
         "files and the evidence table, every cited number carrying a per-claim provenance footnote "
         f"— is {_blob(repo_url, 'paper/DRAFT.md', 'paper/DRAFT.md')}. Regenerate the evidence base "
-        "with <code>schelling paper-evidence</code>.</p></section>"
+        "with <code>schelling paper-evidence</code>.</p>"
     )
-    bib = ""
     if data.bibliography:
         items = "".join(f"<li>{_esc(entry)}</li>" for entry in data.bibliography)
-        bib = f'<section><h2>Bibliography</h2><ul class="bib">{items}</ul></section>'
-    return hero + abstract + draft + bib
+        sections.append(f'<h2>Bibliography</h2><ul class="bib">{items}</ul>')
+    return hero + _numbered(sections)
 
 
 # --------------------------------------------------------------------------- reports
@@ -404,14 +447,14 @@ def _reports_body(data: SiteData, repo_url: str) -> str:
             f'<p class="rf">{_esc(r.filename)}</p></li>'
             for r in data.reports
         )
-        listing = f'<section><ul class="rlist">{items}</ul></section>'
+        listing = f'<h2>Published reports</h2><ul class="rlist">{items}</ul>'
     else:
         listing = (
-            '<section><p class="note">No rendered reports are published yet. Reports are generated '
-            "with <code>schelling report</code> / <code>schelling dossier</code> and copied into "
-            "docs/reports/.</p></section>"
+            '<h2>Published reports</h2><p class="note">No rendered reports are published yet. '
+            "Reports are generated with <code>schelling report</code> / "
+            "<code>schelling dossier</code> and copied into docs/reports/.</p>"
         )
-    return hero + listing
+    return hero + _numbered([listing])
 
 
 def build_site(
