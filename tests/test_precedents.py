@@ -89,6 +89,43 @@ def test_parse_rejects_and_skips_malformed() -> None:
     assert len(good) == 1 and good[0].id == "x"
 
 
+# --------------------------------------------------------------- extractor hardening (D30)
+_ONE = (
+    '{"id":"a","what_happened":"w","date":"2024","source":"s",'
+    '"proposed_placement":20,"reasoning":"r","ex_ante_codable":true}'
+)
+# The actual failing shape: a search+thinking response truncated mid-preamble, no array at all.
+_PREAMBLE_ONLY = (
+    "I'll research the prior IAEA Board decisions on Iran to build the outside-view set. "
+    "Note: live web search was rate-limited, so the vote tallies rely on the public record"
+)
+
+
+def test_extractor_tolerates_fences_preamble_object_and_wrapper() -> None:
+    assert len(parse_precedents(f"here you go:\n```json\n[{_ONE}]\n```")) == 1  # fenced array
+    assert len(parse_precedents(f"Based on sources: [{_ONE}] done.")) == 1  # preamble + array
+    assert len(parse_precedents(_ONE)) == 1  # a single object -> one-element list
+    assert len(parse_precedents(f'{{"precedents": [{_ONE}]}}')) == 1  # wrapper object
+    with pytest.raises(PrecedentSearchError):
+        parse_precedents(_PREAMBLE_ONLY)  # genuinely no JSON -> raises
+
+
+def test_find_retries_on_preamble_then_succeeds() -> None:
+    # First reply is the truncated preamble (the live failure); the retry returns the array.
+    client = ReplayClient([LLMResult(_PREAMBLE_ONLY, 100, 50), LLMResult(_ARR, 100, 50)])
+    pset = find_precedents(client, _game())
+    assert len(pset.precedents) == 3
+    assert len(client.calls) == 2  # it retried once
+
+
+def test_find_final_failure_reports_what_was_returned() -> None:
+    client = ReplayClient([LLMResult(_PREAMBLE_ONLY, 1, 1), LLMResult(_PREAMBLE_ONLY, 1, 1)])
+    with pytest.raises(PrecedentSearchError) as exc:
+        find_precedents(client, _game())
+    # the failure is diagnosable: it quotes the first chars of the actual response, not a bare msg
+    assert "I'll research the prior IAEA" in str(exc.value)
+
+
 # --------------------------------------------------------------- ratification gating (item 2)
 def test_ratification_required_before_panel() -> None:
     assert not is_ratified(_pset())

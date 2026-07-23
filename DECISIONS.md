@@ -1684,3 +1684,22 @@ determinism, the evidence-river ratification gate, and the CLI (`precedents` wri
 `solve --precedents` attaches + prints divergence; `dossier --precedents` never modifies the record).
 Sealed records are untouched — a panel is attached post-hoc via `model_copy`, outside `inputs_hash`,
 and the dossier attaches read-only.
+
+### D30.0 — Bugfix: `precedents` failed "no JSON array" on --search (token truncation)
+Diagnosed from the live response on `analyses/iaea/iaea.json --search` (raw dumped to a scratch file):
+**22 blocks** (4 thinking, 2 text, 8 server_tool_use, 5 web_search_tool_result, 3
+code_execution_tool_result), **`stop_reason: max_tokens`**. The client's block-parsing already
+concatenates only `text` blocks correctly (one implementation, in `formalizer.client._parse_response`
+— precedents did not duplicate it), and that concatenation was **preamble only** (511 chars: "I'll
+research… Note: live web search was rate-limited…"): the model spent its 4000-token output budget on
+thinking + tool use + a wordy preamble and was **truncated before emitting the array**. So there was
+genuinely no `[`/`{`/fence and the extractor correctly reported none.
+
+**Fix (D30):** (1) raised `_MAX_TOKENS` 4000 → 8000 and made the system prompt demand JSON-only (no
+preamble, no notes, no fences); (2) hardened `parse_precedents` to tolerate ```json fences, a preamble
+before/after the JSON, a `{"precedents": [...]}` wrapper, and a **single object** instead of an array;
+(3) `find_precedents` now **retries once** with a stricter JSON-only instruction, and on final failure
+raises with the **first 300 characters of the last response** so the failure is diagnosable, not
+opaque. Replay fixtures cover the exact failing shape (preamble-only → retry → array) and each
+tolerated shape. Confirmed live: `precedents analyses/iaea/iaea.json --search` now returns 11 IAEA
+Board precedent proposals. 427 tests green.
