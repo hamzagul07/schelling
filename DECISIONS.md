@@ -1990,3 +1990,24 @@ locks the sidebar shell, the eight-section index, the accented two-line h1, no t
 64-char SHA-256 on its own `.h` line. 448 tests green; `site build --check` in sync; dark mode and
 offline-cleanliness verified on every section; `render.py` gains a per-file E501 ignore as a dense
 HTML-template generator (as `css.py` already has).
+
+### D36.0 — E-TESTS is a committed snapshot; refresh it when the suite grows
+`paper/EVIDENCE.md`'s `E-TESTS` row is a **committed snapshot** of `pytest --collect-only`, not a
+live count. The site publishes it: `site.data.gather()` sources the "TESTS" stat from `E-TESTS`
+(chosen in D31.2 so `site build --check` stays stable across the publishing commit and across test
+additions — a live count would desync the committed site on every new test). The trade-off is that
+the figure goes stale silently: it had drifted to **297** while the suite had grown to **449** (the
+site's flagship page showed the old number). Refreshed by regenerating `paper/EVIDENCE.md` with
+`schelling paper-evidence` and rebuilding `docs/`. The regeneration changed **only** the `E-TESTS`
+value (297 → 449) and provenance git-hashes — **no science number moved, and no figure changed** —
+which is exactly the provenance/test-count drift that `paper-evidence --check` classes as a warning,
+not a failure (D18.3); after regeneration both `paper-evidence --check` and `site build --check`
+report in sync. **No manuscript claim depends on the value:** no draft section cites `[E-TESTS]`, so
+`paper/DRAFT.md` is byte-unchanged and needs no reassembly.
+
+**Standing rule:** `E-TESTS` must be refreshed (regenerate `EVIDENCE.md`, then rebuild `docs/`)
+whenever the suite grows materially, because the published site quotes it. Neither drift check
+enforces this — `paper-evidence --check` only warns on a test-count change, and `site build --check`
+only sees the committed snapshot — so the refresh is a manual step, best done in any session that
+adds a batch of tests. Logging D36.0 itself grew the decisions count the site's grid publishes, so
+`docs/` is rebuilt once more after this entry.
