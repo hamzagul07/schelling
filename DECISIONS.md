@@ -1703,3 +1703,47 @@ raises with the **first 300 characters of the last response** so the failure is 
 opaque. Replay fixtures cover the exact failing shape (preamble-only → retry → array) and each
 tolerated shape. Confirmed live: `precedents analyses/iaea/iaea.json --search` now returns 11 IAEA
 Board precedent proposals. 427 tests green.
+
+### D30.1 — Selection-bias lesson: the reference class is SESSIONS-AT-RISK, not notable outcomes
+The D30.0 live run returned **11 proposals — every one a censure, referral, or non-compliance
+resolution** (placements 2–30, all in action bands). That is a textbook **selection-bias** reference
+class: it enumerated the *notable outcomes* and silently dropped every Board session that met and
+adopted nothing. A base rate over that numerator with no denominator overstates the probability of
+action — precisely the error the outside view is supposed to guard against. The quiet sessions are
+not absences; each is a decision opportunity that **places in the no-action band (40–59)** and belongs
+in the class.
+
+**Standing rule (now in `docs/PRECEDENTS.md` and the finder's system prompt):** identify the
+*population of decision opportunities* FIRST — every occasion the decision could have been taken, from
+a stated start date — and only then record what each one decided. Silent non-events are part of the
+class. Enumerate the denominator before you count the numerator. The lesson is general, not
+IAEA-specific: any base rate is meaningful only over its population of opportunities.
+
+### D30.2 — Denominator correction: INCOMPLETE beats a biased base rate
+Schema + panel changes implementing D30.1. `PrecedentSet` and `PrecedentPanel` gained `reference_class`
+(the population definition + start date, as the model states it) and `sessions_at_risk` (the
+denominator; **null = enumeration not fully sourced**). The finder now returns a JSON *object*
+`{"reference_class", "sessions_at_risk", "precedents"}`; the system prompt demands the population first,
+places no-action sessions in the no-action band ("do not list only the dramatic outcomes; that is
+selection bias"), and sets `sessions_at_risk` to null when the enumeration cannot be sourced.
+`_extract_top_json` prefers the whole object (carrying the metadata) before falling back to a bare
+array; `_parse_response` returns `(precedents, reference_class, sessions_at_risk)`.
+
+`build_precedent_panel` computes a band distribution — and therefore a base rate and the divergence
+diagnostic — **only when the class is COMPLETE**: `sessions_at_risk is not None and n_covered >=
+sessions_at_risk` (the ratified ex-ante precedents span the population). Otherwise the panel is
+INCOMPLETE: `band_distribution={}`, `base_rate_band → None`, `coverage_fraction = n_covered /
+sessions_at_risk` (or None), and the report renders an INCOMPLETE caveat ("N of M sessions-at-risk
+covered … no base rate is computed") instead of a distribution. `divergence` was already None whenever
+`base_rate_band` is None, so an incomplete class **cannot** fire the outside-view diagnostic.
+
+**Confirmed live (item 3).** Re-running `precedents analyses/iaea/iaea.json --search` with the
+corrected prompt returned **9 proposals across the June-2024 → June-2026 Boards — including 4
+no-action sessions placed ~50** (the quiet Boards the D30.0 class dropped). The model **reported the
+population as INCOMPLETE itself** (`sessions_at_risk: null`), because the outcomes of the Sept-2025 /
+Nov-2025 / Mar-2026 Boards could not be independently sourced. Building the panel against the sealed
+IAEA compromise record (model median **50.5** → "No new resolution; report noted; left to the
+diplomatic track"): reference class **INCOMPLETE**, coverage fraction unknown (denominator null), **no
+base rate, and the divergence diagnostic does NOT fire**. The D30.0 false divergence (the outside view
+"disagreeing" with the model's no-action median) was an artifact of the biased outcome-only sample; the
+sessions-at-risk enumeration plus honest INCOMPLETE reporting removes it. All gates green.
