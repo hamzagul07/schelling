@@ -2042,3 +2042,56 @@ the compromise model is proven to the ceiling (unlike the coercive US-Iran quest
 - **STOPPED at the draft** (D12.5 human-review gate): not solved, not sealed. Hassan reviews the
   draft with Claude before any forecast is run. `analyses/opec/` (situation, draft, report) stays
   gitignored; only the rubric, the rationale doc, and this entry are committed.
+
+### D37.1 — Sealed Q-2026-OPEC-SEP v1-thin (the honest thin-sourcing baseline)
+Hassan directed sealing the v1 draft as-is — its value is as the low-sourcing baseline against which
+a better-sourced v2 is measured. Sealed all three records at `--vintage v1-thin`: **challenge 62.009,
+compromise 62.450, llm-judgment 58.000** (`frozen_at 2026-07-24`). The two solver records verify 4/4
+(`schelling verify`: ledger-match, inputs-hash, determinism); the llm record is a SHA-256-only
+commitment (non-deterministic, D27.2) so `schelling verify` doesn't apply to it — its integrity is the
+ledger sha + OTS anchor, exactly like the USIRAN/IAEA llm seals.
+
+- **One correction before sealing (approved out-of-band).** The formalizer had set the draft's
+  `question_id` to `Q-2026-OPEC-SEP-VOLADJ`, which mismatched the pre-registered
+  `GRADING-Q-2026-OPEC-SEP.md` and would have produced an ungradable seal (the rubric lookup keys on
+  `question_id`). Corrected `question_id` → `Q-2026-OPEC-SEP` (metadata only — no actor, coordinate,
+  evidence or forecast value changed; the thin baseline is preserved) and re-solved.
+- **Rubric attachment.** `solve` does not embed the rubric, so the two solver records were sealed with
+  the arithmetic `ResolutionRubric` injected from the GRADING file (hash-excluded, so `verify` still
+  reproduces); the llm record picked it up via `llm-forecast`'s read-only lookup.
+- **Ledger + site.** The seal added three rows and re-anchored `FORECASTS.md` (OTS). OPEC now resolves
+  **2026-08-05** — earlier than USIRAN (08-31) and IAEA (09-30) — so the ledger header's date line
+  (which the site publishes as "first grading") was updated to the earliest, 2026-08-06, and
+  re-stamped; `FORECAST-INTERVALS.json` refreshed to 11, `docs/` rebuilt (11 sealed). All checks green.
+
+### D37.2 — Targeted v2 re-formalization: sourcing improved, unevenly, and honestly
+Re-formalized to `analyses/opec/opec-v2.json` (`--search --max-searches 12`, **$1.23, 12 searches, 82
+sources** vs v1's 6/38) with explicit search directives added to the situation NOTES (delegate-sourced
+positions; per-producer IMF fiscal breakevens; compensation schedules since Jan 2024; chronic
+overproduction and unwinding stances; confirm the 2 Aug date from OPEC; cite the OPEC Secretariat
+statement directly; and — per the brief — a capability rule accounting for **above-quota production
+ability as power**). `question_id` came back correct this time.
+
+**Acceptance test — sourced vs inferred, v2 vs v1, stated plainly (no dressing up):**
+- **Genuinely new sourced evidence in v2:** the OPEC Secretariat statement cited directly
+  (opec.org 3 May 2026, membership); the **2 Aug meeting date** now sourced (Saudi Gazette) and not
+  reported to have moved; **per-country compensation schedules** (Interfax: Kazakhstan ~2.63 mbpd,
+  Iraq ~1.4 mbpd, Russia ~0.31 mbpd); **Kazakhstan's chronic, unenforceable overproduction** as
+  bargaining power (OilPrice); **Saudi Arabia's fiscal breakeven** (~$86.60, IMF-style). The +188 kb/d
+  **increase** reading is retained (wires, not the aggregator).
+- **Capability rule (brief item 3) satisfied and disclosed:** Saudi = 100; others scaled by a blend of
+  production weight, spare capacity, AND demonstrated above-quota production — Kazakhstan lifted above
+  its bare volume share (cap 12/20/30 → 22/32/45) because its unenforceable overproduction is itself
+  moving/blocking power.
+- **But the coordinates themselves are still inference, and unevenly:** by the draft's own assumptions,
+  **no actor's position is delegate-sourced** (assumption 5 — pre-meeting positions weren't
+  retrievable), and salience is directly sourced **only for Saudi Arabia** (assumption 6). The four
+  big/pivotal members (Saudi, Kazakhstan, Iraq, Russia) now rest on real actor-specific evidence
+  (compensation, overproduction, breakeven); the three small members (**Kuwait, Algeria, Oman**) are
+  **unchanged from v1** — only "named in the OPEC statement" plus a generic "consensus follower," all
+  three coordinates pure inference. So the honest verdict: the **evidence base under the inferences
+  improved materially for the members that matter**, but the position/salience/capability values
+  remain grounded estimates, not sourced points — a real improvement, not the same inference re-cited.
+- **STOPPED before solving v2** (item 5). v2 is a draft under the human-review gate; `analyses/opec/`
+  (v1/v2 drafts, situations, reports) stays gitignored. Only the v1-thin seal (FORECASTS.md,
+  ledger-proofs, intervals, docs) and this log are committed.

@@ -6,7 +6,8 @@ record files themselves are never committed (`runs/` is gitignored), so no numbe
 edited after the fact. To reveal and verify after grading, run `sha256sum runs/<file>` locally and
 check the digest against the matching line below.
 
-**Resolution date: 2026-08-31** (the real-world event resolves) · **Grading date: 2026-09-01**
+**Resolution date: 2026-08-05** (the earliest sealed question resolves — Q-2026-OPEC-SEP; then
+Q-2026-USIRAN-STAGE2 on 2026-08-31 and Q-2026-IAEA-SEP on 2026-09-30) · **Grading date: 2026-08-06**
 (each record is scored as `|forecast median − actual|` on the same 0–100 continuum).
 
 ## Q-2026-USIRAN-STAGE2 — Will the US and Iran advance to MOU "stage two" by 31 Aug 2026?
@@ -32,6 +33,9 @@ rubric on their question.
 | compromise | v1 | Q-2026-IAEA-SEP | 2026-07-22 | 50.518 | `e8d10117192f1259b9e9ab6250641f82e0c1d50a4c00c2e73ff193580f867f99` |
 | llm-judgment | v2 | Q-2026-USIRAN-STAGE2 | 2026-07-21 | 41.000 | `180da06528d6a03128e4acde8e12e50432045e4cfb49d783105345bbc92bf2d4` |
 | llm-judgment | v1 | Q-2026-IAEA-SEP | 2026-07-22 | 32.000 | `074e17529b416a7b6deabb75b6e8ceccc62be1f6feba061c44b0ee47979f52cf` |
+| challenge | v1-thin | Q-2026-OPEC-SEP | 2026-07-24 | 62.009 | `ffe20dbfb8aeeb54fa6a2badf6f8ead9f4083f0c6d66a3af895023b1d315ab53` |
+| compromise | v1-thin | Q-2026-OPEC-SEP | 2026-07-24 | 62.450 | `c7ae358f4c36a4cbe994f67c443996585ab09019126eac0034026ed51fb7f62e` |
+| llm-judgment | v1-thin | Q-2026-OPEC-SEP | 2026-07-24 | 58.000 | `fd0692c8cb25acc8c9222f6889f24920099a1485f6c0461da9bdcdde71705021` |
 <!-- LEDGER:END -->
 
 
