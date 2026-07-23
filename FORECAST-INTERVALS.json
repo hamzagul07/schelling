@@ -1,0 +1,37 @@
+{
+  "_note": "Display snapshot of the 80% intervals (p10, p90) of the sealed forecasts, keyed by the ledger SHA-256. Regenerated from the sealed run records by `schelling site build --refresh-intervals`; the records stay gitignored (commit-reveal). Medians are governed by FORECASTS.md; this file adds only the interval endpoints of the already-sealed records.",
+  "intervals": {
+    "074e17529b416a7b6deabb75b6e8ceccc62be1f6feba061c44b0ee47979f52cf": {
+      "p10": 20.0,
+      "p90": 52.0
+    },
+    "180da06528d6a03128e4acde8e12e50432045e4cfb49d783105345bbc92bf2d4": {
+      "p10": 22.0,
+      "p90": 62.0
+    },
+    "3bc97cd4a4ba53fc1255801154c5775281c72dfaf06bcc632fb91263a3c17372": {
+      "p10": 20.3,
+      "p90": 64.947
+    },
+    "aece91bdcfd8a35aeea15c98fc6d10af11793fce5a637f9e277f1225a1d1e54f": {
+      "p10": 24.887,
+      "p90": 56.185
+    },
+    "c87d91ae7f0532966123a78f383fcd6a2403ab1299c7609f3dc496dbbd7b6782": {
+      "p10": 39.062,
+      "p90": 44.299
+    },
+    "d55ffc3e78fc5543b5224f6bb925b5793226913f436f9af7b9a8f20511dd12f6": {
+      "p10": 36.605,
+      "p90": 42.307
+    },
+    "e8d10117192f1259b9e9ab6250641f82e0c1d50a4c00c2e73ff193580f867f99": {
+      "p10": 46.064,
+      "p90": 55.2
+    },
+    "fc271d2dbd8c7493d9001026ab59c2b937a16eb612c065799e20a615970a2f00": {
+      "p10": 34.0,
+      "p90": 66.71
+    }
+  }
+}

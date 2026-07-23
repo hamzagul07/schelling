@@ -1534,15 +1534,27 @@ def site_build(
         "--check",
         help="Verify the committed site matches a fresh regeneration; fail on drift.",
     ),
+    refresh_intervals: bool = typer.Option(
+        False,
+        "--refresh-intervals",
+        help="Rebuild FORECAST-INTERVALS.json from the sealed run records (local; needs runs/).",
+    ),
 ) -> None:
-    """Regenerate the static site under ``docs/`` from repository artifacts (D31.2).
+    """Regenerate the static site under ``docs/`` from repository artifacts (D31.2, D34).
 
     Every page is generated from the sealed ledger, the backtest, the paper's evidence table, the
-    decisions log, and the test count — no figure is hand-typed. With ``--check`` it writes
-    nothing and exits non-zero if any committed page differs from a fresh build, so CI can
-    guarantee the published site is never stale.
+    decisions log, the test count, and the committed interval snapshot — no figure is hand-typed.
+    With ``--check`` it writes nothing and exits non-zero if any committed page differs from a fresh
+    build. ``--refresh-intervals`` regenerates the hero figure's interval snapshot from the (local,
+    gitignored) records; the committed snapshot is what the build and ``--check`` read.
     """
     from schelling.site.render import check_site, write_site
+
+    if refresh_intervals:
+        from schelling.site.intervals import refresh_intervals as _refresh
+
+        matched, total = _refresh(repo_root)
+        typer.echo(f"FORECAST-INTERVALS.json: {matched}/{total} ledger rows matched from runs/")
 
     if check:
         drift = check_site(repo_root, docs_dir, repo_url=repo_url)
