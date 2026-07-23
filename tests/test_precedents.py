@@ -30,15 +30,25 @@ from schelling.schemas.question import GameSpec
 runner = CliRunner()
 FIXTURES = Path(__file__).parent / "fixtures"
 
-# Two ex-ante precedents both land in the low "Censure and referral" band (0-24) so the base rate is
-# a single, unambiguous band; the third is hindsight-coded (excluded from the base rate).
-_ARR = (
-    '[{"id":"p1","what_happened":"Board censured Iran","date":"2024-11","source":"Reuters 2024",'
+# Two ex-ante precedents both land in the low "Censure and referral" band (0-24), the third is
+# hindsight-coded. The wrapper states a COMPLETE reference class: sessions_at_risk=2 covers both
+# ex-ante ones, so a base rate is computed.
+_PRECEDENTS = (
+    '{"id":"p1","what_happened":"Board censured Iran","date":"2024-11","source":"Reuters 2024",'
     '"proposed_placement":10,"reasoning":"same body, firm","ex_ante_codable":true},'
     '{"id":"p2","what_happened":"Board referred Iran","date":"2025-06","source":"IAEA 2025",'
     '"proposed_placement":15,"reasoning":"same body, firm again","ex_ante_codable":true},'
     '{"id":"p3","what_happened":"post-hoc coded","date":"2020","source":"X","proposed_placement":8,'
-    '"reasoning":"h","ex_ante_codable":false}]'
+    '"reasoning":"h","ex_ante_codable":false}'
+)
+_ARR = (
+    '{"reference_class":"every IAEA Board session with Iran on the agenda since 2024",'
+    '"sessions_at_risk":2,"precedents":[' + _PRECEDENTS + "]}"
+)
+# The same precedents but with an UNSOURCED denominator -> INCOMPLETE (no base rate).
+_ARR_INCOMPLETE = (
+    '{"reference_class":"IAEA sessions (denominator not fully sourced)",'
+    '"sessions_at_risk":null,"precedents":[' + _PRECEDENTS + "]}"
 )
 
 
@@ -76,6 +86,33 @@ def test_finder_proposes_nothing_is_accepted() -> None:
     assert all(not p.ratified for p in pset.precedents)  # every placement is a PROPOSAL
     assert pset.ratification_note == ""
     assert not is_ratified(pset)
+    # the reference-class population is captured (D30.1)
+    assert pset.sessions_at_risk == 2 and "since 2024" in pset.reference_class
+
+
+def test_incomplete_reference_class_computes_no_base_rate() -> None:
+    from schelling.precedents.panel import coverage_fraction, divergence
+
+    pset = find_precedents(ReplayClient([LLMResult(_ARR_INCOMPLETE, 100, 50)]), _game())
+    assert pset.sessions_at_risk is None  # the denominator could not be sourced
+    panel = build_precedent_panel(_ratify(pset), _game())
+    assert panel.complete is False
+    assert panel.band_distribution == {}  # NO base rate on a biased sample (D30.1)
+    assert coverage_fraction(panel) is None
+    d = json.loads((FIXTURES / "report" / "forecast_narrative.json").read_text())
+    d["ensemble"]["median"] = 61.0  # a band the precedents would "disagree" with
+    d["precedent_panel"] = panel.model_dump()
+    rec = ForecastRecord.model_validate(d)
+    assert divergence(rec) is None  # no base rate -> no divergence diagnostic
+    html = render(json.loads(rec.model_dump_json()))
+    assert "INCOMPLETE reference class" in html
+    assert "OUTSIDE VIEW DISAGREES" not in html
+
+
+def test_complete_reference_class_covers_the_population() -> None:
+    panel = build_precedent_panel(_ratify(_pset()), _game())
+    assert panel.complete is True and panel.n_covered == 2 and panel.sessions_at_risk == 2
+    assert panel.band_distribution  # a base rate IS computed when the class is complete
 
 
 def test_parse_rejects_and_skips_malformed() -> None:

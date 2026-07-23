@@ -447,6 +447,14 @@ class PrecedentPanel(BaseModel):
     band_distribution: dict[str, float] = Field(default_factory=dict)  # band label -> fraction
     median_placement: float | None = None  # median of the ex-ante placements
     blend_weight: float = 0.0  # disclosed: the base rate is never mixed into the forecast
+    # Denominator correction (Session 30, D30.1): the reference class is sessions-AT-RISK, not just
+    # notable outcomes. ``sessions_at_risk`` is the population size from records (None = unsourced).
+    # A base rate is only computed when the enumeration is ``complete``; otherwise the class is
+    # reported as INCOMPLETE with the fraction covered, never a base rate on a biased sample.
+    reference_class: str = ""  # the population definition + start date
+    sessions_at_risk: int | None = None  # denominator: decision opportunities in the class
+    n_covered: int = 0  # numerator: ratified ex-ante precedents placed
+    complete: bool = False  # the covered precedents span the full population
 
 
 class LLMSample(BaseModel):
