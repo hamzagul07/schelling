@@ -81,6 +81,8 @@ ignore = ["N803", "N806"]
 "tests/*" = ["N802"]
 # typer's declarative API intentionally puts Option/Argument calls in parameter defaults.
 "src/schelling/cli.py" = ["B008"]
+# css.py is a single CSS stylesheet held in one string constant; line length is a CSS concern.
+"src/schelling/site/css.py" = ["E501"]
 
 # ---------------------------------------------------------------------------
 # mypy  — strict on the solver (per BUILD_PLAN §1); strict globally here since
