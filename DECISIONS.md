@@ -2011,3 +2011,34 @@ enforces this — `paper-evidence --check` only warns on a test-count change, an
 only sees the committed snapshot — so the refresh is a manual step, best done in any session that
 adds a batch of tests. Logging D36.0 itself grew the decisions count the site's grid publishes, so
 `docs/` is rebuilt once more after this entry.
+
+### D37.0 — Q-2026-OPEC-SEP: a fast-resolving, arithmetic-rubric ledger question (setup only)
+Third sealed-ledger question, pre-registered from the approved package `question-opec-sep.md`:
+what collective crude-production adjustment the seven OPEC+ voluntary-adjustment producers (Saudi
+Arabia, Russia, Iraq, Kuwait, Kazakhstan, Algeria, Oman — the group after the UAE's May-2026 exit)
+announce for September 2026 at their 2 Aug 2026 meeting. Chosen because it **resolves in nine days**
+(resolution 2026-08-05, grading 2026-08-06), sits in the **validated cooperative/DEU domain** where
+the compromise model is proven to the ceiling (unlike the coercive US-Iran question), and carries an
+**external analyst benchmark**.
+
+- **Arithmetic rubric (not bands).** `GRADING-Q-2026-OPEC-SEP.md` is committed at the repo root
+  (public pre-registration; `seal` refuses a rubric-less question). The mapping is a continuous rule
+  — `grade = 50 + (adjustment_kbd / 600) × 50`, clamped and rounded — encoded in the machine-readable
+  `ResolutionRubric` block **with no `bands` array**, so `parse_rubric_block` reads it as
+  arithmetic/linear (the report renders the continuous density strip, not band segments — D22.2) and
+  `seal` accepts it. The drift-guard `test_committed_grading_bands_match_outcome_mapping_prose` is a
+  hardcoded two-question parametrization, so a bands-less rubric does not trip it.
+- **`situation.txt`** was created from the package's paste-ready block verbatim (de-indented) under
+  the gitignored `analyses/opec/`; the question rationale doc was moved from the repo root to
+  `docs/questions/question-opec-sep.md` (committed) so it sits beside its rubric, matching the IAEA
+  precedent.
+- **Draft formalized live** (`formalize --search --max-searches 6`, $0.80, 6 searches, 38 sources,
+  stamped `frozen_at=2026-07-24`, `live_searched=true`): 7 actors, template *Multilateral / Coalition
+  Bargaining*. The one hard-sourced datum is the group's **5 July +188 kb/d collective increase**
+  (used the primary/wire reading, not the lone aggregator that called it a cut); every actor-level
+  position, salience and capability is **inferred and disclosed in the assumptions** (capability rule
+  = production weight / move-or-block ability, Saudi=100 down to Oman≈8; the 2 Aug date and the
+  post-withdrawal roster are assumed, not source-confirmed).
+- **STOPPED at the draft** (D12.5 human-review gate): not solved, not sealed. Hassan reviews the
+  draft with Claude before any forecast is run. `analyses/opec/` (situation, draft, report) stays
+  gitignored; only the rubric, the rationale doc, and this entry are committed.
