@@ -10,17 +10,25 @@ import pytest
 
 from schelling.report.svg import _n
 from schelling.schemas.question import RubricBand
-from schelling.site.data import LedgerRow, QuestionInfo, ReportLink, SiteData, _parse_ledger, gather
-from schelling.site.figures import _trial_rows, forecast_landscape, trials
+from schelling.site.data import (
+    LedgerRow,
+    QuestionInfo,
+    ReportLink,
+    SiteData,
+    _parse_ledger,
+    gather,
+    trial_gates,
+)
+from schelling.site.figures import forecast_landscape, trials
 from schelling.site.intervals import compute_intervals, load_intervals
 from schelling.site.render import build_site, check_site, write_site
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Numbers that are structural HTML/spec tokens, not figures: viewport initial-scale=1, the "8" of
-# UTF-8, the "256" of SHA-256, and "80" as in the fixed 80% interval level. Everything else must
-# trace to an artifact.
-_STRUCTURAL = {"1", "8", "256", "80"}
+# UTF-8, the "256" of SHA-256, "80" as in the fixed 80% interval level, and "3.0" as in the AGPL-3.0
+# licence. Everything else must trace to an artifact.
+_STRUCTURAL = {"1", "8", "256", "80", "3.0"}
 _NUM = re.compile(r"(?<![\w.])[-+]?\d+(?:\.\d+)?")
 _SCRIPT = re.compile(r"<script>.*?</script>", re.DOTALL)
 _SVG = re.compile(r"<svg.*?</svg>", re.DOTALL)  # figure geometry is computed, verified separately
@@ -131,6 +139,12 @@ def _sample_data() -> SiteData:
                 RubricBand(lo=60.0, hi=100.0, label="Endorses access"),
             ],
         },
+        canon_cards=29,
+        canon_families=[
+            ("A", "Resolve and endurance"),
+            ("B", "Power and its limits"),
+            ("C", "Perception and information"),
+        ],
     )
 
 
@@ -241,17 +255,19 @@ def test_committed_reports_are_offline_clean() -> None:
 
 # --------------------------------------------------------------------------- honesty rules (D31.5)
 def test_honesty_shows_graded_beside_sealed() -> None:
-    """The graded count is always rendered beside the sealed count — as adjacent stat cards on both
-    the index and the ledger page (D31.5, restyled D33.3)."""
+    """The graded count is always rendered beside the sealed count — as adjacent grid cells on both
+    the index and the ledger page (D31.5, restyled D35), and the sidebar footer states both."""
     data = _sample_data()  # sealed_count == 2, graded_count == 0
-    sealed_card = '<div class="stat"><p class="k">Forecasts sealed</p><p class="v">2</p></div>'
-    graded_card = '<div class="stat"><p class="k">Graded</p><p class="v">0</p></div>'
+    sealed_cell = '<p class="k">FORECASTS SEALED</p><p class="v">2</p>'
+    graded_cell = '<p class="k">GRADED</p><p class="v">0</p>'
     for name in ("index.html", "ledger.html"):
         page = build_site(REPO_ROOT, data=data)[name]
-        assert sealed_card in page, name
-        assert graded_card in page, name
-        # the two cards are adjacent (sealed immediately followed by graded)
-        assert sealed_card + graded_card in page, name
+        assert sealed_cell in page, name
+        assert graded_cell in page, name
+        # sealed cell immediately precedes graded cell in the stat grid
+        assert page.index(sealed_cell) < page.index(graded_cell), name
+        # the sidebar footer names both counts together
+        assert "0 graded · 2 sealed" in page, name
 
 
 def test_no_accuracy_claim_while_ungraded() -> None:
@@ -275,24 +291,34 @@ def test_graded_count_reflects_recorded_outcomes() -> None:
     assert graded.graded_count == 1
 
 
-# --------------------------------------------------------------------------- reference design (D33)
+# --------------------------------------------------------------------------- reference design (D35)
 def test_reference_design_structure_holds() -> None:
-    """The specifics that must not drift from the approved reference (D33.4): a two-line h1 whose
-    second line carries the accent; no HTML tables anywhere (hashes never live in a table cell); the
-    full 64-char SHA-256 on its own monospace .hash line; the nav with brand + navlinks."""
+    """The specifics that must not drift from the approved vast reference (D35): the sidebar shell
+    with the eight-section index, a two-line accented h1, no HTML tables anywhere, and the full
+    64-char SHA-256 on its own monospace .h line (never a table cell)."""
     data = _sample_data()
     for name, page in _pages(data).items():
+        assert '<div class="shell"><aside>' in page, name  # sidebar shell
+        assert '<nav class="idx">' in page, name  # numbered section index
         assert "<h1>" in page and '<span class="turn">' in page, name  # two-line accented h1
         assert "<table" not in page and "</td>" not in page, name  # never a table
-        assert '<nav><div class="wrap"><a class="brand"' in page, name
-    # every ledger row: the full 64-char hash on its own monospace line, never in a table cell
-    for name in ("index.html", "ledger.html"):
-        page = build_site(REPO_ROOT, data=data)[name]
-        hashes = re.findall(r'<p class="hash">([0-9a-f]{64})</p>', page)
-        assert len(hashes) == data.sealed_count, name
-    # findings gate numbers all trace and render as "n / n" or a single sourced figure
-    findings = _pages(data)["findings.html"]
-    assert 'class="gate"' in findings and 'class="gates"' in findings
+    # the index carries all eight sections as anchors
+    index = _pages(data)["index.html"]
+    for anchor in (
+        "finding",
+        "ledger",
+        "trials",
+        "apparatus",
+        "canon",
+        "record",
+        "paper",
+        "verify",
+    ):
+        assert f'id="{anchor}"' in index, anchor
+    # every sealed row's full 64-char hash on its own monospace .h line, on the ledger page
+    ledger = _pages(data)["ledger.html"]
+    hashes = re.findall(r'<span class="h">([0-9a-f]{64})</span>', ledger)
+    assert len(hashes) == data.sealed_count
 
 
 # --------------------------------------------------------------------------- real-repo integration
@@ -308,13 +334,13 @@ def test_gather_parses_the_real_repository() -> None:
     assert check_site(REPO_ROOT, REPO_ROOT / "docs") == []
 
 
-# --------------------------------------------------------------------------- instrument layer (D34)
-# The hero figure's continuum scale, mirroring figures.forecast_landscape (guards the mapping).
-_LEFT, _RIGHT, _FW = 130.0, 92.0, 680.0
+# ------------------------------------------------------------------- instrument layer (D34/35)
+# The hero figure's 1200-unit continuum scale, mirroring figures.forecast_landscape (D35.3).
+_X0, _X1 = 44.0, 940.0
 
 
 def _sx(v: float) -> float:
-    return _LEFT + (_FW - _RIGHT - _LEFT) * v / 100.0
+    return _X0 + (_X1 - _X0) * v / 100.0
 
 
 def test_both_figures_regenerate_identically() -> None:
@@ -344,7 +370,7 @@ def test_trials_plot_the_sourced_maes() -> None:
     """Each trial bar pair shows the sourced model and baseline MAEs, and the rows match the
     evidence table / leaderboard exactly (D34.2, D34.5)."""
     data = _sample_data()
-    rows = _trial_rows(data)
+    rows = trial_gates(data)
     assert [(m, b, v) for _, m, b, v in rows] == [
         (28.31, 23.64, "failed"),  # E-DEU-MAE-r1 / E-BASE-WMEAN-r1
         (26.83, 22.99, "failed"),  # E-METHOD-challenge_rp / E-METHOD-baseline_wmean
@@ -354,15 +380,14 @@ def test_trials_plot_the_sourced_maes() -> None:
     ]
     svg = trials(data)
     for _, model_mae, base_mae, _verdict in rows:
-        assert f">{model_mae:g}</text>" in svg
-        assert f">{base_mae:g}</text>" in svg
+        assert f">{model_mae:g} / {base_mae:g}</text>" in svg  # the sourced bar-pair label
 
 
 def test_figures_appear_on_their_pages() -> None:
     data = _sample_data()
     pages = _pages(data)
-    assert "Fig. 1" in pages["index.html"] and "Fig. 1" in pages["ledger.html"]
-    assert "Fig. 2" in pages["findings.html"]
+    assert "Fig. 1" in pages["index.html"]  # the forecast landscape headlines the ledger section
+    assert "Fig. 2" in pages["index.html"] and "Fig. 2" in pages["findings.html"]
     assert 'role="img"' in pages["index.html"] and 'role="img"' in pages["findings.html"]
 
 
