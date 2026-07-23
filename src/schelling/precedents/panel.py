@@ -37,26 +37,46 @@ def _band_distribution(precedents: list[Precedent], game: GameSpec) -> dict[str,
 
 
 def build_precedent_panel(pset: PrecedentSet, game: GameSpec) -> PrecedentPanel:
-    """Assemble the panel from the RATIFIED precedents; the base rate uses the ex-ante-codable ones,
-    and hindsight-coded ratified precedents are carried separately (D29.2-D29.3)."""
+    """Assemble the panel from the RATIFIED precedents (D29.2-D29.3).
+
+    The reference class is sessions-at-risk (D30.1): a base rate is computed **only when the
+    enumeration is complete** — the ratified ex-ante precedents span the full ``sessions_at_risk``
+    population. Otherwise the class is INCOMPLETE and no distribution is produced (the fraction
+    covered is reported instead), so a biased sample never masquerades as a base rate.
+    """
     ratified = [p for p in pset.precedents if p.ratified]
     ex_ante = [p for p in ratified if p.ex_ante_codable]
     hindsight = [p for p in ratified if not p.ex_ante_codable]
+    n_covered = len(ex_ante)
+    complete = pset.sessions_at_risk is not None and n_covered >= pset.sessions_at_risk
     placements = [p.proposed_placement for p in ex_ante]
     return PrecedentPanel(
         source_model=pset.source_model,
         ratification_note=pset.ratification_note,
         precedents=ex_ante,
         hindsight_precedents=hindsight,
-        band_distribution=_band_distribution(ex_ante, game),
+        band_distribution=_band_distribution(ex_ante, game) if complete else {},
         median_placement=float(statistics.median(placements)) if placements else None,
         blend_weight=0.0,  # never blended
+        reference_class=pset.reference_class,
+        sessions_at_risk=pset.sessions_at_risk,
+        n_covered=n_covered,
+        complete=complete,
     )
 
 
+def coverage_fraction(panel: PrecedentPanel) -> float | None:
+    """The fraction of the reference class covered (``n_covered / sessions_at_risk``), or None."""
+    if panel.sessions_at_risk:
+        return panel.n_covered / panel.sessions_at_risk
+    return None
+
+
 def base_rate_band(panel: PrecedentPanel) -> str | None:
-    """The modal band of the precedent distribution (ties broken by label), or None if empty."""
-    if not panel.band_distribution:
+    """The modal band of the precedent distribution, or None when the class is incomplete/empty.
+
+    Only a COMPLETE reference class yields a base rate (D30.1)."""
+    if not panel.complete or not panel.band_distribution:
         return None
     return max(panel.band_distribution.items(), key=lambda kv: (kv[1], kv[0]))[0]
 

@@ -24,3 +24,8 @@ class PrecedentSet(BaseModel):
     searches_used: int = 0
     created_at: str | None = None
     ratification_note: str = ""  # the human ratification, quoted (empty until ratified)
+    # The reference class is sessions-AT-RISK (D30.1): identify the population of decision
+    # opportunities first, then the outcomes. ``sessions_at_risk`` is the population size from
+    # records (None = enumeration not fully sourced -> report INCOMPLETE, never a base rate).
+    reference_class: str = ""  # the population definition + start date, as the model stated it
+    sessions_at_risk: int | None = None  # the denominator
