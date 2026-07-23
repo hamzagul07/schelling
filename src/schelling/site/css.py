@@ -22,7 +22,8 @@ SITE_CSS = """
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
-  font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased}
+  font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums;counter-reset:sec}
 .wrap{max-width:760px;margin:0 auto;padding:0 24px}
 a{color:inherit}
 
@@ -46,12 +47,29 @@ h1 .turn{display:block;color:var(--accent)}
 .btn:hover{background:var(--tint)}
 .btn.primary{border-color:var(--accent);color:var(--accent)}
 
-section{margin-top:64px}
+section{margin-top:56px;border-top:1px solid var(--line);padding-top:22px;counter-increment:sec}
+.snum{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--text-3);margin:0 0 16px}
+.snum::before{content:"\\A7 " counter(sec,decimal-leading-zero)}
 h2{font-family:var(--serif);font-weight:400;font-size:24px;margin:0 0 6px;letter-spacing:-.01em}
 h3{font-family:var(--sans);font-weight:500;font-size:15px;margin:24px 0 6px}
 .sub{font-size:14px;color:var(--text-3);margin:0 0 20px}
 
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+/* --- instrument figures (Session 34) --- */
+figure{margin:0}
+.figure{margin:8px 0 0}
+.fig-cap{font-family:var(--mono);font-size:12px;color:var(--text-3);letter-spacing:.03em;margin:10px 0 0}
+.fig-axis{stroke:var(--line-2);stroke-width:1}
+.fig-rule{stroke:var(--line);stroke-width:1}
+.fig-modal{fill:var(--tint)}
+.fig-lab{font-family:var(--mono);font-size:11px;fill:var(--text-2)}
+.fig-id{font-family:var(--mono);font-size:11px;fill:var(--text)}
+.fig-num{font-family:var(--mono);font-size:11px;fill:var(--text-2)}
+.fig-modal-lab{font-family:var(--sans);font-size:10px;fill:var(--accent)}
+.fig-tick{font-family:var(--mono);font-size:10px;fill:var(--text-3)}
+.fig-legend{font-family:var(--sans);font-size:11px;fill:var(--text-2)}
+.fig-verdict{font-family:var(--mono);font-size:11px;fill:var(--text-3);letter-spacing:.04em}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:40px 0 0}
 .stat{background:var(--tint);border-radius:8px;padding:16px 18px}
 .stat .k{font-size:13px;color:var(--text-2);margin:0 0 4px}
 .stat .v{font-size:24px;font-weight:500;margin:0;letter-spacing:-.01em}

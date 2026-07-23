@@ -6,16 +6,24 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from schelling.site.data import LedgerRow, QuestionInfo, ReportLink, SiteData, gather
+import pytest
+
+from schelling.report.svg import _n
+from schelling.schemas.question import RubricBand
+from schelling.site.data import LedgerRow, QuestionInfo, ReportLink, SiteData, _parse_ledger, gather
+from schelling.site.figures import _trial_rows, forecast_landscape, trials
+from schelling.site.intervals import compute_intervals, load_intervals
 from schelling.site.render import build_site, check_site, write_site
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Numbers that are structural HTML/spec tokens, not figures: viewport initial-scale=1, the "8" of
-# UTF-8, and the "256" of SHA-256. Everything else in a page must trace to an artifact.
-_STRUCTURAL = {"1", "8", "256"}
+# UTF-8, the "256" of SHA-256, and "80" as in the fixed 80% interval level. Everything else must
+# trace to an artifact.
+_STRUCTURAL = {"1", "8", "256", "80"}
 _NUM = re.compile(r"(?<![\w.])[-+]?\d+(?:\.\d+)?")
 _SCRIPT = re.compile(r"<script>.*?</script>", re.DOTALL)
+_SVG = re.compile(r"<svg.*?</svg>", re.DOTALL)  # figure geometry is computed, verified separately
 _ENTITY = re.compile(r"&#?\w+;")  # HTML entities (e.g. &#39;, &amp;) are not figures
 
 
@@ -58,6 +66,8 @@ def _sample_data() -> SiteData:
             "E-METHOD-baseline_median": ev("28.37 / 40.64"),
             "E-ORACLE-MAE": ev("23.84 vs 22.99"),
             "E-ORACLE-GAP": ev("-0.84"),
+            "E-DEU-MAE-r1": ev("28.31"),
+            "E-BASE-WMEAN-r1": ev("23.64"),
             "E-TESTS": ev("430"),
         },
         gate_verdict="FAILED",
@@ -104,6 +114,22 @@ def _sample_data() -> SiteData:
             "Q-2026-IAEA-SEP": QuestionInfo(
                 "Q-2026-IAEA-SEP", "GRADING-Q-2026-IAEA-SEP.md", "2026-09-30"
             ),
+        },
+        intervals={
+            "aece91bdcfd8a35aeea15c98fc6d10af11793fce5a637f9e277f1225a1d1e54f": (24.887, 56.185),
+            "e8d10117192f1259b9e9ab6250641f82e0c1d50a4c00c2e73ff193580f867f99": (46.064, 55.2),
+        },
+        rubric_bands={
+            "Q-2026-USIRAN-STAGE2": [
+                RubricBand(lo=0.0, hi=30.0, label="Largely US terms"),
+                RubricBand(lo=30.0, hi=59.0, label="Interim framework"),
+                RubricBand(lo=59.0, hi=100.0, label="Largely Iranian terms"),
+            ],
+            "Q-2026-IAEA-SEP": [
+                RubricBand(lo=0.0, hi=39.0, label="Censure or referral"),
+                RubricBand(lo=40.0, hi=59.0, label="No new resolution"),
+                RubricBand(lo=60.0, hi=100.0, label="Endorses access"),
+            ],
         },
     )
 
@@ -180,8 +206,9 @@ def test_no_hand_typed_figures() -> None:
     data = _sample_data()
     allowed = data.provenance() | _STRUCTURAL
     for name, page in _pages(data).items():
-        # the countdown script's arithmetic constants and HTML entities are not figures
-        scrubbed = _ENTITY.sub(" ", _SCRIPT.sub("", page))
+        # SVG figure geometry (coordinates) is computed, not hand-typed, and its plotted values are
+        # verified against the artifacts separately; scripts/entities are not figures either.
+        scrubbed = _ENTITY.sub(" ", _SVG.sub("", _SCRIPT.sub("", page)))
         for token in _NUM.findall(scrubbed):
             assert token in allowed, f"{name}: un-sourced number {token!r}"
 
@@ -279,3 +306,74 @@ def test_gather_parses_the_real_repository() -> None:
     assert data.decisions_count > 100
     # the real site regenerates and is in sync with what is committed under docs/
     assert check_site(REPO_ROOT, REPO_ROOT / "docs") == []
+
+
+# --------------------------------------------------------------------------- instrument layer (D34)
+# The hero figure's continuum scale, mirroring figures.forecast_landscape (guards the mapping).
+_LEFT, _RIGHT, _FW = 130.0, 92.0, 680.0
+
+
+def _sx(v: float) -> float:
+    return _LEFT + (_FW - _RIGHT - _LEFT) * v / 100.0
+
+
+def test_both_figures_regenerate_identically() -> None:
+    """Both figures are pure functions of the data — byte-identical on re-run (D34.3)."""
+    data = _sample_data()
+    assert forecast_landscape(data) == forecast_landscape(data)
+    assert trials(data) == trials(data)
+    for svg in (forecast_landscape(data), trials(data)):
+        assert 'role="img"' in svg and "<title>" in svg and "<desc>" in svg
+        assert "<script" not in svg and "xmlns" not in svg and "http" not in svg  # offline-clean
+
+
+def test_landscape_plots_the_sourced_values() -> None:
+    """Every median dot and interval bar is positioned from the sourced value — no hand-plotted
+    coordinate (D34.1, D34.5)."""
+    data = _sample_data()
+    svg = forecast_landscape(data)
+    for row in data.ledger:
+        cx = _n(_sx(float(row.median)))
+        assert f'cx="{cx}"' in svg, f"median {row.median} not plotted at {cx}"
+        iv = data.intervals.get(row.sha256)
+        if iv is not None:
+            assert f'x="{_n(_sx(iv[0]))}"' in svg, f"interval start {iv[0]} not plotted"
+
+
+def test_trials_plot_the_sourced_maes() -> None:
+    """Each trial bar pair shows the sourced model and baseline MAEs, and the rows match the
+    evidence table / leaderboard exactly (D34.2, D34.5)."""
+    data = _sample_data()
+    rows = _trial_rows(data)
+    assert [(m, b, v) for _, m, b, v in rows] == [
+        (28.31, 23.64, "failed"),  # E-DEU-MAE-r1 / E-BASE-WMEAN-r1
+        (26.83, 22.99, "failed"),  # E-METHOD-challenge_rp / E-METHOD-baseline_wmean
+        (22.09, 21.26, "failed"),  # leaderboard candidate A: TEST vs comp
+        (21.57, 21.09, "failed"),  # leaderboard candidate B
+        (23.84, 22.99, "ceiling"),  # E-ORACLE-MAE
+    ]
+    svg = trials(data)
+    for _, model_mae, base_mae, _verdict in rows:
+        assert f">{model_mae:g}</text>" in svg
+        assert f">{base_mae:g}</text>" in svg
+
+
+def test_figures_appear_on_their_pages() -> None:
+    data = _sample_data()
+    pages = _pages(data)
+    assert "Fig. 1" in pages["index.html"] and "Fig. 1" in pages["ledger.html"]
+    assert "Fig. 2" in pages["findings.html"]
+    assert 'role="img"' in pages["index.html"] and 'role="img"' in pages["findings.html"]
+
+
+def test_intervals_snapshot_matches_records() -> None:
+    """Where the (gitignored) records are present, the committed interval snapshot matches them —
+    so a stale FORECAST-INTERVALS.json cannot slip through locally (D34.1)."""
+    if not (REPO_ROOT / "runs").exists() or not any((REPO_ROOT / "runs").glob("*.json")):
+        pytest.skip("runs/ records absent (gitignored on CI)")
+    ledger = _parse_ledger((REPO_ROOT / "FORECASTS.md").read_text())
+    from_records = compute_intervals(REPO_ROOT, ledger)
+    committed = load_intervals(REPO_ROOT)
+    assert from_records == committed, (
+        "FORECAST-INTERVALS.json is stale — run site build --refresh-intervals"
+    )

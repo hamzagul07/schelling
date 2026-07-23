@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from schelling.paper.assemble import parse_evidence
+from schelling.report.rubric_lookup import parse_rubric_block
+from schelling.schemas.question import RubricBand
 
 _LEDGER = re.compile(r"<!-- LEDGER:START -->(.*?)<!-- LEDGER:END -->", re.DOTALL)
 _LEADERBOARD = re.compile(r"<!-- LEADERBOARD:START -->(.*?)<!-- LEADERBOARD:END -->", re.DOTALL)
@@ -73,6 +75,11 @@ class SiteData:
     bibliography: list[str] = field(default_factory=list)
     reports: list[ReportLink] = field(default_factory=list)
     questions: dict[str, QuestionInfo] = field(default_factory=dict)
+    # Instrument layer (Session 34): the 80% interval of each sealed forecast, keyed by ledger
+    # SHA-256 (from the committed FORECAST-INTERVALS.json snapshot), and each question's rubric band
+    # boundaries (from its committed GRADING file). Both feed the hero figure; both are committed.
+    intervals: dict[str, tuple[float, float]] = field(default_factory=dict)
+    rubric_bands: dict[str, list[RubricBand]] = field(default_factory=dict)
 
     # ------------------------------------------------------------------ derived counts
     @property
@@ -258,6 +265,11 @@ def gather(repo_root: Path) -> SiteData:
     draft_path = repo_root / "paper" / "DRAFT.md"
     bib_path = repo_root / "paper" / "BIBLIOGRAPHY.md"
 
+    from schelling.site.intervals import load_intervals  # local: intervals imports from this module
+
+    questions = _questions(repo_root, ledger)
+    rubric_bands = _rubric_bands(repo_root, questions)
+
     return SiteData(
         decisions_count=sum(1 for line in decisions.splitlines() if line.startswith("### D")),
         test_count=evidence.get("E-TESTS", {}).get("value", ""),
@@ -273,5 +285,22 @@ def gather(repo_root: Path) -> SiteData:
         abstract=_parse_abstract(draft_path.read_text()) if draft_path.exists() else "",
         bibliography=_parse_bibliography(bib_path.read_text()) if bib_path.exists() else [],
         reports=_reports(repo_root),
-        questions=_questions(repo_root, ledger),
+        questions=questions,
+        intervals=load_intervals(repo_root),
+        rubric_bands=rubric_bands,
     )
+
+
+def _rubric_bands(
+    repo_root: Path, questions: dict[str, QuestionInfo]
+) -> dict[str, list[RubricBand]]:
+    """Each sealed question's rubric band boundaries, parsed from its committed GRADING file."""
+    out: dict[str, list[RubricBand]] = {}
+    for qid, info in questions.items():
+        path = repo_root / info.rubric_file
+        if not path.exists():
+            continue
+        rubric = parse_rubric_block(path.read_text())
+        if rubric is not None and rubric.bands:
+            out[qid] = sorted(rubric.bands, key=lambda b: b.lo)
+    return out
