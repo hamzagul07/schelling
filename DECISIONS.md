@@ -1843,3 +1843,44 @@ root, outside `docs/` entirely — verified: `site build --check` still reports 
 logic was needed (and none was added — the config files are authored, never generated). README gains
 a **Deployment** section: regenerate `docs/` with `site build`, commit, push, the host republishes;
 CI's drift check guarantees the published site matches the artifacts.
+
+### D33.0 — Adopt the reference design (styling and markup only)
+Hassan dropped `site-reference-index.html` at the repo root as the approved visual target. Its CSS
+became `docs/site.css` (adapted, not copied) and the page templates now emit the same structure and
+classes. The change is styling and markup **only**: `site/data.py` (the data layer), `check_site`/
+`build_site` (the drift check), and the honesty guarantees are unchanged. New palette (warm off-white
+`--bg:#fbfaf8`, accent `#b45309`), serif (`ui-serif,Georgia`) used **only** for the `h1` and section
+headings, and the reference's nav / stat cards / div-based ledger / gate rows carried across all five
+pages. The countdown script is gone (replaced by a "First grading" stat card), so the site is now
+entirely script-free.
+
+### D33.1 — Every figure still comes from SiteData; unsourceable elements are dropped
+The reference hand-types every number for illustration; the generator does not. Sealed and graded
+counts, the next grading date, the test count, every ledger row (question, model, verbatim median,
+resolution date, full SHA-256), and every gate label with its numbers are read from `SiteData` —
+which is parsed from the sealed ledger, the evidence table, and the leaderboard. The
+no-hand-typed-figures test still passes: every number in the HTML traces to `SiteData.provenance()`.
+Where the generator's figures differ from the reference's illustrations, the sourced value wins
+(e.g. the test count renders `297` from `EVIDENCE.md`'s `E-TESTS`, not the reference's `442`; dates
+render ISO from the rubric files, not `1 Sep`; question labels render the canonical id, not a
+hand-written prose name). `_gate_rows` **drops** any gate whose numbers cannot be sourced rather than
+inventing a source (D33.2), and shows all five only because every figure resolves from the evidence
+table and the leaderboard.
+
+### D33.3 — The honesty rules, in the new markup
+The ledger still shows the **graded count beside the sealed count** — now as adjacent `Forecasts
+sealed` / `Graded` stat cards, present on both the index and the ledger page. While `graded == 0`
+the ledger note states plainly that nothing is graded, so no accuracy is claimed; no page asserts
+forecast accuracy. The honesty test was updated to assert the new stat-card markup (the guarantee is
+unchanged — only the string it checks moved from `N sealed · M graded` to the two adjacent cards).
+
+### D33.4 — Specifics locked against drift
+A `test_reference_design_structure_holds` guard asserts the details that must not drift: a two-line
+serif `h1` whose second line (`.turn`) carries the accent and whose first does not; **no HTML tables
+anywhere** (hashes never live in a table cell); the full 64-char SHA-256 on its own 11px monospace
+`.hash` line beneath each row; the nav with a monospace brand plus navlinks. The ledger shows **all**
+sealed rows (eight), not the reference's five. CSS holds the rest: body copy capped at 62–66ch, two
+font weights only (400/500), 1px hairlines, no shadows or gradients, dark mode via
+`prefers-color-scheme`, and a mobile breakpoint that reflows rows and hides the header row —
+`site.css` keeps its per-file E501 ruff ignore as a stylesheet asset. 443 tests green;
+`site build --check` in sync; `docs/` regenerated.
