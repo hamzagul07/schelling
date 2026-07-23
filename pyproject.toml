@@ -83,6 +83,9 @@ ignore = ["N803", "N806"]
 "src/schelling/cli.py" = ["B008"]
 # css.py is a single CSS stylesheet held in one string constant; line length is a CSS concern.
 "src/schelling/site/css.py" = ["E501"]
+# render.py is a dense HTML-template generator (Session 35 full-scale layout); the long lines are
+# markup string literals whose wrapping would only obscure the emitted HTML.
+"src/schelling/site/render.py" = ["E501"]
 
 # ---------------------------------------------------------------------------
 # mypy  — strict on the solver (per BUILD_PLAN §1); strict globally here since

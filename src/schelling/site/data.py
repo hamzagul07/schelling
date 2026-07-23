@@ -25,6 +25,11 @@ _TITLE = re.compile(r"<title>(.*?)</title>", re.DOTALL | re.IGNORECASE)
 # hyphens in ``utf-8``, ``SHA-256`` and ``Q-2026`` are read as text, not as negative signs, and a
 # digit inside a hex hash (preceded by a letter) is not a figure at all.
 _NUM = re.compile(r"(?<![\w.])[-+]?\d+(?:\.\d+)?")
+_CANON_CARD = re.compile(r"^\*\*[A-E]\d+\.", re.MULTILINE)
+_CANON_FAMILY = re.compile(
+    "^##\\s*Family\\s+([A-E])\\s*[\\u2014\\u2013-]\\s*(.+?)\\s*$", re.MULTILINE
+)
+_NUM_ANY = re.compile(r"[-+]?\d+(?:\.\d+)?")
 
 
 @dataclass(frozen=True)
@@ -80,6 +85,10 @@ class SiteData:
     # boundaries (from its committed GRADING file). Both feed the hero figure; both are committed.
     intervals: dict[str, tuple[float, float]] = field(default_factory=dict)
     rubric_bands: dict[str, list[RubricBand]] = field(default_factory=dict)
+    # Full-scale layout (Session 35): the concept-library card count and family names (from
+    # data/concepts/canon.md). Both feed the canon section; both are committed.
+    canon_cards: int = 0
+    canon_families: list[tuple[str, str]] = field(default_factory=list)
 
     # ------------------------------------------------------------------ derived counts
     @property
@@ -91,6 +100,17 @@ class SiteData:
     def graded_count(self) -> int:
         """How many sealed forecasts have been graded — 0 until an outcome is recorded (D31.5)."""
         return sum(1 for row in self.ledger if row.question in self.graded_questions)
+
+    @property
+    def question_count(self) -> int:
+        """How many distinct questions are sealed in the ledger."""
+        return len(self.questions)
+
+    @property
+    def gate_count(self) -> int:
+        """How many pre-registered MAE gates the site can source from the backtest / evidence — the
+        set the trials figure plots (D35.5). Zero-safe: the element is dropped, not invented."""
+        return len(trial_gates(self))
 
     # ------------------------------------------------------------------ evidence access
     def fig(self, tag: str) -> str:
@@ -126,6 +146,9 @@ class SiteData:
                 self.grading_date,
                 str(self.sealed_count),
                 str(self.graded_count),
+                str(self.question_count),
+                str(self.gate_count),
+                str(self.canon_cards),
             }
         )
         out = set(strings)
@@ -269,6 +292,10 @@ def gather(repo_root: Path) -> SiteData:
 
     questions = _questions(repo_root, ledger)
     rubric_bands = _rubric_bands(repo_root, questions)
+    canon_path = repo_root / "data" / "concepts" / "canon.md"
+    canon_cards, canon_families = (
+        _parse_canon(canon_path.read_text()) if canon_path.exists() else (0, [])
+    )
 
     return SiteData(
         decisions_count=sum(1 for line in decisions.splitlines() if line.startswith("### D")),
@@ -288,7 +315,72 @@ def gather(repo_root: Path) -> SiteData:
         questions=questions,
         intervals=load_intervals(repo_root),
         rubric_bands=rubric_bands,
+        canon_cards=canon_cards,
+        canon_families=canon_families,
     )
+
+
+def _parse_canon(text: str) -> tuple[int, list[tuple[str, str]]]:
+    """The concept-library card count and its family names, from ``data/concepts/canon.md`` — one
+    card per ``**X#.`` marker, one family per ``## Family X — name`` header (D35.5)."""
+    cards = len(_CANON_CARD.findall(text))
+    families = [(m.group(1), m.group(2).strip()) for m in _CANON_FAMILY.finditer(text)]
+    return cards, families
+
+
+def trial_gates(data: SiteData) -> list[tuple[str, float, float, str]]:
+    """The pre-registered MAE gates in run order: (label, model MAE, baseline MAE, verdict). Every
+    value is sourced from the evidence table and the successor leaderboard (both tracing to
+    BACKTEST.md); a gate whose numbers can't be parsed is dropped, never invented (D34.2, D35.5)."""
+
+    def num(s: str) -> float | None:
+        m = _NUM_ANY.search(s)
+        return float(m.group(0)) if m else None
+
+    failed = (data.gate_verdict or "").lower() or "failed"
+    hdr = {h: i for i, h in enumerate(data.leaderboard_header)}
+    t_i, c_i = hdr.get("TEST MAE"), hdr.get("comp. MAE")
+
+    def lb_pair(row: list[str]) -> tuple[float | None, float | None]:
+        if t_i is None or c_i is None or max(t_i, c_i) >= len(row):
+            return None, None
+        return num(row[t_i]), num(row[c_i])
+
+    cands: list[tuple[str, float | None, float | None, str]] = [
+        (
+            "challenge, equal capabilities",
+            num(data.fig("E-DEU-MAE-r1")),
+            num(data.fig("E-BASE-WMEAN-r1")),
+            failed,
+        ),
+        (
+            "challenge, real capabilities",
+            num(data.fig("E-METHOD-challenge_rp")),
+            num(data.fig("E-METHOD-baseline_wmean")),
+            failed,
+        ),
+    ]
+    for row in data.leaderboard_rows:
+        name = row[0] if row else ""
+        model_mae, base_mae = lb_pair(row)
+        short = (
+            "status-quo gravity"
+            if "gravity" in name.lower()
+            else "regime-aware settlement"
+            if "regime" in name.lower()
+            else name
+        )
+        cands.append((f"successor — {short}", model_mae, base_mae, "failed"))
+    nums = _NUM_ANY.findall(data.fig("E-ORACLE-MAE"))
+    cands.append(
+        (
+            "flexible oracle probe",
+            float(nums[0]) if nums else None,
+            float(nums[1]) if len(nums) > 1 else None,
+            "ceiling",
+        )
+    )
+    return [(lab, m, b, v) for lab, m, b, v in cands if m is not None and b is not None]
 
 
 def _rubric_bands(
