@@ -66,6 +66,8 @@ app = typer.Typer(
 )
 knowledge_app = typer.Typer(help="Transcript concept index (BUILD_PLAN §7).", no_args_is_help=True)
 app.add_typer(knowledge_app, name="knowledge")
+site_app = typer.Typer(help="Static site generation (Session 31, D31).", no_args_is_help=True)
+app.add_typer(site_app, name="site")
 
 # Shown when the bge-m3 knowledge extra is needed but not installed (D7.0c).
 _KNOWLEDGE_HINT = (
@@ -1518,6 +1520,47 @@ def knowledge_build(
         typer.echo(_KNOWLEDGE_HINT, err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(f"indexed {index.count()} chunks -> {db_path}")
+
+
+@site_app.command("build")
+def site_build(
+    repo_root: Path = typer.Option(Path("."), "--repo-root", help="Repository root."),
+    docs_dir: Path = typer.Option(Path("docs"), "--docs-dir", help="Where the site is written."),
+    repo_url: str = typer.Option(
+        "https://github.com/hamzagul07/schelling", "--repo-url", help="Public repo URL for links."
+    ),
+    check: bool = typer.Option(
+        False,
+        "--check",
+        help="Verify the committed site matches a fresh regeneration; fail on drift.",
+    ),
+) -> None:
+    """Regenerate the static site under ``docs/`` from repository artifacts (D31.2).
+
+    Every page is generated from the sealed ledger, the backtest, the paper's evidence table, the
+    decisions log, and the test count — no figure is hand-typed. With ``--check`` it writes
+    nothing and exits non-zero if any committed page differs from a fresh build, so CI can
+    guarantee the published site is never stale.
+    """
+    from schelling.site.render import check_site, write_site
+
+    if check:
+        drift = check_site(repo_root, docs_dir, repo_url=repo_url)
+        if drift:
+            typer.echo(
+                f"SITE DRIFT — build fails ({len(drift)} file(s) differ from HEAD):", err=True
+            )
+            for rel in drift:
+                typer.echo(f"  ✗ {rel}", err=True)
+            typer.echo("Regenerate with `schelling site build` and re-commit.", err=True)
+            raise typer.Exit(code=1)
+        typer.echo("site is in sync with HEAD — no drift.")
+        return
+
+    written = write_site(repo_root, docs_dir, repo_url=repo_url)
+    typer.echo(f"site: {len(written)} file(s) → {docs_dir}")
+    for rel in written:
+        typer.echo(f"  {rel}")
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -40,3 +40,8 @@ jobs:
         # provenance/test-count drift (D18.3). DEU-derived tags are skipped here because the DEU
         # dataset is gitignored on CI — those numbers are guarded by the (data-gated) local tests.
         run: uv run schelling paper-evidence --check
+
+      - name: Site drift (site build --check)
+        # Fails if the committed docs/ site differs from a fresh regeneration — every page is
+        # generated from repository artifacts, so a stale published site cannot slip through (D31.2).
+        run: uv run schelling site build --check
