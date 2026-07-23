@@ -1884,3 +1884,59 @@ font weights only (400/500), 1px hairlines, no shadows or gradients, dark mode v
 `prefers-color-scheme`, and a mobile breakpoint that reflows rows and hides the header row —
 `site.css` keeps its per-file E501 ruff ignore as a stylesheet asset. 443 tests green;
 `site build --check` in sync; `docs/` regenerated.
+
+### D34.0 — The instrument layer: two figures generated from artifacts
+Two deterministic inline-SVG figures, same rule as the report figures — no hand-plotted coordinate,
+every mark positioned from a sourced value (`src/schelling/site/figures.py`). **Fig. 1, the forecast
+landscape** (index + ledger): one group per sealed question, one row per model forecast, the median
+as a dot and the 80% interval as a bar on the question's 0-100 continuum, with the rubric band
+boundaries drawn behind as thin rules and the modal band — the band holding the most model medians —
+tinted and labelled; the resolution date sits at the right of each group, a legend above, and it
+scales to any number of questions. **Fig. 2, the trials** (findings): a horizontal bar pair per
+pre-registered MAE gate (model vs baseline on one shared scale) with the verdict as a monospace
+label, ordered as the tests ran so it reads as a sequence of attempts. Both are `role="img"` with a
+generated `<title>`/`<desc>`, byte-identical on re-run, and free of scripts/external assets. Data
+marks reuse the report renderer's palette (amber for the 0-end half, teal for the 100-end); the
+palette's dark structural colours would vanish on a dark ground, so axes, band rules, and every
+label instead use the site's CSS variables (`fig-*` classes) and flip with `prefers-color-scheme`.
+
+### D34.1 — The committed interval snapshot (FORECAST-INTERVALS.json)
+Fig. 1 needs each forecast's 80% interval, which lives only in the gitignored `runs/` records —
+absent on CI, where `site build --check` must pass. Reading records at build time would make the
+committed site un-reproducible on CI. So the intervals are snapshotted into a committed file,
+`FORECAST-INTERVALS.json`, keyed by the ledger SHA-256; `gather()` reads only that committed snapshot
+(a pure function of committed files), and `site build --refresh-intervals` regenerates it from the
+records locally (matching each ledger row to its record by SHA-256, exactly as `schelling verify`
+does). The medians remain governed by `FORECASTS.md`; the snapshot adds only the interval endpoints
+of the already-sealed records, so disclosing them early **strengthens** the commit-reveal (they
+become a visible, un-editable commitment too). `test_intervals_snapshot_matches_records` catches a
+stale snapshot wherever the records are present; it skips on CI.
+
+### D34.2 — Fig. 2 is sourced from the backtest, and drops what it can't source
+Each trial row's model and baseline MAE come from the evidence table (`E-DEU-MAE-r1`,
+`E-BASE-WMEAN-r1`, `E-METHOD-challenge_rp`, `E-METHOD-baseline_wmean`, `E-ORACLE-MAE`) and the
+successor leaderboard (TEST vs comp columns, located by header name) — all committed, all tracing to
+`BACKTEST.md`. A gate whose numbers cannot be parsed is dropped, never invented, exactly as the gate
+text rows do (D33.2). `test_trials_plot_the_sourced_maes` asserts the plotted MAEs equal the values
+parsed independently from the artifacts.
+
+### D34.3 — The no-hand-typed-figures rule, extended to SVG
+The figures put hundreds of computed coordinates into the HTML. Those are geometry, not hand-typed
+figures, so the no-hand-typed-figures test scrubs `<svg>…</svg>` (as it already scrubs `<script>`)
+before scraping numbers from the prose and tables — which must still all trace to
+`SiteData.provenance()`. The figures' *data* is guarded separately and more strictly:
+`test_landscape_plots_the_sourced_values` recomputes each median's x-coordinate through the figure's
+own continuum scale and asserts the dot and interval bar are plotted there, and
+`test_trials_plot_the_sourced_maes` checks Fig. 2's bar labels. `"80"` (the fixed interval level)
+joins `"256"` (SHA-256) in the structural whitelist.
+
+### D34.4 — Typographic instrumentation, restrained
+A hairline rule above each section (its `border-top`) with the section number in monospace at the
+left — the ordinal is a **CSS counter** (`.snum::before { content: "§ " counter(sec,
+decimal-leading-zero) }`), so no number is hand-typed into the HTML. Monospace for every identifier
+and figure caption (question ids wrapped in `<code>`, `Fig. 1` / `Fig. 2`, run-id/hash strings),
+hashes already on their own 11px monospace line, and `font-variant-numeric: tabular-nums` on the body
+so every column of digits lines up. No stamps, no fake classification markings — the credibility
+comes from precision, not costume. 448 tests green; `site build --check` in sync; `docs/`
+regenerated; the honesty rule, drift check, no-hand-typed test, and offline-cleanliness all still
+pass.
