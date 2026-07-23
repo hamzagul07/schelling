@@ -1819,3 +1819,27 @@ inside a hex hash as non-figure; entities and the inline script are scrubbed fir
 **offline-cleanliness** (no embedded external resource on any generated page or copied report). Plus
 a real-repo integration test that `gather()` parses the committed artifacts and the published `docs/`
 is in sync. 13 site tests; 442 in the suite.
+
+### D32.0 — Vercel deployment: a static site, not a Python app
+Vercel's build failed with *"No python entrypoint found in default locations"* — it detected
+`pyproject.toml`, assumed a Python serverless project, and looked for an app entrypoint. This repo is
+not a serverless app: the deployable artifact is the static `docs/` folder produced by
+`schelling site build`. Fixed with two hand-authored root config files (config only — no change to
+the generator, the drift check, or the honesty rules):
+
+- **`vercel.json`** — `framework: null`, `installCommand: ""`, `buildCommand: ""`,
+  `outputDirectory: "docs"`, `cleanUrls: true`, `trailingSlash: false`. The **empty strings** (not
+  `null`) are what actually skip the install and build steps; the previously-committed `vercel.json`
+  used `buildCommand: null`, which lets framework detection run — the cause of the failure.
+- **`.vercelignore`** — hides everything Vercel must not see so framework detection cannot fire at
+  all: `src`, `tests`, `pyproject.toml`, `uv.lock`, `data`, `runs`, `paper`, `analyses`,
+  `docs/papers`. Nothing outside `docs/` is needed to serve the site.
+
+### D32.1 — The drift check ignores config by construction
+`site build --check` compares only the seven files `build_site()` produces (five pages, `site.css`,
+`.nojekyll`), each under `docs/`; it never enumerates the docs directory or the repo root, so a
+hand-authored root file cannot register as drift. `vercel.json` and `.vercelignore` live at the repo
+root, outside `docs/` entirely — verified: `site build --check` still reports *no drift*. No exclusion
+logic was needed (and none was added — the config files are authored, never generated). README gains
+a **Deployment** section: regenerate `docs/` with `site build`, commit, push, the host republishes;
+CI's drift check guarantees the published site matches the artifacts.
