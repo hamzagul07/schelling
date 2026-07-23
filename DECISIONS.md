@@ -1747,3 +1747,75 @@ diplomatic track"): reference class **INCOMPLETE**, coverage fraction unknown (d
 base rate, and the divergence diagnostic does NOT fire**. The D30.0 false divergence (the outside view
 "disagreeing" with the model's no-action median) was an artifact of the biased outcome-only sample; the
 sessions-at-risk enumeration plus honest INCOMPLETE reporting removes it. All gates green.
+
+### D31.0 — The site: generated, never written
+`schelling site build` regenerates a static site under `docs/`, published via GitHub Pages (main
+branch, `/docs`). Plain HTML + one CSS file (`docs/site.css`), plus a `.nojekyll` marker so Pages
+serves the files verbatim. No framework, no build step, no external fonts or scripts — the same
+offline-clean rule as the reports. The site lives in `src/schelling/site/` (`data.py` gathers,
+`css.py` is the stylesheet, `render.py` builds and diffs the pages) and the CLI adds `site build
+[--check]`. Five pages: **index** (thesis, the four movements, the finding in three sentences, the
+live ledger with a countdown and how-to-verify), **ledger** (full table, per-question rubric links,
+`schelling verify` + `ots verify`), **findings** (pre-registered gates & verdicts, the ceiling, the
+successor leaderboard), **paper** (abstract, a link to DRAFT.md, the bibliography), **reports** (an
+index of rendered dossiers copied into `docs/reports/`).
+
+### D31.1 — Every figure traces to an artifact
+`site.data.gather()` parses every number the pages quote from a committed artifact — the sealed
+ledger `FORECASTS.md` (rows, hashes, medians, frozen/resolution/grading dates), `BACKTEST.md` (the
+gate verdict and the leaderboard marker block), `paper/EVIDENCE.md` (headline figures via the
+paper's own `parse_evidence`, and the test count from its `E-TESTS` row), and `DECISIONS.md` (the
+decision count). No figure is hand-typed into HTML; the page builders interpolate only fields of
+`SiteData`. This mirrors the concepts firewall in spirit: the site *displays* computed numbers, it
+never originates one.
+
+### D31.2 — Determinism, and why the site stamps no live HEAD or pytest count
+`site build --check` fails if the committed site differs from a fresh regeneration (added to CI after
+`paper-evidence --check`). For that to be stable, `gather()` reads only committed files — **no git,
+no pytest subprocess, no wall clock**. Two figures the plan listed as "generated" were deliberately
+*not* baked into page content:
+- **The HEAD sha.** A live HEAD stamp can never satisfy `--check`: the very commit that publishes the
+  site changes HEAD, so a post-commit regen would always differ. Provenance is instead the committed
+  artifacts themselves (which already carry git provenance in EVIDENCE.md).
+- **The test count.** Sourced from `EVIDENCE.md`'s `E-TESTS` row (a committed artifact, the same
+  figure the paper cites) rather than a live `pytest --collect-only`, so adding a test does not
+  silently desync the published site, and CI regenerates the identical bytes. When the paper's
+  evidence is next regenerated, the site follows.
+- **The countdown.** A build-time day count would bake a wall-clock value into hashed content
+  (breaking rule 2 *and* `--check`). So the page ships the static target date only, and a single
+  tiny **inline** script computes days-remaining client-side at view time — self-contained, offline,
+  no network. This is the one script on the site.
+
+### D31.3 — Offline-cleanliness, precisely scoped
+Each page renders fully offline: the only external references are **navigational** `<a href>` links
+to the public repository (rubrics, `DRAFT.md`, `FORECASTS.md`) and — inside copied reports — source
+citations. No **embedded** resource is ever loaded off-site: no external `src=`, no external
+stylesheet `<link>`, no `@import`, no `url(http…)`, no webfont. Repo-root artifacts (rubrics, the
+draft) live above `docs/` and are not served by Pages, so they are linked at the public repo URL
+(`--repo-url`, default `hamzagul07/schelling`), which is a navigation target, not a resource load.
+
+### D31.4 — Design: honor the reports' system
+Editorial and restrained, reusing the reports' existing palette (accent amber `#b45309`) rather than
+inventing one — the correct precedence (the project's own system over fresh choices). Serif
+(Georgia) for the thesis lines, system-sans for body, monospace for hashes/ids; one accent; 0.5px
+hairlines; no gradients or shadows; dark mode via `prefers-color-scheme`; a print stylesheet; fully
+responsive. System font stacks only — no webfont — so the "no external fonts" rule holds with zero
+fallback risk.
+
+### D31.5 — Honesty rules baked into the template
+The ledger always prints the **graded count beside the sealed count** ("N sealed · M graded"). A
+question counts as graded only once its `GRADING-<qid>.md` carries an `Actual outcome:` line — a
+pre-registered rubric alone does not — so today `graded == 0` and the banner states plainly that no
+page claims forecast accuracy. Any page quoting a forecast shows its resolution date and a
+sealed/graded chip. The `findings` page reports the DEU **backtest** (clearly a retrodictive
+benchmark, never the sealed live forecasts), so no page claims live accuracy while `graded == 0`.
+
+### D31.6 — Tests
+`tests/test_site.py` covers: **generation determinism** (byte-identical rebuilds), **the drift
+check** (`check_site` returns `[]` after a write and flags a mutated or missing page), **no
+hand-typed figures** (every number in each page traces to `SiteData.provenance()` — a tokenizer that
+reads text hyphens in `utf-8`/`SHA-256`/`Q-2026` as text, not negative signs, and treats a digit
+inside a hex hash as non-figure; entities and the inline script are scrubbed first), and
+**offline-cleanliness** (no embedded external resource on any generated page or copied report). Plus
+a real-repo integration test that `gather()` parses the committed artifacts and the published `docs/`
+is in sync. 13 site tests; 442 in the suite.
