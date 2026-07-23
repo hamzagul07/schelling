@@ -62,10 +62,34 @@ def _sample_data() -> SiteData:
         },
         gate_verdict="FAILED",
         successor_verdict="No candidate beats the compromise weighted mean on TEST.",
-        leaderboard_header=["Candidate", "Scored on", "TEST MAE", "comp. MAE", "beats?"],
+        leaderboard_header=[
+            "Candidate",
+            "Scored on",
+            "dev MAE",
+            "TEST MAE",
+            "comp. MAE",
+            "Δ (95% CI)",
+            "beats?",
+        ],
         leaderboard_rows=[
-            ["Candidate A — status-quo gravity", "TEST rp-issues", "22.09", "21.26", "no"],
-            ["Candidate B — regime-aware settlement", "TEST (all)", "21.57", "21.09", "no"],
+            [
+                "Candidate A — status-quo gravity",
+                "TEST rp-issues",
+                "24.96 (23.87)",
+                "22.09",
+                "21.26",
+                "+0.83 [-0.15, +1.91]",
+                "no",
+            ],
+            [
+                "Candidate B — regime-aware settlement",
+                "TEST (all)",
+                "24.86 (24.10)",
+                "21.57",
+                "21.09",
+                "+0.48 [-0.69, +1.76]",
+                "no",
+            ],
         ],
         abstract="An open replication reproduces the case (9.530) and fails on 351 issues.",
         bibliography=[
@@ -190,10 +214,17 @@ def test_committed_reports_are_offline_clean() -> None:
 
 # --------------------------------------------------------------------------- honesty rules (D31.5)
 def test_honesty_shows_graded_beside_sealed() -> None:
-    data = _sample_data()
+    """The graded count is always rendered beside the sealed count — as adjacent stat cards on both
+    the index and the ledger page (D31.5, restyled D33.3)."""
+    data = _sample_data()  # sealed_count == 2, graded_count == 0
+    sealed_card = '<div class="stat"><p class="k">Forecasts sealed</p><p class="v">2</p></div>'
+    graded_card = '<div class="stat"><p class="k">Graded</p><p class="v">0</p></div>'
     for name in ("index.html", "ledger.html"):
         page = build_site(REPO_ROOT, data=data)[name]
-        assert "2 sealed · 0 graded" in page, name
+        assert sealed_card in page, name
+        assert graded_card in page, name
+        # the two cards are adjacent (sealed immediately followed by graded)
+        assert sealed_card + graded_card in page, name
 
 
 def test_no_accuracy_claim_while_ungraded() -> None:
@@ -215,6 +246,26 @@ def test_graded_count_reflects_recorded_outcomes() -> None:
     )
     assert graded.sealed_count == 2
     assert graded.graded_count == 1
+
+
+# --------------------------------------------------------------------------- reference design (D33)
+def test_reference_design_structure_holds() -> None:
+    """The specifics that must not drift from the approved reference (D33.4): a two-line h1 whose
+    second line carries the accent; no HTML tables anywhere (hashes never live in a table cell); the
+    full 64-char SHA-256 on its own monospace .hash line; the nav with brand + navlinks."""
+    data = _sample_data()
+    for name, page in _pages(data).items():
+        assert "<h1>" in page and '<span class="turn">' in page, name  # two-line accented h1
+        assert "<table" not in page and "</td>" not in page, name  # never a table
+        assert '<nav><div class="wrap"><a class="brand"' in page, name
+    # every ledger row: the full 64-char hash on its own monospace line, never in a table cell
+    for name in ("index.html", "ledger.html"):
+        page = build_site(REPO_ROOT, data=data)[name]
+        hashes = re.findall(r'<p class="hash">([0-9a-f]{64})</p>', page)
+        assert len(hashes) == data.sealed_count, name
+    # findings gate numbers all trace and render as "n / n" or a single sourced figure
+    findings = _pages(data)["findings.html"]
+    assert 'class="gate"' in findings and 'class="gates"' in findings
 
 
 # --------------------------------------------------------------------------- real-repo integration
