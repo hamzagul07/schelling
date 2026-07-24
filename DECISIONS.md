@@ -2366,3 +2366,33 @@ the lock being structural — the weighted median is pinned by the capability×s
 distribution, not by the hard argmax of offer selection — so quantal response on the acceptance step
 does not dislodge it. The compromise mean remains the settlement model; nothing here changes a sealed
 number.
+
+### D42.0 — Phase C evidence: E-tags for the eight-method tournament and the median-lock probe
+The paper revision keeps the standing rule that every cited number is computed, never hand-typed
+(D14.1). Four Phase C leaderboard tags (`E-PHASEC-challenge-qre`, `-pce`, `-nash`, `-nash-ks`) are
+emitted by `paper.evidence` from the same `run_successor_search` report that writes BACKTEST.md, each
+value carrying the whole verdict (TEST MAE vs compromise, Δ, CI) so the draft cites it entire.
+`E-PHASEC-COUNT` computes the number of distinct solution concepts weighed against the mean as
+`2 + len(candidates) + len(structural) = 8`. The live median-lock diagnostic is E-tagged too
+(`E-QRE-ZEROSWING-{usiran,iaea}`, `E-QRE-CI80-{usiran,iaea}`): `paper.evidence` recomputes it on the
+two gitignored formalized drafts at the **same seed (42) and 10,000 draws** the dated D41.6 note used,
+so the tags reproduce it byte-for-byte (18/27→17/27, 44.65→25.02; 13/20→13/20, 32.71→22.28). Like the
+DEU-derived tags these are skipped on CI when the data is absent (the `--check` data-absent path), so
+the gate stays green offline. A reusable `qre_tornado` was added to `mc/sensitivity.py` — the same
+one-at-a-time sweep as `tornado`, solved with `run_qre`; additive, the challenge and compromise
+numerical paths are untouched and the D39.2 gate stays green.
+
+### D42.1 — Phase C prose: the eight-method report, the operator diagnosis, the broadened ceiling
+Section 4 now reports all eight solution concepts against the compromise mean, grouped by tradition:
+expected-utility bargaining, its quantal-response softening, the two axiomatic bargaining solutions
+(Nash, Kalai-Smorodinsky), probabilistic Condorcet (KTAB's method), and the two fitted structural
+blends — with PCE reported honestly as the near-miss that is nominally better yet statistically
+indistinguishable (CI straddles zero). A new subsection **4.1, "The operator, not the dynamics,"**
+files the operator diagnosis: quantal response softens precisely the discrete acceptance step, yet
+leaves the count of dead sensitivity parameters near-unchanged and *tightens* the forecast interval
+rather than widening it — so the median lock is a property of the weighted-median operator, not of the
+bargaining dynamics above it, with the corollary that the continuous smoothing which cures it is the
+weighted mean itself. Section 5's ceiling claim is strengthened to rest on two independent lines of
+evidence meeting at the same floor: the noise-floor oracle from above, and the eight-concept
+tournament from the side. `paper-assemble` re-run deterministically: 7,079 words, no unresolved
+E-tags. E-TESTS refreshed and docs rebuilt; nothing sealed changed.
