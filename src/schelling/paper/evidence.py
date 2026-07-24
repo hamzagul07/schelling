@@ -309,7 +309,113 @@ def _successor_items(repo_root: Path, report: SuccessorReport) -> list[EvidenceI
                 f"(boot seed {report.boot_seed}) — {beats} compromise, on {c.applies_to}",
             )
         )
+    # Phase C structural solvers (Session 41/42, D41.5): the value carries the verdict so the paper
+    # cites it whole — no hand-typed figure. delta<0 with a CI clear of 0 would validate; none does.
+    for c in report.structural:
+        verdict = "validated" if c.beats_compromise else "exploratory (CI straddles 0)"
+        items.append(
+            EvidenceItem(
+                f"E-PHASEC-{c.key}",
+                "4. Successor",
+                f"{c.name}: TEST MAE vs compromise",
+                f"{_f2(c.test_mae)} vs {_f2(c.test_compromise_mae)}, "
+                f"Δ {c.delta:+.2f}, CI [{c.ci_lo:+.2f}, {c.ci_hi:+.2f}]",
+                src,
+                prov,
+                f"boot seed {report.boot_seed}, on {c.applies_to} — {verdict}",
+            )
+        )
+    # The count of distinct solution concepts weighed against the mean: the compromise mean itself,
+    # the challenge (expected-utility) model, the two R1 structural blends, and the four Phase C
+    # solvers = 8 (Section 5's ceiling now rests on all of them, plus the oracle probe).
+    n_concepts = 2 + len(report.candidates) + len(report.structural)
+    items.append(
+        EvidenceItem(
+            "E-PHASEC-COUNT",
+            "5. Ceiling",
+            "Distinct solution concepts tested against the mean",
+            str(n_concepts),
+            src,
+            prov,
+            "compromise mean + challenge (EU) + gravity + regime + challenge-qre + nash + nash-ks "
+            "+ pce (D41)",
+        )
+    )
     return items
+
+
+# --------------------------------------------------------------- operator diagnosis: QRE lock (§4)
+# The live median-lock experiment (D41.6): challenge vs challenge-qre on the two live formalized
+# games, seed 42, 10,000 draws — the same parameters the dated diagnostic used, so these E-tags
+# reproduce it exactly. The drafts live in gitignored analyses/, so on CI (absent) the tags are
+# skipped like the DEU-derived ones; locally they are recomputed, never hand-typed.
+_QRE_GAMES: tuple[tuple[str, str, str], ...] = (
+    ("usiran", "US-Iran stage two", "analyses/usiran/usiran-v2.json"),
+    ("iaea", "IAEA September", "analyses/iaea/iaea.json"),
+)
+_QRE_SEED = 42
+_QRE_DRAWS = 10_000
+
+
+def _qre_lock_items(repo_root: Path) -> tuple[list[EvidenceItem], list[str]]:
+    import hashlib
+    import json
+
+    from schelling.mc.monte_carlo import MODEL_CHALLENGE, MODEL_CHALLENGE_QRE, forecast
+    from schelling.mc.sensitivity import _ZERO, qre_tornado, tornado
+    from schelling.schemas.question import GameSpec
+    from schelling.solver.config import SolverConfig
+
+    items: list[EvidenceItem] = []
+    missing: list[str] = []
+    cfg = SolverConfig()
+    for slug, label, rel in _QRE_GAMES:
+        path = repo_root / rel
+        if not path.exists():
+            missing.append(f"QRE lock diagnostic ({label}): {rel} absent (gitignored draft).")
+            continue
+        raw = path.read_bytes()
+        game = GameSpec.model_validate(json.loads(raw)["game"])
+        prov = "sha256:" + hashlib.sha256(raw).hexdigest()[:12]
+        ch_zero = sum(1 for e in tornado(game, cfg) if abs(e.swing) < _ZERO)
+        qr_zero = sum(1 for e in qre_tornado(game, cfg) if abs(e.swing) < _ZERO)
+        n = sum(
+            1
+            for a in game.actors
+            for f in ("position", "salience", "capability")
+            if getattr(a, f).low < getattr(a, f).high
+        )
+        ch = forecast(
+            game, cfg, n_draws=_QRE_DRAWS, seed=_QRE_SEED, write=False, model=MODEL_CHALLENGE
+        )
+        qr = forecast(
+            game, cfg, n_draws=_QRE_DRAWS, seed=_QRE_SEED, write=False, model=MODEL_CHALLENGE_QRE
+        )
+        items.append(
+            EvidenceItem(
+                f"E-QRE-ZEROSWING-{slug}",
+                "4. Successor",
+                f"Median-lock: zero-swing sensitivity rows, challenge → QRE ({label})",
+                f"{ch_zero}/{n} → {qr_zero}/{n}",
+                rel,
+                prov,
+                f"seed {_QRE_SEED}; QRE leaves the pinned-median count near-unchanged (D41.6)",
+            )
+        )
+        ch_w = ch.ensemble.p90 - ch.ensemble.p10
+        qr_w = qr.ensemble.p90 - qr.ensemble.p10
+        items.append(
+            EvidenceItem(
+                f"E-QRE-CI80-{slug}",
+                "4. Successor",
+                f"Median-lock: CI80 width, challenge → QRE ({label})",
+                f"{_f2(ch_w)} → {_f2(qr_w)}",
+                rel,
+                prov,
+                f"seed {_QRE_SEED}, {_QRE_DRAWS} draws; QRE tightens rather than widens (D41.6)",
+            )
+        )
+    return items, missing
 
 
 # --------------------------------------------------------------------------- sealed ledger (§8)
@@ -540,6 +646,9 @@ def build_evidence(repo_root: Path) -> EvidenceBundle:
         report, _a, _b = run_successor_search(csv_path)
         bundle.report = report
         bundle.items += _successor_items(repo_root, report)
+        qre_items, qre_missing = _qre_lock_items(repo_root)
+        bundle.items += qre_items
+        bundle.open_questions += qre_missing
     else:
         bundle.open_questions += [
             "DEU MAE/RMSE tables, split-sample, oracle gap, worst issues, round-1 (E-DEU-MAE-r1 / "
