@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" font-family="Helvetica,Arial,sans-serif">
+<text x="320" y="26" text-anchor="middle" font-size="17" font-weight="bold" fill="#1a1a2e">Successor leaderboard — TEST scored once (R1)</text>
+<text x="30" y="70" text-anchor="start" font-size="12" font-weight="bold" fill="#1a1a2e">Candidate</text>
+<text x="300" y="70" text-anchor="start" font-size="12" font-weight="bold" fill="#1a1a2e">TEST MAE</text>
+<text x="380" y="70" text-anchor="end" font-size="12" font-weight="bold" fill="#1a1a2e">comp MAE</text>
+<text x="470" y="70" text-anchor="end" font-size="12" font-weight="bold" fill="#1a1a2e">delta [95% CI]</text>
+<text x="610" y="70" text-anchor="end" font-size="12" font-weight="bold" fill="#1a1a2e">beats?</text>
+<line x1="30" y1="78" x2="610" y2="78" stroke="#ddd"/>
+<text x="30" y="104" text-anchor="start" font-size="12" font-weight="normal" fill="#1a1a2e">Candidate A — status-quo gravity</text>
+<text x="300" y="104" text-anchor="start" font-size="12" font-weight="normal" fill="#1a1a2e">22.09</text>
+<text x="380" y="104" text-anchor="end" font-size="12" font-weight="normal" fill="#1a1a2e">21.26</text>
+<text x="470" y="104" text-anchor="end" font-size="12" font-weight="normal" fill="#1a1a2e">+0.83 [-0.15, +1.91]</text>
+<text x="610" y="104" text-anchor="end" font-size="12" font-weight="normal" fill="#1a1a2e">no</text>
+<line x1="30" y1="112" x2="610" y2="112" stroke="#ddd"/>
+<text x="30" y="138" text-anchor="start" font-size="12" font-weight="normal" fill="#1a1a2e">Candidate B — regime-aware settlement</text>
+<text x="300" y="138" text-anchor="start" font-size="12" font-weight="normal" fill="#1a1a2e">21.57</text>
+<text x="380" y="138" text-anchor="end" font-size="12" font-weight="normal" fill="#1a1a2e">21.09</text>
+<text x="470" y="138" text-anchor="end" font-size="12" font-weight="normal" fill="#1a1a2e">+0.48 [-0.69, +1.76]</text>
+<text x="610" y="138" text-anchor="end" font-size="12" font-weight="normal" fill="#1a1a2e">no</text>
+<line x1="30" y1="146" x2="610" y2="146" stroke="#ddd"/>
+<text x="30" y="178" font-size="11" fill="#888">pre-registered split train 140 / dev 105 / TEST 106 (seed 20260721); no candidate beats the compromise mean.</text>
+</svg>
