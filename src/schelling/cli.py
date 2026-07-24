@@ -46,7 +46,7 @@ from schelling.knowledge.index import (
     DEFAULT_TRANSCRIPTS,
     KnowledgeIndex,
 )
-from schelling.mc.monte_carlo import engine_version, forecast, write_record
+from schelling.mc.monte_carlo import engine_sha, forecast, write_record
 from schelling.mc.sensitivity import format_tornado, zero_swing_warning
 from schelling.report.render import render as render_report
 from schelling.schemas.forecast import (
@@ -910,7 +910,7 @@ def llm_forecast_cmd(
             n_samples=samples,
             temperature=temperature,
             contamination_override=contamination_risk,
-            engine_version=engine_version(),
+            engine_version=engine_sha(),
         )
     except (LLMForecastError, WebSearchUnavailableError) as exc:
         typer.echo(f"llm-forecast failed: {exc}", err=True)

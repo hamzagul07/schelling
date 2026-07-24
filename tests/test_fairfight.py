@@ -139,7 +139,7 @@ def test_fair_fight_is_deterministic() -> None:
 def test_forecast_commitment_is_engine_independent() -> None:
     game = _game("emission_standards.json")
     rec = forecast(game, n_draws=20, seed=1, write=False, model="compromise")
-    other = rec.model_copy(update={"engine_version": "f" * 40, "created_at": "2099-01-01"})
+    other = rec.model_copy(update={"engine_sha": "f" * 40, "created_at": "2099-01-01"})
     # the commitment hashes the prediction, not the engine SHA or timestamp.
     assert forecast_commitment(rec) == forecast_commitment(other)
     # a different model gives a different commitment.

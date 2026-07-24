@@ -78,7 +78,7 @@ def _record(
     return ForecastRecord(
         question_id="Q-T",
         run_id="Q-T-mc-s0",
-        engine_version="deadbeef",
+        engine_sha="deadbeef",
         inputs_hash="0" * 64,
         seed=0,
         model="challenge",

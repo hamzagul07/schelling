@@ -19,7 +19,7 @@ from collections.abc import Callable, Mapping
 
 import numpy as np
 
-from schelling.mc.monte_carlo import engine_version, forecast, run_monte_carlo
+from schelling.mc.monte_carlo import engine_sha, forecast, run_monte_carlo
 from schelling.schemas.forecast import (
     AdviseLens,
     AdviseRecord,
@@ -362,7 +362,7 @@ def advise(
     record = AdviseRecord(
         question_id=game.question_id,
         run_id=run_id,
-        engine_version=engine_version(),
+        engine_version=engine_sha(),
         inputs_hash=hashed,
         seed=seed,
         created_at=created_at,
