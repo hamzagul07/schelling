@@ -986,11 +986,18 @@ def compare(
     grades: Path | None = typer.Option(
         None, "--grades", help="JSON mapping question_id -> actual (graded outcomes)."
     ),
+    runs: Path = typer.Option(
+        Path("runs"), "--runs", help="Records dir for the proper-score panel (draws needed)."
+    ),
 ) -> None:
-    """Pre-registered comparison of |median - actual| across challenge, compromise, and llm-judgment
-    on the live ledger (D27.4). Exploratory until 10 graded questions — the harness REFUSES to print
-    a ranking before then, the same discipline as the coercive reading.
+    """Pre-registered comparison across challenge, compromise, and llm-judgment on the live ledger.
+
+    The primary ranking is over |median - actual| (D27.4) and stays exploratory until 10 graded
+    questions — the harness REFUSES to rank before then, the discipline the coercive reading holds.
+    Beside it, when the sealed records are present locally, the proper scores (Brier / log for
+    banded rubrics, CRPS for arithmetic ones) are reported per graded record, secondary (D40.1).
     """
+    from schelling.backtest.scoring import format_scorecard, load_forecast_records, score_runs
     from schelling.llm_forecast.compare import compare_baselines
 
     if not ledger.exists():
@@ -1003,12 +1010,106 @@ def compare(
             raise typer.Exit(code=2)
         grade_map = {str(k): float(v) for k, v in json.loads(grades.read_text()).items()}
     result = compare_baselines(ledger.read_text(), grade_map)
-    if not result.ready:
+    if result.ready:
         typer.echo(result.note)
-        return
-    typer.echo(result.note)
-    for i, s in enumerate(result.scores, 1):
-        typer.echo(f"  {i}. {s.family:<12} MAE {s.mae:.3f}  (n={s.n})")
+        for i, s in enumerate(result.scores, 1):
+            typer.echo(f"  {i}. {s.family:<12} MAE {s.mae:.3f}  (n={s.n})")
+    else:
+        typer.echo(result.note)
+    # Proper-score panel (secondary; needs the cached draws in runs/). Silent when absent.
+    if grade_map:
+        cards = score_runs(load_forecast_records(runs), grade_map)
+        if cards:
+            typer.echo("\nProper scores (secondary; from cached draws):")
+            for card in cards:
+                typer.echo(format_scorecard(card))
+
+
+@app.command()
+def power(
+    weights: str = typer.Option(
+        ..., "--weights", help="Comma-separated voting weights, e.g. 4,4,4,2,2,1."
+    ),
+    quota: float = typer.Option(..., "--quota", help="Votes needed for a coalition to win."),
+    labels: str | None = typer.Option(
+        None, "--labels", help="Comma-separated player names (default P1..Pn)."
+    ),
+    bloc: list[str] = typer.Option(
+        [], "--bloc", help="A comma-separated group that votes as one; repeatable."
+    ),
+    seed: int = typer.Option(0, "--seed", help="Seed for the Monte-Carlo path (large n)."),
+    samples: int = typer.Option(200_000, "--samples", min=1, help="MC samples when n exceeds ~20."),
+) -> None:
+    """Shapley-Shubik and Banzhaf voting-power indices for a weighted voting game (D40.2).
+
+    An evidence AID for a human to cite, never an automatic assignment: it prints the indices with
+    the rule and quota used and NEVER writes a capability value. Exact for small n; seeded
+    Monte-Carlo permutation sampling with a standard error above ~20 players.
+    """
+    from schelling.power.indices import compute_power, format_power
+
+    w = [float(x) for x in weights.split(",") if x.strip()]
+    labs = [x.strip() for x in labels.split(",")] if labels else None
+    blocs = [[m.strip() for m in b.split(",") if m.strip()] for b in bloc] if bloc else None
+    try:
+        results = compute_power(w, quota, labels=labs, blocs=blocs, seed=seed, samples=samples)
+    except ValueError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(format_power(results))
+
+
+@app.command()
+def sobol(
+    fixture: Path = typer.Argument(..., help="A GameSpec or DraftGameSpec JSON."),
+    solver: str = typer.Option(
+        "compromise", "--solver", help="compromise (fast, default) or challenge (BDM, slow)."
+    ),
+    n: int = typer.Option(512, "--n", min=1, help="Saltelli base sample size; cost is N*(2k+2)."),
+    seed: int = typer.Option(0, "--seed", help="Seed for the Saltelli sample (deterministic)."),
+    html: Path | None = typer.Option(
+        None, "--html", help="Also write the tornado + Sobol two-panel page here."
+    ),
+) -> None:
+    """Sobol variance-based global sensitivity, a second panel beside the tornado (D40.3).
+
+    The tornado ranks single-parameter swings; Sobol reports each parameter's share of the output
+    variance, first-order (alone) and total-order (including interactions). Runs on the compromise
+    solver by default; the challenge (BDM) solver is far slower and is gated behind --solver.
+    """
+    from schelling.mc.sensitivity import format_tornado, tornado
+    from schelling.mc.sobol import format_sobol, sobol_for_game
+    from schelling.report.sobol_panel import sobol_panel_html
+
+    if solver not in ("compromise", "challenge"):
+        typer.echo("--solver must be 'compromise' or 'challenge'.", err=True)
+        raise typer.Exit(code=2)
+    if not fixture.exists():
+        typer.echo(f"input not found: {fixture}", err=True)
+        raise typer.Exit(code=2)
+    try:
+        game, _a, _fm, _ls, _sf = _load_solve_input(fixture)
+    except ValueError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    entries = tornado(game)
+    if solver == "challenge":
+        # ranged params (= tornado rows) set k; the Saltelli cost is N*(2k+2)
+        typer.echo(
+            f"note: challenge solver re-simulates every solve — {n * (2 * len(entries) + 2)} "
+            "solves; this can take a while. Use --solver compromise for a fast estimate."
+        )
+    result = sobol_for_game(game, model=solver, n=n, seed=seed)
+    typer.echo("Tornado — single-parameter swings:")
+    typer.echo(format_tornado(entries))
+    typer.echo("")
+    typer.echo(format_sobol(result))
+    if html is not None:
+        from schelling.solver.model import run
+
+        baseline = run(game).forecast_median
+        html.write_text(sobol_panel_html(game.question_id, entries, baseline, result))
+        typer.echo(f"\nwrote {html}")
 
 
 @app.command()
