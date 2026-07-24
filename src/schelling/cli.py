@@ -46,7 +46,7 @@ from schelling.knowledge.index import (
     DEFAULT_TRANSCRIPTS,
     KnowledgeIndex,
 )
-from schelling.mc.monte_carlo import engine_sha, forecast, write_record
+from schelling.mc.monte_carlo import KNOWN_MODELS, engine_sha, forecast, write_record
 from schelling.mc.sensitivity import format_tornado, zero_swing_warning
 from schelling.report.render import render as render_report
 from schelling.schemas.forecast import (
@@ -368,7 +368,10 @@ def solve(
     solver: str = typer.Option(
         "both",
         "--solver",
-        help="challenge|compromise|both, or a successor: gravity|regime (R1).",
+        help=(
+            "challenge|compromise|both, a successor gravity|regime (R1), or a Phase C solver "
+            "challenge-qre|nash|nash-ks|pce (D41)."
+        ),
     ),
     reference_point: float | None = typer.Option(
         None,
@@ -383,13 +386,18 @@ def solve(
     precedents_file: Path | None = typer.Option(
         None, "--precedents", help="A ratified precedents JSON — attaches the outside-view panel."
     ),
+    correlated_sampling: bool = typer.Option(
+        False,
+        "--correlated-sampling/--independent-sampling",
+        help="Opt into the copula sampler (salience correlated within coalitions, D41.4).",
+    ),
     out_dir: Path = typer.Option(Path("runs"), "--out-dir", help="Where the record is written."),
 ) -> None:
     """Solve a game (bare GameSpec or DraftGameSpec) and write the ForecastRecord(s)."""
     if not fixture.exists():
         typer.echo(f"input not found: {fixture}", err=True)
         raise typer.Exit(code=2)
-    valid = ("challenge", "compromise", "both", "gravity", "regime")
+    valid = (*KNOWN_MODELS, "both", "gravity", "regime")
     if solver not in valid:
         typer.echo(f"--solver must be one of {', '.join(valid)}.", err=True)
         raise typer.Exit(code=2)
@@ -432,6 +440,7 @@ def solve(
                 live_searched=live_searched,
                 sources_fetched=sources_fetched,
                 model=model,
+                correlated=correlated_sampling,
             )
         if panel is not None:
             record = record.model_copy(update={"analog_panel": panel})
@@ -1364,7 +1373,7 @@ def successor(
         md_out.write_text(board)
 
     typer.echo("Successor search — TEST scored once:")
-    for c in report.candidates:
+    for c in [*report.candidates, *report.structural]:
         verdict = "beats compromise" if c.beats_compromise else "does NOT beat compromise"
         typer.echo(
             f"  {c.name}: TEST MAE {c.test_mae:.2f} vs {c.test_compromise_mae:.2f}  "

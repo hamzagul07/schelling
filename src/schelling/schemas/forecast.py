@@ -207,6 +207,11 @@ class ForecastRecord(BaseModel):
     outcome_distribution: list[float] = Field(default_factory=list)  # raw draws (cache, D4.1)
     convergence_stats: dict[str, float] = Field(default_factory=dict)
     sensitivity: list[SensitivityEntry] = Field(default_factory=list)
+    # How the input ranges were sampled (Session 41, D41.4). "independent" is the default and the
+    # only mode any sealed record uses; "correlated" records that the opt-in Gaussian-copula sampler
+    # (salience correlated within coalitions) was used. Record-level metadata — NOT part of
+    # ``inputs_hash`` (which hashes game + config only), so it never alters a sealed hash.
+    sampling: str = "independent"
 
 
 class AnalogExample(BaseModel):

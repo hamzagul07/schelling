@@ -34,6 +34,22 @@ def sample_triangular(estimate: TriangularEstimate, rng: np.random.Generator) ->
     return float(rng.triangular(estimate.low, estimate.mode, estimate.high))
 
 
+def triangular_ppf(estimate: TriangularEstimate, u: float) -> float:
+    """Inverse-CDF of a triangular ``(low, mode, high)`` at quantile ``u`` in [0, 1].
+
+    The quantile form of :func:`sample_triangular` — used by correlated sampling (D41.4), which
+    draws a correlated ``u`` from a Gaussian copula instead of an independent uniform. A point
+    estimate (``low == high``) returns the mode.
+    """
+    low, mode, high = estimate.low, estimate.mode, estimate.high
+    if low == high:
+        return float(mode)
+    c = (mode - low) / (high - low)
+    if u <= c:
+        return float(low + ((u * (high - low) * (mode - low)) ** 0.5))
+    return float(high - (((1.0 - u) * (high - low) * (high - mode)) ** 0.5))
+
+
 def sample_game(game: GameSpec, rng: np.random.Generator) -> GameSpec:
     """Materialize one point-estimate ``GameSpec`` by drawing every actor field.
 
