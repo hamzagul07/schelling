@@ -873,7 +873,7 @@ def _narr_appendix(record: ForecastRecord, rubric_source: str | None = None) -> 
     parts.append(f"<h3>Reproduce</h3><pre>{cmd}</pre>")
     pairs = {
         "inputs_hash": record.inputs_hash,
-        "engine (git SHA)": record.engine_version,
+        "engine (git SHA)": record.engine_sha,
         "seed": str(record.seed),
         "model": record.model,
         "n_draws": str(record.ensemble.n_draws),
@@ -930,7 +930,7 @@ def _forecast_provenance(record: ForecastRecord) -> str:
         "seed": str(record.seed),
         "n_draws": str(record.ensemble.n_draws),
         "inputs_hash": record.inputs_hash,
-        "engine": record.engine_version,
+        "engine": record.engine_sha,
         "solver_config": cfg,
     }
     fm = record.formalizer_metadata
