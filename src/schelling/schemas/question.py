@@ -56,6 +56,14 @@ class ResolutionRubric(BaseModel):
     # per-band probabilities; when absent the rubric is treated as arithmetic/linear (the grading
     # formula maps the outcome onto the continuum directly). Excluded from the hash with the rubric.
     bands: list[RubricBand] = Field(default_factory=list)
+    # Which scoring rule is authoritative (Session 40, D40.1). A proper scoring rule reads the whole
+    # forecast distribution, not just the median; the template now declares one primary and keeps
+    # |median - actual| as an explicit secondary. Both fields are grading metadata — like the rest
+    # of the rubric they are EXCLUDED from ``inputs_hash``, so declaring them cannot move a sealed
+    # number. Empty ``primary_metric`` means the legacy default ``absolute_error`` (see scoring);
+    # every question sealed before D40 declared |median - actual| and keeps it untouched.
+    primary_metric: str = ""  # "" -> absolute_error; else "brier" (banded) or "crps" (arithmetic)
+    secondary_metrics: list[str] = Field(default_factory=list)  # reported alongside, labelled
 
 
 class GameSpec(BaseModel):
