@@ -2095,3 +2095,40 @@ ability as power**). `question_id` came back correct this time.
 - **STOPPED before solving v2** (item 5). v2 is a draft under the human-review gate; `analyses/opec/`
   (v1/v2 drafts, situations, reports) stays gitignored. Only the v1-thin seal (FORECASTS.md,
   ledger-proofs, intervals, docs) and this log are committed.
+
+### D37.3 — Sealed Q-2026-OPEC-SEP v2-sourced, after a targeted pause check
+One targeted search (2026-07-24, via WebSearch — not a re-formalize) for any member favouring
+**pausing or reversing** the September unwind: none found. July-2026 reporting consistently expects
+the seven to add ~188 kb/d for September, treating the monthly schedule as fixed policy even with
+Brent above $100. The group's **Q1-2026 pause is real precedent** (Jan–Mar, Russia/Novak-led) but its
+triggers — seasonal demand slowdown + an oversupply glut (IEA ~4 mbpd surplus) — are **not** cited for
+September; the current driver is the Strait-of-Hormuz supply disruption and high prices, which favour
+adding barrels (analyst oversupply worry is only a forward risk "once transit normalises"). Sources:
+Al Jazeera 2026-07-06; investinglive/Bloomberg; Reuters via Investing.com; Forbes/Astana Times.
+
+- **Widening (item 2, second branch).** With no member favouring a pause, the low end of **every**
+  actor's position range was widened to **45** (a small ~90 kb/d cut) so a pause/reverse outcome sits
+  inside the ensemble support rather than outside it, recorded as an explicit assumption. No mode was
+  moved below 50 — a pause is *possible* (precedent + retained flexibility) but not currently favoured
+  by anyone, so it belongs in the tail, not the centre. The widening moved the CI80 lower bound down,
+  not the pinned weighted median.
+- **Sealed v2-sourced (three records):** challenge 63.680, compromise 63.434, llm-judgment 66.000
+  (frozen 2026-07-24). Solver records verify 4/4; the arithmetic rubric was attached to the v2 draft
+  before solving, so no post-hoc injection was needed this time. `FORECAST-INTERVALS.json` refreshed
+  to 14, `docs/` rebuilt (14 sealed), OTS re-anchored on each seal.
+- **The sourcing experiment, side by side** (Q-2026-OPEC-SEP, all three families):
+
+  | Model family | v1-thin | v2-sourced | Δ |
+  |---|---:|---:|---:|
+  | challenge    | 62.009 | 63.680 | +1.67 |
+  | compromise   | 62.450 | 63.434 | +0.98 |
+  | llm-judgment | 58.000 | 66.000 | +8.00 |
+
+  Better sourcing barely moved the two solver medians (both pinned near the group's revealed +188
+  pace) but lifted the llm judgment from 58 to 66 (its 80% interval shifting from [48,66] to [50,75])
+  — the model, given the compensation/overproduction/fiscal evidence, grew more confident the group
+  continues the August pace. Both vintages are now gradable against the same arithmetic rubric on
+  2026-08-06; the experiment (does targeted sourcing change the forecast?) is visible in the ledger.
+- **Operational note.** The v2 `llm-forecast` first failed on an exhausted Anthropic API credit
+  balance; Hassan topped up and it completed. Both OPEC formalize passes + three llm-forecast runs are
+  what drew the balance down.
