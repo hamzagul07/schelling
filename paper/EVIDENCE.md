@@ -30,10 +30,10 @@
 | E-R1-SPLIT | 4. Successor | Pre-registered split (train / dev / TEST) | 140 / 105 / 106 | `src/schelling/backtest/deu3_split.json` | `3294081` | seed 20260721; committed before any candidate code (git order = prereg) |
 | E-R1-gravity | 4. Successor | Candidate A — status-quo gravity: TEST MAE vs compromise | 22.09 vs 21.26 | `src/schelling/backtest/deu3_split.json` | `sha256:0d75f0d2f3a9` | Δ +0.83 [95% CI -0.15, +1.91] (boot seed 20260721) — does NOT beat compromise, on TEST rp-issues |
 | E-R1-regime | 4. Successor | Candidate B — regime-aware settlement: TEST MAE vs compromise | 21.57 vs 21.09 | `src/schelling/backtest/deu3_split.json` | `sha256:0d75f0d2f3a9` | Δ +0.48 [95% CI -0.69, +1.76] (boot seed 20260721) — does NOT beat compromise, on TEST (all) |
-| E-LEDGER-challenge-v1 | 8. Ledger | Sealed challenge v1 median | 34.576 | `FORECASTS.md` | `6a2d81a` | frozen 2026-07-21; sha256 aece91bdcfd8… (gitignored — commit-reveal) |
-| E-LEDGER-compromise-v1 | 8. Ledger | Sealed compromise v1 median | 41.636 | `FORECASTS.md` | `6a2d81a` | frozen 2026-07-21; sha256 c87d91ae7f05… (gitignored — commit-reveal) |
-| E-LEDGER-challenge-v2 | 8. Ledger | Sealed challenge v2 median | 29.407 | `FORECASTS.md` | `6a2d81a` | frozen 2026-07-21; sha256 3bc97cd4a4ba… (gitignored — commit-reveal) |
-| E-LEDGER-compromise-v2 | 8. Ledger | Sealed compromise v2 median | 39.443 | `FORECASTS.md` | `6a2d81a` | frozen 2026-07-21; sha256 d55ffc3e78fc… (gitignored — commit-reveal) |
+| E-LEDGER-challenge-v1 | 8. Ledger | Sealed challenge v1 median | 34.576 | `FORECASTS.md` | `5c94e3e` | frozen 2026-07-21; sha256 aece91bdcfd8… (gitignored — commit-reveal) |
+| E-LEDGER-compromise-v1 | 8. Ledger | Sealed compromise v1 median | 41.636 | `FORECASTS.md` | `5c94e3e` | frozen 2026-07-21; sha256 c87d91ae7f05… (gitignored — commit-reveal) |
+| E-LEDGER-challenge-v2 | 8. Ledger | Sealed challenge v2 median | 29.407 | `FORECASTS.md` | `5c94e3e` | frozen 2026-07-21; sha256 3bc97cd4a4ba… (gitignored — commit-reveal) |
+| E-LEDGER-compromise-v2 | 8. Ledger | Sealed compromise v2 median | 39.443 | `FORECASTS.md` | `5c94e3e` | frozen 2026-07-21; sha256 d55ffc3e78fc… (gitignored — commit-reveal) |
 | E-CTX-1 | 3. Fair fight (context) | Published: Old Model (expected-utility / challenge) | 21.5 | `BACKTEST.md` | `1a7260a` | 9 issues w/ resolve data — BdM 2011, Table 1 (regime/ordering only, NOT like-for-like) |
 | E-CTX-2 | 3. Fair fight (context) | Published: Weighted mean, round 1 | 11.8 | `BACKTEST.md` | `1a7260a` | 9 issues w/ resolve data — BdM 2011, Table 1 (regime/ordering only, NOT like-for-like) |
 | E-CTX-3 | 3. Fair fight (context) | Published: Weighted median, round 1 | 29.4 | `BACKTEST.md` | `1a7260a` | 9 issues w/ resolve data — BdM 2011, Table 1 (regime/ordering only, NOT like-for-like) |
@@ -45,7 +45,7 @@
 | E-CHINA-ROWS | 7. Case library | China Tables 2+3 rows verified (blind dual entry) | 60/60 (26 + 34) | `data/coercive-cases/ktab-china-2014.json` | `6c24b91` | two independent blind transcriptions agree; every Exercised-Power checksum reproduces |
 | E-CHINA-VERIFIED | 7. Case library | China transcription.verified | True | `data/coercive-cases/ktab-china-2014.json` | `6c24b91` | flipped true only on human ratification (D13.0) |
 | E-DOMAIN-VERDICT | 7. Case library | Domain verdicts | cooperative: compromise mean wins; coercive: PENDING | `BACKTEST.md` | `1a7260a` | coercive classics paywalled (D11.1); domestic cases out-of-domain, never counted |
-| E-TESTS | Repro | Test count (pytest --collect-only) | 449 | `tests/` | `79f30b8` | regenerated live; green gate is the acceptance bar |
+| E-TESTS | Repro | Test count (pytest --collect-only) | 461 | `tests/` | `79f30b8` | regenerated live; green gate is the acceptance bar |
 
 ## Open questions — numbers no artifact could source
 - (none — every cited number resolved to an artifact)
