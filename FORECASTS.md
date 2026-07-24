@@ -68,9 +68,10 @@ Anyone can audit a sealed forecast without trusting us:
 
 1. **Recompute-and-match (`schelling verify <record.json>`).** Recomputes the record file's SHA-256
    and matches it against the table above, recomputes the canonical inputs hash, and re-solves the
-   embedded game with the record's own config and seed to confirm the forecast reproduces
-   byte-for-byte (determinism, CLAUDE.md rule 2). Reports PASS/FAIL per check. Equivalently, by hand:
-   `sha256sum runs/<file>` and compare the digest to the matching row.
+   embedded game with the record's own config and seed — through the **engine version the record was
+   sealed under** (see *Engine versioning*, below), not the current default — to confirm the forecast
+   reproduces byte-for-byte (determinism, CLAUDE.md rule 2). Reports PASS/FAIL per check. Equivalently,
+   by hand: `sha256sum runs/<file>` and compare the digest to the matching row.
 2. **External time anchor (OpenTimestamps).** Each seal timestamps this file; the proofs live in
    `ledger-proofs/` (content-addressed by the ledger's SHA-256). To confirm a commitment predates
    resolution, install the client (`pip install opentimestamps-client`), then run
@@ -105,3 +106,22 @@ recomputed under current v2 rules the same game hashes to **`2cbb0bc624f3…`**.
 `45d931c6cd91` byte-for-byte). **No sealed byte was ever changed.** `schelling verify` is epoch-aware:
 it reproduces the stored hash under v1 rules and reports PASS, so all four records verify. Mapping,
 for the record: **v1-challenge `45d931c6cd91` (v1) → `2cbb0bc624f3` (v2).**
+
+## Engine versioning and PASS-with-note (D39, dated 2026-07-24)
+
+The `inputs_hash` epoch above addresses *how a record is content-addressed*; a separate integer,
+`ForecastRecord.engine_version`, pins *which solver numerical path produced it*. Every record also
+carries the engine's git SHA (`engine_sha`) for provenance, but the integer is what `verify` acts on.
+
+- **Version 1 is the Session 1–38 behaviour**, and every record sealed to date declares it. A solver
+  registry maps each version to its own frozen solve entrypoint; `schelling verify` re-solves through
+  `resolve(record.engine_version)`, so a future change to the engine can never silently move a number
+  in a record sealed under an earlier version. A permanent regression test re-solves every sealed
+  record through its own declared version and fails if any median moves — v1 stays frozen.
+- **PASS-with-note.** If a build genuinely no longer ships the engine version a record was sealed
+  under (a legacy path that could not be preserved), `verify` does **not** report FAIL. The SHA-256
+  and ledger row still match — the commitment is intact and authenticated — so `verify` reports the
+  determinism check as **PASS-with-note**: *hash and ledger match, but the ensemble is not
+  re-derivable under the current engine.* Any record in that state is listed here so the ledger itself
+  records which forecasts are hash-authenticated but not currently re-derivable. **As of this seal, no
+  record is in that state: all declare engine v1, which this build still ships, and all verify 3/3.**

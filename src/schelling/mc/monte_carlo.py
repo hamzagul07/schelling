@@ -32,6 +32,7 @@ from schelling.schemas.forecast import (
 from schelling.schemas.question import GameSpec
 from schelling.solver.config import SolverConfig
 from schelling.solver.model import run
+from schelling.solver.registry import CURRENT_ENGINE_VERSION
 from schelling.solver.votes import weighted_mean
 
 # Forecasting models the MC layer can run per draw (D10.5).
@@ -128,8 +129,12 @@ def convergence_stats(mc: MonteCarloResult) -> dict[str, float]:
     }
 
 
-def engine_version() -> str:
-    """The engine's git commit SHA (deterministic within a commit), or ``"unknown"``."""
+def engine_sha() -> str:
+    """The engine's git commit SHA (deterministic within a commit), or ``"unknown"``.
+
+    Provenance only — the *numerical* engine version is the integer
+    ``ForecastRecord.engine_version`` (D39), which selects the solve path ``schelling verify``
+    re-runs."""
     try:
         out = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -215,7 +220,8 @@ def build_forecast_record(
     return ForecastRecord(
         question_id=game.question_id,
         run_id=run_id,
-        engine_version=engine_version(),
+        engine_version=CURRENT_ENGINE_VERSION,
+        engine_sha=engine_sha(),
         inputs_hash=hashed,
         seed=mc.seed,
         model=model,

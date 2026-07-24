@@ -45,7 +45,7 @@
 | E-CHINA-ROWS | 7. Case library | China Tables 2+3 rows verified (blind dual entry) | 60/60 (26 + 34) | `data/coercive-cases/ktab-china-2014.json` | `6c24b91` | two independent blind transcriptions agree; every Exercised-Power checksum reproduces |
 | E-CHINA-VERIFIED | 7. Case library | China transcription.verified | True | `data/coercive-cases/ktab-china-2014.json` | `6c24b91` | flipped true only on human ratification (D13.0) |
 | E-DOMAIN-VERDICT | 7. Case library | Domain verdicts | cooperative: compromise mean wins; coercive: PENDING | `BACKTEST.md` | `1a7260a` | coercive classics paywalled (D11.1); domestic cases out-of-domain, never counted |
-| E-TESTS | Repro | Test count (pytest --collect-only) | 461 | `tests/` | `79f30b8` | regenerated live; green gate is the acceptance bar |
+| E-TESTS | Repro | Test count (pytest --collect-only) | 467 | `tests/` | `84b15e1` | regenerated live; green gate is the acceptance bar |
 
 ## Open questions — numbers no artifact could source
 - (none — every cited number resolved to an artifact)

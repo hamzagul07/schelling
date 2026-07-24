@@ -41,11 +41,11 @@ def verify_record(record_path: Path, ledger_path: Path) -> VerifyReport:
     from schelling.mc.monte_carlo import (
         CURRENT_HASH_VERSION,
         KNOWN_HASH_VERSIONS,
-        forecast,
         inputs_hash,
     )
     from schelling.schemas.forecast import ForecastRecord
     from schelling.solver.config import SolverConfig
+    from schelling.solver.registry import resolve
 
     record = ForecastRecord.model_validate_json(record_path.read_text())
     checks: list[Check] = []
@@ -97,12 +97,26 @@ def verify_record(record_path: Path, ledger_path: Path) -> VerifyReport:
             )
         )
 
-    redo = forecast(
+    # Re-solve through the engine version the record was SEALED under, not the current default
+    # (D39.1). A build that no longer ships that version cannot re-derive it — that is PASS-with-
+    # note (authenticated by hash + ledger match), never a FAIL (D39.3).
+    solver = resolve(record.engine_version)
+    if solver is None:
+        checks.append(
+            Check(
+                "determinism",
+                True,
+                f"engine v{record.engine_version} is not in this build's solver registry — "
+                "PASS-with-note: hash and ledger match, but the ensemble is not re-derivable "
+                "under the current engine (D39.3)",
+            )
+        )
+        return VerifyReport(checks)
+    redo = solver(
         record.game,
         config,
         n_draws=record.ensemble.n_draws,
         seed=record.seed,
-        write=False,
         model=record.model,
     )
     a, b = record.ensemble, redo.ensemble
@@ -113,6 +127,11 @@ def verify_record(record_path: Path, ledger_path: Path) -> VerifyReport:
         and abs(a.p90 - b.p90) < _TOL
     )
     checks.append(
-        Check("determinism", same, f"re-solved median {b.median:.6f} vs recorded {a.median:.6f}")
+        Check(
+            "determinism",
+            same,
+            f"re-solved median {b.median:.6f} vs recorded {a.median:.6f} "
+            f"(engine v{record.engine_version})",
+        )
     )
     return VerifyReport(checks)

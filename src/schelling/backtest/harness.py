@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from schelling.backtest.deu import dataset_sha256
-from schelling.mc.monte_carlo import engine_version
+from schelling.mc.monte_carlo import engine_sha
 from schelling.schemas.backtest import (
     BacktestRecord,
     DEUIssue,
@@ -282,7 +282,7 @@ def run_backtest(
         reference_point_used=reference_point,
         split_sample=split_sample,
         oracle=oracle,
-        engine_version=engine_version(),
+        engine_version=engine_sha(),
         created_at=created_at,
         methods=results,
         primary_method=primary_key,

@@ -76,7 +76,7 @@ def _record_dict(*, rubric: ResolutionRubric | None) -> dict[str, Any]:
     rec = ForecastRecord(
         question_id="Q-T",
         run_id="Q-T-mc-s0",
-        engine_version="deadbeef",
+        engine_sha="deadbeef",
         inputs_hash="0" * 64,
         seed=0,
         model="compromise",
