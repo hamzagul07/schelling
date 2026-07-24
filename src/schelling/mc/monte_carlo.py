@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
+from schelling.mc.correlated import salience_cholesky, sample_game_correlated
 from schelling.mc.sampling import derive_rng, sample_game
 from schelling.mc.sensitivity import tornado
 from schelling.schemas.forecast import (
@@ -32,12 +33,30 @@ from schelling.schemas.forecast import (
 from schelling.schemas.question import GameSpec
 from schelling.solver.config import SolverConfig
 from schelling.solver.model import run
+from schelling.solver.nash import ks_forecast, nash_forecast
+from schelling.solver.pce import pce_forecast
+from schelling.solver.qre import run_qre
 from schelling.solver.registry import CURRENT_ENGINE_VERSION
 from schelling.solver.votes import weighted_mean
 
 # Forecasting models the MC layer can run per draw (D10.5).
 MODEL_CHALLENGE = "challenge"  # the BDM bargaining solver (headline = converged weighted median)
 MODEL_COMPROMISE = "compromise"  # the capability x salience weighted mean (Van den Bos / DEU)
+# Phase C solvers (Session 41, D41): each a NEW option routed by engine v1's dispatch below — the
+# challenge and compromise numerical paths are untouched (D39.2 gate stays green).
+MODEL_CHALLENGE_QRE = "challenge-qre"  # quantal-response challenge model (D41.1)
+MODEL_NASH = "nash"  # weighted Nash bargaining (D41.2)
+MODEL_NASH_KS = "nash-ks"  # Kalai-Smorodinsky bargaining (D41.2)
+MODEL_PCE = "pce"  # probabilistic Condorcet election, the KTAB method (D41.3)
+# Every forecasting model this build ships, for CLI validation / listing.
+KNOWN_MODELS = (
+    MODEL_CHALLENGE,
+    MODEL_COMPROMISE,
+    MODEL_CHALLENGE_QRE,
+    MODEL_NASH,
+    MODEL_NASH_KS,
+    MODEL_PCE,
+)
 
 FloatArray = npt.NDArray[np.float64]
 IntArray = npt.NDArray[np.int64]
@@ -71,6 +90,7 @@ def run_monte_carlo(
     n_draws: int = DEFAULT_DRAWS,
     seed: int = 0,
     model: str = MODEL_CHALLENGE,
+    correlated: bool = False,
 ) -> MonteCarloResult:
     """Solve ``n_draws`` triangular draws deterministically and collect per-draw outputs.
 
@@ -78,21 +98,49 @@ def run_monte_carlo(
     (zero variance). ``model`` selects the per-draw forecast: the challenge (BDM) solver's
     converged median, or the compromise weighted mean (D10.5). The round loop is plain Python but
     the contest math is vectorized, so 10k draws finish well under the §6 60-second budget.
+
+    ``correlated`` opts into the Gaussian-copula sampler (salience correlated within coalitions,
+    D41.4) instead of the default independent per-field draws; the marginals are unchanged.
     """
     cfg = config or SolverConfig()
     medians = np.empty(n_draws, dtype=np.float64)
     means = np.empty(n_draws, dtype=np.float64)
     rounds = np.empty(n_draws, dtype=np.int64)
     stops: list[StoppingRule] = []
+    chol = salience_cholesky(game) if correlated else None
     for i in range(n_draws):
-        draw = sample_game(game, derive_rng(seed, i))
+        rng = derive_rng(seed, i)
+        draw = (
+            sample_game_correlated(game, rng, chol) if chol is not None else sample_game(game, rng)
+        )
         if model == MODEL_COMPROMISE:
             value = _compromise_forecast(draw)
             medians[i] = value
             means[i] = value
             rounds[i] = 0
             stops.append(StoppingRule.CONVERGED)
-        else:
+        elif model == MODEL_CHALLENGE_QRE:  # D41.1 — quantal-response challenge
+            qre = run_qre(draw, cfg)
+            medians[i] = qre.forecast_median
+            means[i] = qre.forecast_mean
+            rounds[i] = qre.rounds_executed
+            stops.append(qre.stopping_rule)
+        elif model in (
+            MODEL_NASH,
+            MODEL_NASH_KS,
+            MODEL_PCE,
+        ):  # D41.2 / D41.3 — closed-form settlements
+            if model == MODEL_NASH:
+                value = nash_forecast(draw, cfg)
+            elif model == MODEL_NASH_KS:
+                value = ks_forecast(draw, cfg)
+            else:
+                value = pce_forecast(draw)
+            medians[i] = value
+            means[i] = value
+            rounds[i] = 0
+            stops.append(StoppingRule.CONVERGED)
+        else:  # challenge (unchanged default path — D39.2 depends on this staying identical)
             result = run(draw, cfg)
             medians[i] = result.forecast_median
             means[i] = result.forecast_mean
@@ -196,6 +244,7 @@ def build_forecast_record(
     sources_fetched: list[FetchedSource] | None = None,
     model: str = MODEL_CHALLENGE,
     analog_panel: AnalogPanel | None = None,
+    sampling: str = "independent",
 ) -> ForecastRecord:
     """Assemble the complete :class:`ForecastRecord` from a Monte Carlo run.
 
@@ -244,6 +293,7 @@ def build_forecast_record(
         outcome_distribution=[float(v) for v in dist],
         convergence_stats=convergence_stats(mc),
         sensitivity=sensitivity,
+        sampling=sampling,
     )
 
 
@@ -270,15 +320,18 @@ def forecast(
     sources_fetched: list[FetchedSource] | None = None,
     model: str = MODEL_CHALLENGE,
     analog_panel: AnalogPanel | None = None,
+    correlated: bool = False,
 ) -> ForecastRecord:
     """Run Monte Carlo + sensitivity, build the ForecastRecord, and (by default) persist it.
 
     This is the one entry point that emits a complete audit artifact for a question. Pass a
     draft's ``assumptions`` and ``formalizer_metadata`` to carry its provenance into the record.
     ``model`` selects the challenge (BDM) or compromise (weighted-mean) forecaster (D10.5).
+    ``correlated`` opts into the copula sampler (D41.4); it defaults off, so existing runs are
+    byte-identical, and the choice is recorded in ``ForecastRecord.sampling``.
     """
     cfg = config or SolverConfig()
-    mc = run_monte_carlo(game, cfg, n_draws=n_draws, seed=seed, model=model)
+    mc = run_monte_carlo(game, cfg, n_draws=n_draws, seed=seed, model=model, correlated=correlated)
     # The tornado re-solves the challenge model; it is not meaningful for the compromise mean.
     sensitivity = tornado(game, cfg) if model == MODEL_CHALLENGE else []
     record = build_forecast_record(
@@ -293,6 +346,7 @@ def forecast(
         sources_fetched=sources_fetched,
         model=model,
         analog_panel=analog_panel,
+        sampling="correlated" if correlated else "independent",
     )
     if write:
         write_record(record, out_dir)
