@@ -102,8 +102,9 @@ def test_forecast_writes_record_to_runs(widened_game: GameSpec, tmp_path: Path) 
     assert written.exists()
     reloaded = ForecastRecord.model_validate_json(written.read_text())
     assert reloaded == record
-    # engine version recorded (git SHA in-repo)
-    assert record.engine_version
+    # engine version recorded: the integer solver version (D39) plus the git SHA for provenance
+    assert record.engine_version == 1
+    assert record.engine_sha
     assert record.solver_config["q"] == 1.0
 
 

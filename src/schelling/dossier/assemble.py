@@ -188,7 +188,7 @@ def _provenance_appendix(
         "question": record.question_id,
         "run id": record.run_id,
         "inputs_hash": record.inputs_hash,
-        "engine (git SHA)": record.engine_version,
+        "engine (git SHA)": record.engine_sha,
         "seed": str(record.seed),
         "model": record.model,
         "n_draws": str(record.ensemble.n_draws),

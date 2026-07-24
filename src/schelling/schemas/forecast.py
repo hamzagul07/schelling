@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from schelling.schemas.question import GameSpec
 
@@ -143,13 +143,33 @@ class ForecastRecord(BaseModel):
     The record is fully recomputable from ``(inputs_hash, solver_config, seed,
     engine_version)``; ``outcome_distribution`` embeds the raw draws as a convenience cache,
     not the source of truth (D4.1).
+
+    ``engine_version`` is the explicit **integer** version of the solver engine (Session 39, D39):
+    ``schelling verify`` re-solves each record through the numerical path it was sealed under, via
+    the solver registry, not the current default. Version 1 is the Session-1..38 behaviour. The git
+    SHA of the engine is kept separately in ``engine_sha`` for provenance. Legacy records that
+    stored the SHA in a string ``engine_version`` are migrated on load (``engine_sha`` = the SHA,
+    ``engine_version`` = 1) so every sealed record still verifies.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_engine_version(cls, data: object) -> object:
+        """Legacy records stored the git SHA in a string ``engine_version`` (pre-D39). Move it to
+        ``engine_sha`` and set the integer ``engine_version`` to 1, so old sealed record files load
+        unchanged and re-solve under engine v1."""
+        if isinstance(data, dict) and isinstance(data.get("engine_version"), str):
+            data = dict(data)
+            data.setdefault("engine_sha", data.pop("engine_version"))
+            data.setdefault("engine_version", 1)
+        return data
+
     question_id: str
     run_id: str
-    engine_version: str  # git SHA of the engine that produced this record
+    engine_version: int = 1  # solver-engine version (D39); verify re-solves under it
+    engine_sha: str = ""  # git SHA of the engine that produced this record (provenance)
     inputs_hash: str  # SHA-256 of the canonical (GameSpec + SolverConfig) JSON
     seed: int  # Monte Carlo master seed
     # Which forecasting model produced the ensemble (Session 10, D10.5): "challenge" (the BDM
