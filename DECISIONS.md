@@ -2166,3 +2166,48 @@ with a per-round spend report. Tests (`tests/test_research.py`, 12): gap identif
 targeted round, cache dedup preserves the first retrieval date, resume continues a prior corpus,
 contradictions widen across readings, the confidence-to-width rule loads from the committed config,
 and corpus-offline formalization is deterministic. 460 tests green.
+
+### D39.0 — An integer engine version, distinct from provenance SHA and from the hash epoch
+A record now pins *which solver numerical path produced it* with an explicit integer,
+`ForecastRecord.engine_version` (v1 = the Session 1–38 behaviour). This is deliberately three
+separate identifiers that had been conflated: `engine_version` (int) is the **numerical path**;
+`engine_sha` (str) is the engine's **git commit** for provenance; and `inputs_hash`'s v1/v2
+**canonicalization epoch** (D18.1) is how a record is content-addressed. The pre-D39 record stored
+the git SHA in a string field also named `engine_version`; a `model_validator(mode="before")`
+migrates any such legacy record — moving the SHA to `engine_sha` and defaulting the integer to 1 — so
+every record on disk still loads and no sealed byte changes. The rename is scoped to `ForecastRecord`
+only: `LLMForecastRecord`, `BacktestRecord`, and `AdviseRecord` keep their own string `engine_version`
+(they are SHA-committed, not re-solved), and the git-SHA helper `monte_carlo.engine_version()` was
+renamed `engine_sha()` to match. Interpretive note: the task said "add an integer and a registry"; the
+one real choice was rename-vs-additive for the clashing field name — rename was chosen as the literal
+reading, bounded by testing that both a legacy dict and a real sealed OPEC record still load (v1 +
+recovered SHA) before touching anything downstream.
+
+### D39.1 — A solver registry; verify re-solves under the record's declared version
+`solver/registry.py` maps each engine version to its own solve entrypoint
+(`ENGINE_REGISTRY = {1: _solve_v1}`, `CURRENT_ENGINE_VERSION = 1`). `schelling verify` now re-solves
+through `resolve(record.engine_version)` — the version the record was **sealed under** — not the
+current default. New records stamp `CURRENT_ENGINE_VERSION`. The **freeze rule** (documented in the
+module): never edit a released version's numerical path; to change numerics, register a new integer
+version and bump `CURRENT_ENGINE_VERSION`. This is the seam the whole engine expansion hangs off — v1
+is now addressable and immutable.
+
+### D39.2 — The permanent regression gate: every sealed record verifies 3/3 under its own engine
+`test_all_sealed_records_verify_under_their_engine` iterates every sealed solver record in `runs/`,
+re-solves it through the engine version it was sealed under, and asserts 3/3 (`report.ok`). This is
+the standing gate for the entire expansion: any future change that would move a v1 median fails here.
+It is data-gated the same way as the other record tests — `runs/` is gitignored (commit-reveal), so
+the gate runs wherever the records are present (locally) and skips on CI. Locally it checks all sealed
+records green.
+
+### D39.3 — PASS-with-note, not FAIL, when a version is genuinely retired
+Where a build no longer ships the engine version a record was sealed under, `verify` reports the
+determinism check as **PASS-with-note** — *hash and ledger match, but the ensemble is not re-derivable
+under the current engine* — rather than FAIL. The SHA-256 + ledger commitment is intact and
+authenticated; only re-derivation is unavailable, and conflating that with tampering would be
+dishonest. The policy is recorded in `FORECASTS.md` (a new *Engine versioning* section), which will
+also list any record that enters that state. As of this session none has: all records declare v1,
+which this build ships, so all verify 3/3. Tests (`tests/test_engine_version.py`, 6): the registry
+shape, new records declaring the current version, the legacy-string migration, verify re-solving under
+the declared version, a retired version reported PASS-with-note (not FAIL), and the permanent
+regression gate. 466 tests green.
