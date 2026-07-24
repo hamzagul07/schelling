@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from schelling.mc.sensitivity import format_tornado, tornado
+from schelling.mc.sensitivity import format_tornado, qre_tornado, tornado
 from schelling.schemas.question import GameSpec
 from schelling.solver.config import SolverConfig
 
@@ -30,6 +30,18 @@ def test_point_estimate_fixture_has_empty_tornado(replication_game: GameSpec) ->
     # Every field is a point estimate -> no ranged parameters -> nothing to rank.
     assert tornado(replication_game) == []
     assert "point estimate" in format_tornado([])
+
+
+def test_qre_tornado_ranges_the_same_params_deterministically(
+    widened_game: GameSpec, replication_game: GameSpec
+) -> None:
+    # The QRE tornado (D42) sweeps the same ranged params as the challenge tornado, deterministic.
+    a = qre_tornado(widened_game)
+    b = qre_tornado(widened_game)
+    assert {e.parameter for e in a} == {"france.position", "germany.position"}
+    assert [e.swing for e in a] == [e.swing for e in b]
+    # a point-estimate game has no ranged params under QRE either
+    assert qre_tornado(replication_game) == []
 
 
 def test_widened_tornado_ranks_the_widened_positions(widened_game: GameSpec) -> None:
