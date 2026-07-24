@@ -105,4 +105,17 @@ Pre-registered 40/30/30 split (seed 20260721: train 140, dev 105, TEST 106), com
 | Candidate B — regime-aware settlement | TEST (all) | 24.86 (24.10) | 21.57 | 21.09 | +0.48 [-0.69, +1.76] | no |
 
 **No candidate beats the compromise weighted mean on TEST.** Both point estimates are worse and both bootstrap CIs straddle zero — statistically indistinguishable from, but not better than, the mean. The compromise model remains the settlement model for DEU; nothing was sealed against the live US-Iran game. A negative result, pre-registered and honest.
+
+### Phase C structural solvers (Session 41)
+
+Parameter-free / a-priori-fixed solvers, scored **once** on the same committed TEST split under the pre-registered gate (docs/PHASE-C-GATE.md): a solver is **validated** only if its TEST MAE beats the compromise mean AND the 95% bootstrap CI lies entirely below 0. None is fitted, so there is no dev tuning; the dev column is shown for context only.
+
+| Solver | Scored on | dev MAE (comp.) | TEST MAE | comp. MAE | Δ (95% CI) | validated? |
+|---|---|---|---:|---:|---|:--:|
+| challenge-qre — quantal response (D41.1) | TEST (all) | 30.78 (24.10) | 24.63 | 21.09 | +3.54 [-0.29, +7.40] | no (exploratory) |
+| pce — probabilistic Condorcet (D41.3) | TEST (all) | 24.88 (24.10) | 20.43 | 21.09 | -0.66 [-2.26, +1.00] | no (exploratory) |
+| nash — weighted Nash bargaining (D41.2) | TEST rp-issues | 41.05 (23.87) | 46.59 | 21.26 | +25.33 [+17.64, +32.90] | no (exploratory) |
+| nash-ks — Kalai-Smorodinsky (D41.2) | TEST rp-issues | 36.29 (23.87) | 32.41 | 21.26 | +11.16 [+4.36, +17.79] | no (exploratory) |
+
+**No structural solver beats the compromise mean on TEST.** As pre-registered and as the oracle ceiling (D11.0) predicted, each ships as an EXPLORATORY `--solver` option, never sealed against a live forecast — exactly as `gravity` and `regime` did. A negative result under a fixed rule is itself evidence.
 <!-- LEADERBOARD:END -->
