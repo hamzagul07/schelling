@@ -2414,3 +2414,24 @@ every open gate with its threshold; it ends with a **BLOCKED ON HASSAN** list co
 human-only steps, in deadline order — the three question gradings (2026-08-06 / 08-31 / 09-30), the
 author surname, the SSRN upload, sending the Scholz email, and acquiring the paywalled coercive tables.
 E-TESTS unchanged; docs rebuilt for the decisions count. Nothing sealed changed.
+
+### D44.0 — Section 4 revision from review: honest multiplicity, count fix, no-uniqueness claim
+A reviewer pass on §4 (the last section reviewed line by line before submission); all prose, no code
+or artifact-number change, nothing sealed touched. (1) **Test-split reuse disclosed plainly:** the
+split was committed before the two R1 candidates and scored once for them, as pre-registered; the four
+Phase C methods were then scored on the **same** split afterwards, none tuned on it. With six
+comparisons a lone nominal winner is about what the null yields, so PCE's near-miss is reported
+against that multiplicity — its margin already lies inside its own 95% interval, and a Bonferroni
+0.05/6 threshold only sharpens the verdict. Stated as the limitation it is, not softened. (2) **Count
+fixed:** the closing "Eight attacks" → "Seven attacks", now consistent across the section — 8 solution
+concepts including the mean, 7 challengers, 7 attacks. (3) **Uniqueness claim removed:** the weighted
+mean is now described as the *simplest* continuous operator and the one that wins here, with other
+smooth aggregators acknowledged to exist and be untested (was "the one operator that is
+continuous…"). (4) In §4.1, **the mathematical claim is separated from the empirical one:** a weighted
+median is discontinuous and a mean is not — true by construction — versus the empirical finding that
+this produces measurable insensitivity; and the empirical support is stated as two live games, not a
+benchmark (the 351 DEU issues are point estimates with no ranges to sweep). (5) **Overconfidence
+clause added:** QRE narrowed the interval while its benchmark accuracy worsened — precision without
+correctness, exactly what a proper scoring rule penalises. (6) **The Nash/KS explanation is labelled a
+conjecture** ("we do not test the conjecture"). (7) Re-assembled: **7,467 words** (was 7,079), no
+unresolved E-tags; regenerated the SSRN preprint manuscript from the revised draft.
