@@ -2396,3 +2396,21 @@ weighted mean itself. Section 5's ceiling claim is strengthened to rest on two i
 evidence meeting at the same floor: the noise-floor oracle from above, and the eight-concept
 tournament from the side. `paper-assemble` re-run deterministically: 7,079 words, no unresolved
 E-tags. E-TESTS refreshed and docs rebuilt; nothing sealed changed.
+
+### D43.0 — Consolidation session: preprint package, outreach draft, STATUS.md (no engine change)
+A read-mostly consolidation before submission; no solver, Monte-Carlo, or sealed record was touched.
+(a) Printed Section 4 (the successor search, including the new §4.1 operator diagnosis) verbatim from
+HEAD for line-by-line review. (b) Built `paper/preprint/`: `manuscript.md` is the assembled
+`paper/DRAFT.md` with a title/author/date block prepended — regenerated from the artifact, no new
+manuscript prose — plus the four figures copied in; `ssrn-metadata.md` holds the SSRN form fields
+(title, author, abstract, keywords) and a 150-word plain-language summary, the only newly-written
+prose, which paraphrases the committed abstract and introduces no claim not already in the paper.
+(c) Wrote `docs/outreach/scholz-email.md`: the final peer-register email to J. B. Scholz, its claims
+updated to the eight-method tournament result, held as a DRAFT (not sent) with a factual, verify-first
+pointer to where he can be found. (d) Produced `STATUS.md` at the repo root — one page from artifacts:
+engine (v1, six models, tests green), the 14-record sealed ledger with resolution/grading dates (0
+graded — all resolve in the future), the case library, the concept canon, the paper, the site, and
+every open gate with its threshold; it ends with a **BLOCKED ON HASSAN** list containing only the
+human-only steps, in deadline order — the three question gradings (2026-08-06 / 08-31 / 09-30), the
+author surname, the SSRN upload, sending the Scholz email, and acquiring the paywalled coercive tables.
+E-TESTS unchanged; docs rebuilt for the decisions count. Nothing sealed changed.
