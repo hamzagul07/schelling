@@ -36,6 +36,9 @@ rubric on their question.
 | challenge | v1-thin | Q-2026-OPEC-SEP | 2026-07-24 | 62.009 | `ffe20dbfb8aeeb54fa6a2badf6f8ead9f4083f0c6d66a3af895023b1d315ab53` |
 | compromise | v1-thin | Q-2026-OPEC-SEP | 2026-07-24 | 62.450 | `c7ae358f4c36a4cbe994f67c443996585ab09019126eac0034026ed51fb7f62e` |
 | llm-judgment | v1-thin | Q-2026-OPEC-SEP | 2026-07-24 | 58.000 | `fd0692c8cb25acc8c9222f6889f24920099a1485f6c0461da9bdcdde71705021` |
+| challenge | v2-sourced | Q-2026-OPEC-SEP | 2026-07-24 | 63.680 | `8471debb5fde4ed11fe688d9df815e14f49e4d4d38b4e0a0429c87e069b38a4c` |
+| compromise | v2-sourced | Q-2026-OPEC-SEP | 2026-07-24 | 63.434 | `84c4bae4b3aeccef921d94cbe28201c477c063d92715543ad9c3ca22be29f9d0` |
+| llm-judgment | v2-sourced | Q-2026-OPEC-SEP | 2026-07-24 | 66.000 | `8f375164d57710c713b39a6ec0cebe5b59d866b9cc198ab64953f584f1265f30` |
 <!-- LEDGER:END -->
 
 
