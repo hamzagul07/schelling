@@ -2272,3 +2272,74 @@ and `--html` writes the two-panel page (`report/sobol_panel.py`). The default fo
 untouched, so sealed reports stay byte-identical and `site build --check` is unaffected. Everything is
 seeded: same game + N + seed = identical indices. Tests: `tests/test_sobol.py` (5), `tests/test_power.py`
 (9), `tests/test_scoring.py` (13). D39.2 regression gate passes untouched.
+
+### D41.0 — Phase C adds solvers as new registry options; no existing path changes
+Phase C adds four new `--solver` options plus an opt-in correlated sampler, all registered under the
+D39 engine as additive dispatch: `run_monte_carlo` routes the new `model` strings through new
+branches and leaves the `challenge` (default `else`) and `compromise` branches byte-identical. The
+enforcement is the D39.2 regression gate (every sealed record re-solves 3/3 under engine v1) plus
+`test_challenge_and_compromise_are_unchanged` — both pass untouched this session. The one pre-D41
+schema touch is a record-level `ForecastRecord.sampling` field (default `"independent"`), which is
+NOT in `inputs_hash` (game+config only), so no sealed content-address moves. Per the standing
+discipline the gate was **pre-registered and committed (docs/PHASE-C-GATE.md) before any solver code
+or DEU run**: a new solver is validated only if it beats the compromise mean on the committed DEU
+TEST split with the 95% bootstrap CI (seed 20260721) entirely below zero; otherwise it ships
+exploratory, exactly as gravity/regime did.
+
+### D41.1 — challenge-qre: quantal response over the challenge model
+`solver/qre.py` softens the challenge model's hard offer acceptance into a McKelvey-Palfrey logit
+choice: a mover weights competing offers by `softmax(lambda*enforceability)` (soft choice) and moves
+a fraction `phi = sigmoid(lambda*e_max)` of the way to that expected target (soft acceptance). As
+`lambda -> inf` both collapse to the exact challenge model; a finite `lambda` makes both soft.
+**`lambda = 1.0` is fixed a priori and disclosed** (docs/PHASE-C-GATE.md), never fitted. It is a
+deterministic mean-field realization (expected move, no per-draw RNG), so it stays auditable.
+Interpretive choice: the naive "soft-select among offers only" is identical to the hard model when a
+mover has a single offer (the common case), so the acceptance-fraction softening was added to make
+the quantal response bite universally and reduce to the challenge model in the limit. **The median-
+lock diagnostic (the point of the exercise):** on DEU the games are point estimates, so there is no
+MC spread to compare; on the ranged widened fixture the challenge model is *not* degenerate-locked
+(0 of 2 tornado rows zero-swing), and QRE yields a comparable but slightly *tighter* ensemble (CI80
+width 1.89 vs 5.17) with marginally more distinct medians — the soft partial moves damp the
+full-concession jumps rather than melting a lock. Honest answer for the games available this session:
+no strong lock was present to melt; QRE changes the dynamics but does not widen dispersion.
+
+### D41.2 — nash and nash-ks: cooperative bargaining settlements
+`solver/nash.py` adds the weighted Nash bargaining solution (`nash`) and Kalai-Smorodinsky (`nash-ks`)
+over linear actor utilities `u_i(x) = -|x - p_i|` with the configured reference point as the
+disagreement point (else the status-quo weighted median). Nash maximizes `sum_i w_i ln g_i(x)` over
+the region where every gain `g_i = |d-p_i| - |x-p_i|` is positive; KS maximizes the minimum
+normalized gain `g_i/G_i`. Both by a deterministic 1-D grid line-search, both falling back to the
+disagreement point when no outcome Pareto-improves on it (e.g. two opposed actors around a central
+disagreement). Hand-verified: opposed pair -> disagreement; `[40,60]` with `d=0` -> Nash 40, KS 48.
+
+### D41.3 — pce: probabilistic Condorcet, the KTAB method
+`solver/pce.py` implements KTAB's probabilistic Condorcet election so the library's published
+forecasts become directly comparable. Candidates are the distinct actor positions; the pairwise
+victory probability is the coalition-support ratio `pv[a,b] = U_a/(U_a+U_b)` (BDM/KTAB victory
+exponent 1, equidistant actors split); selection probabilities are the stationary distribution of
+`PV` by power iteration (KTAB's `scalarPCE`); the forecast is the expected outcome. The exact formula
+is disclosed (CLAUDE.md rule 3). Hand-reasoned: a symmetric `[0,50,100]` game -> 50; a `[0,0,100]`
+majority -> modal 0 and a forecast pulled below the midpoint.
+
+### D41.4 — correlated sampling: opt-in Gaussian copula, committed structure
+`mc/correlated.py` adds an opt-in correlated sampler (`--correlated-sampling` / `correlated=True`).
+Independent per-field triangular sampling stays the default and is byte-identical whether or not the
+correlated path exists (`test_correlated_never_changes_the_independent_run`). The committed structure
+(a fixed modelling choice, not fitted): **salience correlated within coalitions** — actors on the
+same side of the weighted median share salience correlation `SALIENCE_RHO = 0.5` through a Gaussian
+copula (correlated normals -> normal CDF -> each salience's triangular inverse-CDF), so the marginals
+are exactly the independent sampler's while the joint is correlated. The choice is recorded in
+`ForecastRecord.sampling`. Nothing correlated is sealed this session, so `verify` (which re-solves
+engine v1 independent) is never asked to reproduce a correlated record; that limitation is noted.
+
+### D41.5 — the DEU gate: all four ship exploratory, an honest negative result
+Scored once on the committed TEST split (sourced capability, bootstrap seed 20260721), against the
+compromise mean: **challenge-qre 24.63 vs 21.09 (Δ +3.54), pce 20.43 vs 21.09 (Δ −0.66, CI [−2.26,
++1.00]), nash 46.59 vs 21.26 (Δ +25.33), nash-ks 32.41 vs 21.26 (Δ +11.16).** PCE is the only near
+miss — a lower point MAE than the compromise mean, but its 95% CI straddles zero, so under the
+two-part gate it does **not** validate. No solver clears the gate; each ships as an EXPLORATORY
+`--solver` option, none sealed against a live forecast — exactly as gravity/regime did, and exactly
+as the oracle ceiling (D11.0: the mean is at the extractable-signal ceiling on DEU) predicted. The
+living leaderboard in `BACKTEST.md` gains a Phase C section beside the R1 candidates; the R1 rows are
+byte-unchanged. Tests: `tests/test_phase_c_solvers.py` (10), `tests/test_correlated_sampling.py` (6).
+The D39.2 regression gate passes untouched.

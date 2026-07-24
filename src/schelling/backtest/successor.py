@@ -30,6 +30,9 @@ from schelling.schemas.forecast import ForecastRecord
 from schelling.schemas.question import GameSpec
 from schelling.solver.config import SolverConfig
 from schelling.solver.model import run
+from schelling.solver.nash import ks_forecast, nash_forecast
+from schelling.solver.pce import pce_forecast
+from schelling.solver.qre import run_qre
 
 FloatArray = npt.NDArray[np.float64]
 BOOT_SEED = 20260721
@@ -386,6 +389,7 @@ class SuccessorReport:
     boot_seed: int
     candidates: list[CandidateResult]
     any_survivor: bool
+    structural: list[CandidateResult] = field(default_factory=list)  # Phase C solvers (D41)
 
 
 def run_successor_search(
@@ -438,6 +442,7 @@ def run_successor_search(
     )
 
     candidates = [res_a, res_b]
+    structural = evaluate_structural_solvers(issues, split, boot_seed)
     return (
         SuccessorReport(
             dataset_sha256=dataset_sha256(csv_path),
@@ -445,11 +450,89 @@ def run_successor_search(
             split_counts=split_counts(split),
             boot_seed=boot_seed,
             candidates=candidates,
-            any_survivor=any(c.beats_compromise for c in candidates),
+            any_survivor=any(c.beats_compromise for c in [*candidates, *structural]),
+            structural=structural,
         ),
         cand_a,
         cand_b,
     )
+
+
+# --------------------------------------------------------------- Phase C structural solvers (D41)
+# Each is parameter-free (or fixed a priori) and scored ONCE on TEST, per docs/PHASE-C-GATE.md. The
+# gate is the two-part rule: TEST MAE below compromise AND the 95% bootstrap CI entirely below 0.
+_STRUCTURAL: tuple[tuple[str, str, str, bool], ...] = (
+    ("challenge-qre", "challenge-qre — quantal response (D41.1)", "TEST (all)", False),
+    ("pce", "pce — probabilistic Condorcet (D41.3)", "TEST (all)", False),
+    ("nash", "nash — weighted Nash bargaining (D41.2)", "TEST rp-issues", True),
+    ("nash-ks", "nash-ks — Kalai-Smorodinsky (D41.2)", "TEST rp-issues", True),
+)
+
+
+def _structural_pred(key: str, game: GameSpec, rp: float | None) -> float:
+    """One structural solver's point forecast for a DEU issue (point-estimate game)."""
+    cfg = SolverConfig(reference_point=rp)
+    if key == "challenge-qre":
+        return run_qre(game, cfg).forecast_median
+    if key == "nash":
+        return nash_forecast(game, cfg)
+    if key == "nash-ks":
+        return ks_forecast(game, cfg)
+    return pce_forecast(game)
+
+
+def _mae_on(
+    issues: list[DEUIssue], split: dict[str, str], key: str, rp_only: bool, tag: str
+) -> tuple[float, float, int]:
+    """(solver MAE, compromise MAE, n) for one structural solver on a named split (tag)."""
+    subset = [
+        i
+        for i in issues
+        if split[i.issue_id] == tag and (i.reference_point is not None or not rp_only)
+    ]
+    if not subset:
+        return float("nan"), float("nan"), 0
+    y = np.array([i.outcome for i in subset], dtype=np.float64)
+    preds = np.array([_structural_pred(key, i.game, i.reference_point) for i in subset])
+    comp = np.array([compromise_estimate(i.game) for i in subset])
+    return float(np.abs(preds - y).mean()), float(np.abs(comp - y).mean()), len(subset)
+
+
+def evaluate_structural_solvers(
+    issues: list[DEUIssue], split: dict[str, str], boot_seed: int = BOOT_SEED
+) -> list[CandidateResult]:
+    """Score every Phase C structural solver on TEST once, under the pre-registered gate (D41)."""
+    results: list[CandidateResult] = []
+    for key, name, applies, rp_only in _STRUCTURAL:
+        test = [
+            i
+            for i in issues
+            if split[i.issue_id] == "test" and (i.reference_point is not None or not rp_only)
+        ]
+        rows = [build_issue_data(i, "test") for i in test]
+        preds = np.array([_structural_pred(key, i.game, i.reference_point) for i in test])
+        delta, lo, hi = bootstrap_delta_ci(preds, rows, seed=boot_seed)
+        dev_mae, dev_comp, _ = _mae_on(issues, split, key, rp_only, "dev")
+        # Two-part gate: point improvement AND the whole 95% CI below zero (docs/PHASE-C-GATE.md).
+        beats = delta < 0.0 and hi < 0.0
+        results.append(
+            CandidateResult(
+                key=key,
+                name=name,
+                applies_to=applies,
+                l2=0.0,
+                dev_mae=dev_mae,
+                dev_compromise_mae=dev_comp,
+                n_test=len(rows),
+                test_compromise_mae=mae(compromise_pred(rows), rows),
+                test_mae=mae(preds, rows),
+                delta=delta,
+                ci_lo=lo,
+                ci_hi=hi,
+                beats_compromise=beats,
+            )
+        )
+    return results
 
 
 def build_issue_data_from_game(
@@ -564,4 +647,41 @@ def leaderboard_markdown(report: SuccessorReport) -> str:
     )
     lines.append(verdict)
     lines.append("")
+    if report.structural:
+        lines += _structural_section(report)
     return "\n".join(lines)
+
+
+def _structural_section(report: SuccessorReport) -> list[str]:
+    """The Phase C structural-solver leaderboard block (D41), under the same pre-registered gate."""
+    lines = [
+        "### Phase C structural solvers (Session 41)",
+        "",
+        "Parameter-free / a-priori-fixed solvers, scored **once** on the same committed TEST split "
+        "under the pre-registered gate (docs/PHASE-C-GATE.md): a solver is **validated** only if "
+        "its TEST MAE beats the compromise mean AND the 95% bootstrap CI lies entirely below 0. "
+        "None is fitted, so there is no dev tuning; the dev column is shown for context only.",
+        "",
+        "| Solver | Scored on | dev MAE (comp.) | TEST MAE | comp. MAE | Δ (95% CI) | validated? |",
+        "|---|---|---|---:|---:|---|:--:|",
+    ]
+    for c in report.structural:
+        beats = "yes" if c.beats_compromise else "no (exploratory)"
+        lines.append(
+            f"| {c.name} | {c.applies_to} | {c.dev_mae:.2f} ({c.dev_compromise_mae:.2f}) | "
+            f"{c.test_mae:.2f} | {c.test_compromise_mae:.2f} | "
+            f"{c.delta:+.2f} [{c.ci_lo:+.2f}, {c.ci_hi:+.2f}] | {beats} |"
+        )
+    lines.append("")
+    any_struct = any(c.beats_compromise for c in report.structural)
+    if any_struct:
+        lines.append("A structural solver cleared the gate — see the ledger.")
+    else:
+        lines.append(
+            "**No structural solver beats the compromise mean on TEST.** As pre-registered and as "
+            "the oracle ceiling (D11.0) predicted, each ships as an EXPLORATORY `--solver` option, "
+            "never sealed against a live forecast — exactly as `gravity` and `regime` did. A "
+            "negative result under a fixed rule is itself evidence."
+        )
+    lines.append("")
+    return lines
