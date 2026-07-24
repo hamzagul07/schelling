@@ -518,6 +518,88 @@ def _render_draft(draft: DraftGameSpec) -> str:
 
 
 @app.command()
+def research(
+    situation: Path = typer.Argument(..., help="Path to a situation .txt file."),
+    out: Path | None = typer.Option(
+        None, "-o", "--out", help="Corpus directory (default <situation>.corpus)."
+    ),
+    budget: float = typer.Option(
+        5.0, "--budget", min=0.0, help="USD spend cap; stops when the running spend reaches it."
+    ),
+    resume: bool = typer.Option(
+        False, "--resume", help="Continue an existing corpus in the out dir (skips cached sources)."
+    ),
+    model: str = typer.Option("claude-opus-4-8", "--model"),
+    max_searches: int = typer.Option(6, "--max-searches", min=1, help="Search budget per round."),
+) -> None:
+    """Iterative deep research: gather evidence in rounds until marginal new information ~ zero.
+
+    Writes a research corpus (sources + claims + confidence tags) that ``formalize --corpus``
+    consumes offline. Resumable across sessions; sources are cached by URL. The LLM only structures
+    evidence — no probability is produced, and the concept index is never consulted.
+    """
+    if not situation.exists():
+        typer.echo(f"situation file not found: {situation}", err=True)
+        raise typer.Exit(code=2)
+    situation_text = situation.read_text()
+    out_dir = out or situation.with_suffix(".corpus")
+
+    from schelling.research.corpus import load_corpus, situation_hash, write_corpus
+    from schelling.research.research import run_research
+    from schelling.research.schemas import RoundLog
+
+    prior = None
+    if resume:
+        if not (out_dir / "corpus.json").exists():
+            typer.echo(f"--resume: no corpus to resume at {out_dir}", err=True)
+            raise typer.Exit(code=2)
+        prior, _ = load_corpus(out_dir)
+        if situation_hash(situation_text) != prior.situation_hash:
+            typer.echo("--resume: the corpus was built from a different situation.", err=True)
+            raise typer.Exit(code=2)
+        typer.echo(
+            f"Resuming from {len(prior.rounds)} round(s), spend ${prior.total_cost_usd:.4f}."
+        )
+
+    client = AnthropicClient(model=model)
+    if type(client).__name__ == "AnthropicClient" and not os.environ.get("ANTHROPIC_API_KEY"):
+        typer.echo(
+            "No ANTHROPIC_API_KEY found. Set it in your shell or a .env file at the project root.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    def report(log: RoundLog) -> None:
+        typer.echo(
+            f"  round {log.round} [{log.kind}]: +{log.new_claims} claims, "
+            f"+{log.new_sources} sources, {len(log.gaps_remaining)} gap(s) left · "
+            f"spend ${log.cumulative_cost_usd:.4f}"
+        )
+
+    try:
+        corpus = run_research(
+            situation_text,
+            client=client,
+            frozen_at=date.today().isoformat(),
+            budget=budget,
+            prior=prior,
+            max_searches_per_round=max_searches,
+            on_round=report,
+        )
+    except WebSearchUnavailableError as exc:
+        typer.echo(f"Web search unavailable: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    write_corpus(out_dir, corpus, situation_text)
+    typer.echo("")
+    typer.echo(
+        f"Corpus written: {out_dir}  ({len(corpus.sources)} sources, {len(corpus.claims)} claims, "
+        f"stopped: {corpus.stopped_reason}, spend ${corpus.total_cost_usd:.4f})"
+    )
+    typer.echo(f"Then: schelling formalize {situation} --corpus {out_dir}")
+
+
+@app.command()
 def formalize(
     situation: Path = typer.Argument(..., help="Path to a situation .txt file."),
     sources: Path | None = typer.Option(None, "--sources", help="Directory of source files."),
@@ -534,6 +616,9 @@ def formalize(
     ),
     precedents_file: Path | None = typer.Option(
         None, "--precedents", help="A ratified precedents JSON — adds them as citable evidence."
+    ),
+    corpus_dir: Path | None = typer.Option(
+        None, "--corpus", help="A research corpus dir — formalize offline from its frozen evidence."
     ),
 ) -> None:
     """Formalize a situation into a DraftGameSpec. NEVER auto-solves — review, then `solve`."""
@@ -559,6 +644,26 @@ def formalize(
         except ValueError as exc:
             typer.echo(str(exc), err=True)
             raise typer.Exit(code=2) from exc
+
+    # A research corpus is a frozen evidence set: consume it OFFLINE so the draft is reproducible,
+    # and let the committed confidence-to-width rule set the coordinate ranges afterwards (D38.3/4).
+    corpus = None
+    if corpus_dir is not None:
+        from schelling.research.corpus import corpus_to_sources, load_corpus, situation_hash
+
+        if not (corpus_dir / "corpus.json").exists():
+            typer.echo(f"--corpus: no corpus.json in {corpus_dir}", err=True)
+            raise typer.Exit(code=2)
+        corpus, _ = load_corpus(corpus_dir)
+        if situation_hash(situation_text) != corpus.situation_hash:
+            typer.echo(
+                "--corpus was built from a different situation (hashes differ); pass the matching "
+                "situation file.",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+        source_texts.update(corpus_to_sources(corpus))
+        search = False  # a corpus is a fixed evidence set — never a live search
 
     index = None if no_knowledge else (KnowledgeIndex.open(db_path) if db_path.exists() else None)
     if index is None and not no_knowledge:
@@ -604,10 +709,20 @@ def formalize(
         typer.echo(f"{_KNOWLEDGE_HINT} Or pass --no-knowledge to formalize ungrounded.", err=True)
         raise typer.Exit(code=2) from exc
 
+    if corpus is not None:
+        from schelling.research.confidence import apply_confidence_widths
+
+        draft = apply_confidence_widths(draft, corpus)  # confidence -> range width (D38.4)
+
     out_path.write_text(draft.model_dump_json(indent=2) + "\n")
     typer.echo(_render_draft(draft))
     typer.echo("")
     typer.echo(f"Draft written: {out_path}")
+    if corpus is not None:
+        typer.echo(
+            f"Formalized offline from {len(corpus.sources)} cached sources / {len(corpus.claims)} "
+            "claims; ranges set by the committed confidence rule."
+        )
     typer.echo("This is a DRAFT — edit the JSON, then run `schelling solve` to forecast.")
 
 

@@ -1,0 +1,15 @@
+# Confidence-to-range-width rule (Session 38, D38.4). Half-widths on the 0-100 continuum, applied
+# symmetrically around each coordinate's mode. Committed here — not hard-coded in prose or in code —
+# so a forecast's range widths can be cited and audited against a fixed rule. Edit this file to
+# change the mapping and every corpus-formalized draft follows.
+#
+#   established : multiple independent primary sources  -> narrowest range
+#   reported    : a single credible source              -> moderate range
+#   inferred    : no source, the model's own reasoning  -> widest range
+#   contested   : sources disagree                       -> the range SPANS the disagreeing readings
+#                                                           (never collapsed to one side); at least
+#                                                           contested_min_half_width wide.
+established: 4
+reported: 12
+inferred: 22
+contested_min_half_width: 6
