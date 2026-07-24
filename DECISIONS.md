@@ -2132,3 +2132,37 @@ Al Jazeera 2026-07-06; investinglive/Bloomberg; Reuters via Investing.com; Forbe
 - **Operational note.** The v2 `llm-forecast` first failed on an exhausted Anthropic API credit
   balance; Hassan topped up and it completed. Both OPEC formalize passes + three llm-forecast runs are
   what drew the balance down.
+
+### D38.0 — Deep research mode: iterative evidence gathering to a reproducible corpus
+New `schelling research <situation.txt> [--budget N] [--resume]` and `schelling formalize --corpus
+<dir>` (`src/schelling/research/`). Research gathers evidence in **rounds** — a broad survey, then
+targeted searches for the coordinates the game needs but lacks, then a contradiction-resolution pass
+— and **stops when a round adds no new claim** (`marginal`), when no gaps remain (`no_gaps`), or when
+the running spend reaches `--budget` (`budget`), rather than after a fixed number of searches. It is
+**resumable** (reload the corpus and continue) and **caches sources by URL** (`merge_round` drops a
+URL already present, keeping its original retrieval date). The LLM only *structures* evidence
+(extracts claims, tags confidence, names gaps) — it produces no probability (rule 1) and never
+consults the concept index (the firewall is unchanged; CI stays offline via `ReplayClient`).
+
+### D38.1 — The corpus and its confidence tags
+The corpus (`corpus.json` + `situation.txt`) records every source (title, url, retrieval date) and
+every claim with a **confidence tag**: `established` (multiple independent primary sources),
+`reported` (a single credible source), `contested` (sources disagree — every reading recorded), or
+`inferred` (no source; the model's reasoning, stated as such). A coordinate's confidence is
+**derived** from its claims (`ResearchCorpus.coordinate_confidence`), not asserted: a coordinate whose
+claims record more than one distinct reading, or any claim tagged contested, is `contested` and can
+never be silently resolved to one side.
+
+### D38.2 — Offline, reproducible formalization; confidence drives width by a committed rule
+`formalize --corpus <dir>` feeds the corpus to the existing formalizer with **search OFF** — the
+draft is reproducible from a fixed evidence set (the situation hash must match). The committed rule
+`research/confidence.yaml` (a config file, not prose, so it can be cited and audited) maps confidence
+to a half-width on the 0-100 continuum — **established narrows (4), reported widens moderately (12),
+inferred widest (22)** — and `apply_confidence_widths` rewrites each coordinate's range from that rule
+after formalizing, keeping the formalizer's mode. A **contested** coordinate's range spans its
+disagreeing readings (never one side): the contradiction widens the range. Every claim still lands in
+an evidence note or the assumptions list (the firewall path is untouched), and `--budget` caps spend
+with a per-round spend report. Tests (`tests/test_research.py`, 12): gap identification feeds the
+targeted round, cache dedup preserves the first retrieval date, resume continues a prior corpus,
+contradictions widen across readings, the confidence-to-width rule loads from the committed config,
+and corpus-offline formalization is deterministic. 460 tests green.
