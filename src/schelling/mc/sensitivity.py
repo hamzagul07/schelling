@@ -14,6 +14,7 @@ from schelling.schemas.question import GameSpec
 from schelling.schemas.stakeholders import Actor, TriangularEstimate
 from schelling.solver.config import SolverConfig
 from schelling.solver.model import run
+from schelling.solver.qre import run_qre
 
 _FIELDS = ("position", "salience", "capability")
 _ZERO = 1e-9
@@ -54,6 +55,39 @@ def tornado(game: GameSpec, config: SolverConfig | None = None) -> list[Sensitiv
                 continue
             f_low = run(_vary(game, k, field, est.low), cfg).forecast_median
             f_high = run(_vary(game, k, field, est.high), cfg).forecast_median
+            entries.append(
+                SensitivityEntry(
+                    parameter=f"{actor.id}.{field}",
+                    actor_id=actor.id,
+                    field=field,
+                    low_value=est.low,
+                    high_value=est.high,
+                    forecast_at_low=f_low,
+                    forecast_at_high=f_high,
+                    swing=f_high - f_low,
+                )
+            )
+    entries.sort(key=lambda e: (-abs(e.swing), e.parameter))
+    return entries
+
+
+def qre_tornado(game: GameSpec, config: SolverConfig | None = None) -> list[SensitivityEntry]:
+    """The tornado computed under the quantal-response solver (Session 42, D42) — same one-at-a-time
+    low/high vary as :func:`tornado`, solved with ``run_qre`` instead of the hard challenge ``run``.
+
+    Used by the operator-diagnosis evidence (the median-lock experiment): comparing the count of
+    zero-swing rows here against :func:`tornado`'s shows whether softening the acceptance step frees
+    the pinned weighted median. Does not touch the challenge model's numerical path.
+    """
+    cfg = config or SolverConfig()
+    entries: list[SensitivityEntry] = []
+    for k, actor in enumerate(game.actors):
+        for field in _FIELDS:
+            est: TriangularEstimate = getattr(actor, field)
+            if est.low == est.high:
+                continue
+            f_low = run_qre(_vary(game, k, field, est.low), cfg).forecast_median
+            f_high = run_qre(_vary(game, k, field, est.high), cfg).forecast_median
             entries.append(
                 SensitivityEntry(
                     parameter=f"{actor.id}.{field}",
