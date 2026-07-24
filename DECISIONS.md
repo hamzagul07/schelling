@@ -2211,3 +2211,64 @@ which this build ships, so all verify 3/3. Tests (`tests/test_engine_version.py`
 shape, new records declaring the current version, the legacy-string migration, verify re-solving under
 the declared version, a retired version reported PASS-with-note (not FAIL), and the permanent
 regression gate. 466 tests green.
+
+### D40.0 — Phase B is analysis-only: no solver, MC, or sealed number touched
+Phase B adds three post-hoc analysis layers — proper scoring, power indices, Sobol sensitivity —
+and nothing in the session alters a solver, the Monte-Carlo engine, or a sealed number. The D39.2
+regression gate is the enforcement: it re-solves every sealed record under engine v1 and passes
+untouched this session, so the guarantee is checked, not merely asserted. Everything new is a pure,
+deterministic, LLM-free reader of an existing record, a weighted-voting input, or a game's ranges.
+
+### D40.1 — Proper scoring rules, computed alongside the sealed primary (never replacing it)
+`backtest/scoring.py` scores a record against a realized outcome with a **proper** rule — one that
+reads the whole draw distribution, not just the median. Banded rubrics get the multi-category
+**Brier** score `sum_i (p_i - y_i)^2` and the **logarithmic** score `ln(p_realized)`, with the
+probability vector taken from the share of cached draws in each band (the same `report.bands.map_bands`
+mapping). Arithmetic rubrics get **CRPS** of the empirical draws, evaluated by the O(n log n)
+sorted-sample identity; **CRPS reduces to `|forecast - actual|` at a point mass**, so it generalizes
+the ledger's absolute-error metric rather than replacing it (hand-verified in `tests/test_scoring.py`:
+Brier 0.38, log ln(0.5), CRPS 2.5, and point-mass collapse). Orientation (lower/higher better) is
+carried on every score so the sign is never ambiguous; a zero-probability realized band is floored at
+half a draw (0.5/N) so the log score is finite and disclosed. **Integrity constraint (non-negotiable):**
+the three questions sealed before D40 keep `|median - actual|` as primary exactly as their committed
+rubrics state. This is enforced structurally: `ResolutionRubric` gains two OPTIONAL fields
+`primary_metric` / `secondary_metrics`, both EXCLUDED from `inputs_hash` like the rest of the rubric
+(D17.1), so declaring them cannot move a sealed number; an empty `primary_metric` means the legacy
+default `absolute_error`, and the three sealed rubrics declare nothing, so `scoring.primary` returns
+`absolute_error` for them. A test (`test_sealed_rubrics_keep_absolute_error_primary`) asserts none of
+the committed rubrics changed. `docs/GRADING-TEMPLATE.md` now declares the proper rule primary and
+absolute error secondary for questions sealed from now on. `schelling compare` reports the proper
+scores beside the MAE ranking (secondary, from cached draws when present); its refuse-to-rank guard
+(MIN_GRADED=10) is unchanged. Interpretive choice: the logarithmic score is reported in its canonical
+`ln(p)` (higher-better) form with an explicit orientation label, rather than as a loss.
+
+### D40.2 — Power indices as an evidence aid, never an automatic assignment
+`power/indices.py` computes **Shapley-Shubik** and **Banzhaf** indices for a weighted voting game.
+Both use the same swing test and differ only in weighting; small games are solved by **exact
+enumeration** of all `2^n` coalitions, and above `exact_max_n` (default 20, exact cost being
+exponential) the Shapley index is estimated by **seeded Monte-Carlo permutation sampling** and Banzhaf
+by random-coalition sampling, each reported with a binomial **standard error**. Optional **bloc**
+structure collapses a group of players that vote together into one player with their summed weight.
+Correctness is externally checkable, not self-certified: tests match the published worked examples for
+the **1958 EEC Council** (Shapley 0.2333/0.15/0, Luxembourg a dummy; Banzhaf 10/42, 6/42, 0) and the
+**UN Security Council** (permanent 0.19627, elected 0.001865). `schelling power` prints the indices
+with the rule and quota used and a standing line that it is an AID to be cited by a human — it NEVER
+writes a capability value. The formalizer may cite the printed output as a *source* for a capability
+in a voting body, exactly as it would cite any fetched evidence; the firewall is unchanged.
+
+### D40.3 — Sobol global sensitivity, a second panel beside the tornado
+`mc/sobol.py` adds variance-based **first-order** (`S_i`, the parameter alone) and **total-order**
+(`S_Ti`, including interactions) Sobol indices via **Saltelli sampling** (Saltelli-2010 first-order /
+Jansen total-order estimators), over the **same triangular input ranges the MC samples** (each ranged
+actor field mapped through its triangular inverse-CDF). Both cross designs `A_B` and `B_A` are used to
+symmetrize the estimators, at the reported cost of **`N * (2k + 2)` solves** with configurable `N`.
+The estimator is validated against the analytic **Ishigami** function (first-order and total-order
+within 0.03 of the closed-form values, including x3's zero first-order but non-zero total-order — pure
+interaction). The **compromise** solver (closed-form) is the default and runs the full sample quickly;
+the **challenge** (BDM) solver is far slower and is gated behind `--solver challenge`, which prints the
+solve count first. `schelling sobol` prints the tornado and the Sobol panel together, each explicitly
+labelled — tornado = single-parameter swings, Sobol = share of output variance including interactions —
+and `--html` writes the two-panel page (`report/sobol_panel.py`). The default forecast report is
+untouched, so sealed reports stay byte-identical and `site build --check` is unaffected. Everything is
+seeded: same game + N + seed = identical indices. Tests: `tests/test_sobol.py` (5), `tests/test_power.py`
+(9), `tests/test_scoring.py` (13). D39.2 regression gate passes untouched.
