@@ -2343,3 +2343,26 @@ as the oracle ceiling (D11.0: the mean is at the extractable-signal ceiling on D
 living leaderboard in `BACKTEST.md` gains a Phase C section beside the R1 candidates; the R1 rows are
 byte-unchanged. Tests: `tests/test_phase_c_solvers.py` (10), `tests/test_correlated_sampling.py` (6).
 The D39.2 regression gate passes untouched.
+
+### D41.6 — QRE live diagnostic on ranged games (dated 2026-07-24): the lock persists
+A read-only, pre-resolution diagnostic — no engine code, no sealed record, nothing graded (USIRAN
+resolves 2026-08-31, IAEA 2026-09). Ran `--solver challenge-qre` (lambda = 1.0) against the challenge
+model on the two live formalized drafts (gitignored `analyses/`), 10,000 draws, seed 42. The QRE
+tornado was computed by the same one-at-a-time low/high vary the challenge tornado uses, solved with
+`run_qre` (a throwaway script; the committed engine is untouched).
+
+| game | ranged params | zero-swing rows (chal → qre) | mode-vs-MC gap (chal → qre) | CI80 width (chal → qre) |
+|---|---|---|---|---|
+| Q-2026-USIRAN-STAGE2 (9 actors) | 27 | 18/27 → 17/27 | +7.41 → −0.74 | 44.65 → 25.02 |
+| Q-2026-IAEA-SEP (7 actors) | 20 | 13/20 → 13/20 | +10.84 → +9.18 | 32.71 → 22.28 |
+
+**Plainly: QRE does not reduce the degenerate median lock on these live ranged games.** The zero-swing
+sensitivity count is essentially unchanged (18→17 of 27; 13→13 of 20) — most single-parameter moves
+still fail to shift the weighted median under QRE, which is the lock (D12.3). If anything the soft
+partial acceptance makes the ensemble *tighter*, not looser: CI80 narrows on both games (44.65→25.02,
+32.71→22.28) and the mode-game/MC gap shrinks (to near zero on USIRAN). So the softening damps
+excursions rather than freeing the pinned median. This matches D41.1's fixture finding and points to
+the lock being structural — the weighted median is pinned by the capability×salience weight
+distribution, not by the hard argmax of offer selection — so quantal response on the acceptance step
+does not dislodge it. The compromise mean remains the settlement model; nothing here changes a sealed
+number.
