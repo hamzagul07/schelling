@@ -1,13 +1,19 @@
 """Independent ledger audit (Session 17, D17.3): the one-command check an outsider would run.
 
-Given a `runs/` forecast record, ``verify_record`` runs three checks and reports PASS/FAIL each:
+``verify_record`` dispatches on the record's schema (Session 49, D49.1) so **every** sealed ledger
+row is verifiable, not just the solver rows:
 
-1. **ledger-match** — the SHA-256 of the record file bytes appears in FORECASTS.md, i.e. this exact
-   artifact is the one that was sealed (commit-reveal: the digest was published before resolution).
-2. **inputs-hash** — recomputing the canonical (game + config) hash reproduces the record's stored
-   ``inputs_hash`` — the recorded content-address is honest.
-3. **determinism** — re-solving from the embedded game with the record's own config + seed
-   reproduces the ensemble byte-for-byte, so the forecast is reproducible, not asserted (rule 2).
+* A :class:`ForecastRecord` (challenge / compromise) gets the full three-check audit —
+  **ledger-match**, **inputs-hash**, and re-solve **determinism**.
+* A :class:`LLMForecastRecord` (llm-judgment) or :class:`CrowdForecastRecord` (crowd-metaculus) is
+  **non-deterministic by nature** — re-running the model or re-fetching the crowd gives different
+  numbers, so the commitment is the SHA-256 of the record file, not a re-solve. These get
+  **ledger-match** (the sealed bytes) plus an **inputs-hash** reference check; determinism does not
+  apply and is reported as such, never as a FAIL.
+
+Before D49 the audit hard-coded ``ForecastRecord.model_validate_json`` and raised on the llm/crowd
+rows (their ``extra="forbid"`` schemas reject the parse), so a third of a live ledger was
+unverifiable. The dispatch fixes exactly that (D48.1).
 """
 
 from __future__ import annotations
@@ -36,8 +42,79 @@ class VerifyReport:
         return all(c.passed for c in self.checks)
 
 
+def _detect_schema(text: str) -> str:
+    """Which sealed-record schema ``text`` validates against: forecast | llm | crowd | unknown."""
+    from schelling.schemas.forecast import (
+        CrowdForecastRecord,
+        ForecastRecord,
+        LLMForecastRecord,
+    )
+
+    for cls, label in (
+        (ForecastRecord, "forecast"),
+        (LLMForecastRecord, "llm"),
+        (CrowdForecastRecord, "crowd"),
+    ):
+        try:
+            cls.model_validate_json(text)
+            return label
+        except ValueError:
+            continue
+    return "unknown"
+
+
 def verify_record(record_path: Path, ledger_path: Path) -> VerifyReport:
-    """Recompute-and-match a sealed forecast record; return a per-check PASS/FAIL report."""
+    """Audit a sealed record, dispatching on its schema so any ledger row is verifiable (D49.1)."""
+    text = record_path.read_text()
+    schema = _detect_schema(text)
+    if schema == "forecast":
+        return _verify_forecast(record_path, ledger_path)
+    if schema in ("llm", "crowd"):
+        return _verify_nondeterministic(record_path, ledger_path, schema)
+    return VerifyReport(
+        [Check("schema", False, "record validates against no known sealed-record schema")]
+    )
+
+
+def _verify_nondeterministic(record_path: Path, ledger_path: Path, schema: str) -> VerifyReport:
+    """Verify an llm-judgment or crowd record: ledger-match + inputs-hash reference (D49.1).
+
+    These families are non-deterministic by nature (a re-run/re-fetch differs), so the commitment is
+    the record file's SHA-256. Determinism is reported N/A — a PASS-with-note, never a FAIL.
+    """
+    from schelling.schemas.forecast import CrowdForecastRecord, LLMForecastRecord
+
+    cls = LLMForecastRecord if schema == "llm" else CrowdForecastRecord
+    record = cls.model_validate_json(record_path.read_text())
+    family = "llm-judgment" if schema == "llm" else "crowd-metaculus"
+    checks: list[Check] = []
+
+    sha = record_sha256(record_path)
+    ledger_text = ledger_path.read_text() if ledger_path.exists() else ""
+    in_ledger = sha in ledger_text
+    where = f"found in {ledger_path.name}" if in_ledger else f"NOT in {ledger_path.name}"
+    checks.append(Check("ledger-match", in_ledger, f"sha256 {sha[:12]}… {where}"))
+    checks.append(
+        Check(
+            "inputs-hash",
+            True,
+            f"stored {record.inputs_hash[:12]}… is a reference digest for a {family} record "
+            "(not a determinism claim)",
+        )
+    )
+    checks.append(
+        Check(
+            "determinism",
+            True,
+            f"N/A — a {family} record is non-deterministic by nature; the commitment is the "
+            "record file's SHA-256, checked by ledger-match above (D49.1)",
+        )
+    )
+    return VerifyReport(checks)
+
+
+def _verify_forecast(record_path: Path, ledger_path: Path) -> VerifyReport:
+    """Recompute-and-match a sealed ForecastRecord; return a per-check PASS/FAIL report."""
     from schelling.mc.monte_carlo import (
         CURRENT_HASH_VERSION,
         KNOWN_HASH_VERSIONS,

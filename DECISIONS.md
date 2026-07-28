@@ -2678,3 +2678,77 @@ exact overstatement the dry run was told to watch for. One resolved question is 
 six. Owed: distinguish graded QUESTIONS from graded RECORDS in both the counter and its label, and
 surface no family-accuracy claim off a single question (the refuse-to-rank thresholds already guard
 the compare tracks; the site's headline counter does not).
+
+### D49.0 — Grading machinery, for real: the eight D48 findings closed
+Session 49 built the real grading path (`schelling grade`, `backtest/grade.py`, `backtest/mapping.py`)
+on branch `grading` and re-ran the D48 rehearsal end to end on a throwaway branch with the same three
+OPEC outcomes (+188 kb/d, rollover, −400 kb/d cut); all eight findings are closed. **Nothing sealed
+changed:** the 14 ledger rows, their record files, medians, and hashes are byte-identical, and the
+D39.2 regression gate passes untouched. The new machine-readable rubric field and all grade metadata
+are excluded from `inputs_hash`, as the rest of the rubric is (D17.1/D47). D49.1–D49.6 record the
+closures; the rehearsal artifacts were discarded — only the findings and the machinery reach main.
+
+### D49.1 — verify and score dispatch on record schema (closes D48.1, D48.3)
+`verify_record` now detects the record schema and routes: a `ForecastRecord` gets the full three-check
+audit (ledger-match, inputs-hash, re-solve determinism); an `LLMForecastRecord` or
+`CrowdForecastRecord` — non-deterministic by nature — gets ledger-match + an inputs-hash reference
+note, with determinism reported N/A (a PASS-with-note, never a FAIL). `score_record` likewise
+dispatches: ForecastRecord (Brier/log banded, CRPS arithmetic, absolute error always),
+LLMForecastRecord (absolute error always; Brier/log from its reported `band_probabilities` on a banded
+rubric), CrowdForecastRecord (binary track only, D47.2 — a card with no continuum score). The pre-D49
+hard-coded `ForecastRecord.model_validate_json` raised on the two sealed OPEC llm rows (their
+`extra="forbid"` schema rejects the parse); the fix keeps `extra="forbid"` and adds the dispatch, so
+all six OPEC rows now verify and score. Tests in `test_grading_machinery.py`.
+
+### D49.2 — machine-readable outcome map, drift-guarded against the prose (closes D48.2)
+`ResolutionRubric` gains `outcome_map: LinearMap | None` — for an arithmetic question, the executable
+form of the committed formula (`continuum = intercept + slope*raw`, clamped, rounded), so
+`schelling grade` maps a real-world figure without a human transcribing the formula. It is a verbatim
+restatement, not a new rule: `GRADING-Q-2026-OPEC-SEP.md` carries `intercept=50, slope=50/600` and a
+dated provenance note (2026-07-29) stating "the prose governs on any disagreement", exactly as D24.4
+did for the band arrays. The rounding rule, left implicit in the prose ("nearest integer"), is declared
+explicitly as `nearest_int_half_up` (ties to the larger integer; on the clamped [0,100] continuum this
+equals round-half-away-from-zero). A drift-guard test (`test_opec_outcome_map_matches_prose`,
+parametrized over 17 raw values including the clamp edges) pins the executable form to a verbatim
+transcription of the prose formula, and `test_opec_map_rounding_half_up_at_the_point_five_boundary`
+checks raw = 6 → 50.5 → 51 (where banker's `round` gives 50). Banded questions keep `bands` as their
+structured mapping (already drift-guarded, D24.4); `outcome_map` is None for them. Excluded from
+`inputs_hash` with the rest of the rubric.
+
+### D49.3 — three-way OpenTimestamps check + PATH fix (closes D48.4)
+`check_ots` distinguishes: (a) proof MISSING for the current ledger bytes and (b) proof present but
+HASH-MISMATCH — both block grading; (c) attestation retrieved but the Bitcoin anchor not confirmable
+locally (no reachable node / pending) — does NOT block, reporting "calendar attestation retrieved, full
+verification requires a node". The classifier (`classify_ots_output`, pure) is unit-tested on all three
+plus an unrecognised-output case that blocks conservatively. The `ots` PATH discrepancy (D48.4:
+`which ots` from a bare shell reports absent while the venv has it) is resolved by locating the client
+next to the running interpreter (`Path(sys.executable).with_name("ots")`), falling back to PATH — so
+the tool finds the `ots` installed in schelling's own environment regardless of shell PATH.
+`opentimestamps-client` is a declared dependency.
+
+### D49.4 — proof-chain semantics documented; re-stamp on every write; never delete (closes D48.5)
+Writing a grade into FORECASTS.md changes its bytes and thus its content-addressed proof name.
+FORECASTS.md now documents the proof CHAIN (one link per distinct ledger state): a sealed row is
+anchored by the proof current WHEN IT WAS SEALED, reconstructible from git
+(`git show <commit>:FORECASTS.md` reproduces the exact bytes to verify against its matching
+`<sha12>.ots`); no proof is ever deleted, so every historical state stays independently verifiable; and
+every write re-stamps so the head of the chain matches the current file. `schelling grade` re-stamps as
+its final step (a logged no-op if `ots` is absent, the SHA-256 + git commit still standing).
+
+### D49.5 — one source of truth for graded state, written atomically (closes D48.6)
+`grade` writes BOTH FORECASTS.md (a grade block) and the grading file's `**Actual outcome:**` line —
+the exact marker `site.data._graded_questions` keys on — in one `write_grade` step, building both new
+contents before writing either, so graded state can never land in only one file. A consistency test
+(`test_graded_state_is_single_sourced`) asserts that after the write the site's graded detector agrees
+with the ledger's grade block. The two records of "is this graded" cannot silently diverge.
+
+### D49.6 — honest question-first counters and a conditional banner (closes D48.7, D48.8)
+The site headline is now `graded_counter`: "N of M questions graded · R of S records scored" — questions
+first, never records alone, so grading one OPEC question (six records) reads as "1 of 3 questions
+graded · 6 of 14 records scored", not "6 GRADED". The honesty banner is generated from
+`graded_questions_count`, so it can never contradict the counter on the same page: zero → "Nothing here
+has been graded yet, so no accuracy is claimed"; above zero and below the ranking guard's threshold →
+"N question(s) graded so far — far too few for any accuracy claim: the ranking guard requires 10 graded
+questions before any family is ranked". The grid cell, sidebar, and footer all switched to the
+question-first count. Tests in `test_grading_site.py`; the D48 self-contradiction ("6 GRADED" beside
+"Nothing has been graded yet") is structurally impossible now.

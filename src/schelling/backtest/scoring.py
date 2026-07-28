@@ -31,8 +31,12 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from schelling.report.bands import BANDED, LINEAR, NONE, band_containing, map_bands
-from schelling.schemas.forecast import CrowdForecastRecord, ForecastRecord
+from schelling.report.bands import BANDED, LINEAR, NONE, _sorted_bands, band_containing, map_bands
+from schelling.schemas.forecast import (
+    CrowdForecastRecord,
+    ForecastRecord,
+    LLMForecastRecord,
+)
 from schelling.schemas.question import ResolutionRubric
 
 # Metric names — stable identifiers used in rubric declarations, reports, and tests.
@@ -178,15 +182,34 @@ def primary(rubric: ResolutionRubric | None) -> str:
     return rubric.primary_metric
 
 
-def score_record(record: ForecastRecord, actual: float) -> ScoreCard:
-    """Score one record against its realized ``actual``, marking the rubric's primary metric.
+def score_record(
+    record: ForecastRecord | LLMForecastRecord | CrowdForecastRecord, actual: float
+) -> ScoreCard:
+    """Score one sealed record against its realized ``actual`` (Session 49, D49.1 dispatch).
 
-    Dispatches on the rubric shape: a banded rubric gets Brier + log over its bands; an arithmetic
-    or rubric-less record gets CRPS from the draws. ``absolute_error`` is always included. The score
-    named by :func:`primary` is marked ``role="primary"``; all others are ``secondary``.
+    Dispatches on the record schema so **any** ledger row is scoreable:
+
+    * :class:`ForecastRecord` — Brier + log over a banded rubric, or CRPS from cached draws for an
+      arithmetic rubric; ``absolute_error`` always included.
+    * :class:`LLMForecastRecord` — no cached draws, so ``absolute_error`` always, plus Brier + log
+      from its reported ``band_probabilities`` when the rubric is banded.
+    * :class:`CrowdForecastRecord` — a binary-track-only family (D47.2); returns a card with **no**
+      continuum score and a note pointing at ``binary_track``, never a ``|median - actual|`` number.
+
+    The score named by :func:`primary` is marked ``role="primary"``; all others are ``secondary``.
     """
+    if isinstance(record, CrowdForecastRecord):
+        return ScoreCard(
+            question_id=record.question_id,
+            actual=actual,
+            median=record.ensemble.median,
+            kind=NONE,
+            scores=[],
+            realized_band=None,
+            note="Crowd baseline — scored on the binary track only (D47.2); no continuum "
+            "score. See scoring.binary_track for its Brier on P(criterion met).",
+        )
     rubric = record.game.resolution_rubric if record.game else None
-    readout = map_bands(record)
     median = record.ensemble.median
     scores: list[Score] = [
         Score(
@@ -198,13 +221,56 @@ def score_record(record: ForecastRecord, actual: float) -> ScoreCard:
     ]
     realized_band: str | None = None
     note = ""
+    if isinstance(record, LLMForecastRecord):
+        kind, realized_band, note = _score_llm_bands(record, rubric, actual, scores)
+    else:
+        kind, realized_band, note = _score_forecast_bands(record, rubric, actual, scores)
+    if kind == NONE:
+        note = note or "No resolution rubric committed; scored on the raw draws and median only."
+    declared = primary(rubric)
+    marked = [
+        Score(s.name, s.value, s.orientation, s.definition, role="primary")
+        if s.name == declared
+        else s
+        for s in scores
+    ]
+    # If the declared primary isn't computable (e.g. declares brier but has no bands), fall back to
+    # absolute error as primary so a card always has exactly one primary.
+    if not any(s.role == "primary" for s in marked):
+        marked = [
+            Score(s.name, s.value, s.orientation, s.definition, role="primary")
+            if s.name == ABSOLUTE_ERROR
+            else s
+            for s in marked
+        ]
+        note = (note + " ").lstrip() + (
+            f"Declared primary '{declared}' is not computable for this record; "
+            "reported absolute error as primary."
+        )
+    return ScoreCard(
+        question_id=record.question_id,
+        actual=actual,
+        median=median,
+        kind=kind,
+        scores=marked,
+        realized_band=realized_band,
+        note=note,
+    )
+
+
+def _score_forecast_bands(
+    record: ForecastRecord, rubric: ResolutionRubric | None, actual: float, scores: list[Score]
+) -> tuple[str, str | None, str]:
+    """Append Brier+log (banded) or CRPS (arithmetic) for a ForecastRecord; (kind, band, note)."""
+    readout = map_bands(record)
+    realized_band: str | None = None
+    note = ""
     if readout.kind == BANDED and readout.per_band:
         probs = [bp.probability for bp in readout.per_band]
         band = band_containing(actual, rubric)
         realized_band = band.label if band is not None else None
         idx = next(
-            (i for i, bp in enumerate(readout.per_band) if band is not None and bp.band == band),
-            -1,
+            (i for i, bp in enumerate(readout.per_band) if band is not None and bp.band == band), -1
         )
         floor = 0.5 / readout.n_draws if readout.n_draws else 1e-9
         scores.append(
@@ -234,39 +300,55 @@ def score_record(record: ForecastRecord, actual: float) -> ScoreCard:
         )
     else:
         note = "No cached draws — only the median-based absolute error is available."
-    if readout.kind == NONE:
-        note = note or "No resolution rubric committed; scored on the raw draws and median only."
-    elif readout.kind == LINEAR and not record.outcome_distribution:
+    if readout.kind == LINEAR and not record.outcome_distribution:
         note = note or "Arithmetic rubric with no cached draws; only absolute error is available."
-    declared = primary(rubric)
-    marked = [
-        Score(s.name, s.value, s.orientation, s.definition, role="primary")
-        if s.name == declared
-        else s
-        for s in scores
-    ]
-    # If the declared primary isn't computable (e.g. declares brier but has no bands), fall back to
-    # absolute error as primary so a card always has exactly one primary.
-    if not any(s.role == "primary" for s in marked):
-        marked = [
-            Score(s.name, s.value, s.orientation, s.definition, role="primary")
-            if s.name == ABSOLUTE_ERROR
-            else s
-            for s in marked
-        ]
-        note = (note + " ").lstrip() + (
-            f"Declared primary '{declared}' is not computable for this record; "
-            "reported absolute error as primary."
+    return readout.kind, realized_band, note
+
+
+def _score_llm_bands(
+    record: LLMForecastRecord, rubric: ResolutionRubric | None, actual: float, scores: list[Score]
+) -> tuple[str, str | None, str]:
+    """Append Brier+log for an llm-judgment record from its reported ``band_probabilities`` (D49.1).
+
+    The llm baseline carries no cached draws, so its band probabilities are the model's own reported
+    shares, aligned to the sorted bands by label. An arithmetic (band-less) rubric yields only the
+    absolute error already in ``scores``.
+    """
+    if rubric is None:
+        return NONE, None, ""
+    if not rubric.bands:
+        return (
+            LINEAR,
+            None,
+            (
+                "LLM-judgment baseline on an arithmetic rubric — no cached draws; scored on "
+                "|median - actual| only."
+            ),
         )
-    return ScoreCard(
-        question_id=record.question_id,
-        actual=actual,
-        median=median,
-        kind=readout.kind,
-        scores=marked,
-        realized_band=realized_band,
-        note=note,
+    bands = _sorted_bands(rubric)
+    probs = [float(record.band_probabilities.get(b.label, 0.0)) for b in bands]
+    band = band_containing(actual, rubric)
+    realized_band = band.label if band is not None else None
+    idx = next((i for i, b in enumerate(bands) if band is not None and b == band), -1)
+    floor = 0.5 / record.n_samples if record.n_samples else 1e-9
+    scores.append(
+        Score(
+            BRIER,
+            brier_score(probs, idx),
+            "lower",
+            "sum_i (p_i - y_i)^2 over the rubric's bands, from the llm's reported band shares.",
+        )
     )
+    scores.append(
+        Score(
+            LOG,
+            log_score(probs, idx, floor=floor),
+            "higher",
+            f"ln(reported share on the realized band); floored at 0.5/{record.n_samples} samples.",
+        )
+    )
+    note = "LLM-judgment baseline — Brier/log from the model's reported band probabilities."
+    return BANDED, realized_band, note
 
 
 def load_forecast_records(runs_dir: Path) -> list[ForecastRecord]:
