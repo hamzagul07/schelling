@@ -100,6 +100,7 @@ class FetchedSource(BaseModel):
     title: str
     retrieved_at: str  # ISO-8601 fetch date
     snippet: str = ""
+    backend: str = ""  # which search backend served it (Session 46, D46.1): "anthropic" | "exa"
 
 
 class DraftMetadata(BaseModel):
@@ -538,4 +539,35 @@ class LLMForecastRecord(BaseModel):
     contamination_risk: bool = False
     contamination_note: str = ""
 
+    game: GameSpec | None = None  # frozen_at + resolution_rubric, so `schelling seal` accepts it
+
+
+class CrowdForecastRecord(BaseModel):
+    """A crowd baseline sealable on the ledger (Session 46, D46.3): a matched Metaculus community
+    forecast recorded as an external comparator, alongside the solver and llm-judgment families.
+
+    A human must find the match and justify it in writing before this can be built — the match is
+    NEVER automatic (``match_justification`` is required and non-empty). It is structurally
+    seal-compatible: ``model = "crowd-metaculus"`` labels the ledger row, ``ensemble`` holds the
+    community forecast placed on the 0-100 continuum, and ``game`` carries the frozen date + rubric
+    the seal requires. The community forecast is external and non-reproducible, so the commitment is
+    the SHA-256 of this record file (as ``seal`` computes), exactly like the llm-judgment record.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    question_id: str
+    run_id: str
+    engine_version: str = "crowd"  # provenance label; a crowd baseline is not solved
+    inputs_hash: str  # SHA-256 of (game, metaculus id) — for reference, not a determinism claim
+    created_at: str | None = None
+
+    model: str = "crowd-metaculus"  # the ledger family label (seal reads this)
+    metaculus_id: int
+    metaculus_url: str
+    community_prediction: float | None = None  # the raw Metaculus community value, as fetched
+    n_forecasters: int = 0
+    match_justification: str  # the human's written justification for the match (required to seal)
+
+    ensemble: Ensemble  # the community forecast placed on the 0-100 continuum (median = placement)
     game: GameSpec | None = None  # frozen_at + resolution_rubric, so `schelling seal` accepts it
