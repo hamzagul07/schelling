@@ -219,6 +219,11 @@ class ForecastRecord(BaseModel):
     # consensus of several drafts, the per-actor agreement table + variance shares, so the report
     # can disclose the elicitation uncertainty measured. Record-level, outside ``inputs_hash`` too.
     elicitation: ElicitationSummary | None = None
+    # Derived binary probability (Session 47, D47.1): P(binary criterion met) = the share of MC
+    # draws in the bands the rubric's ``binary_met_bands`` marks as MET. Populated only when the
+    # embedded rubric is banded AND declares that mapping; None otherwise. Record-level, outside
+    # ``inputs_hash`` — a derived read of the draws, never a solver input.
+    binary_prob_met: float | None = None
 
 
 class AnalogExample(BaseModel):
@@ -568,6 +573,10 @@ class CrowdForecastRecord(BaseModel):
     community_prediction: float | None = None  # the raw Metaculus community value, as fetched
     n_forecasters: int = 0
     match_justification: str  # the human's written justification for the match (required to seal)
+    # The binary-track probability the crowd is scored with (Session 47, D47.1): P(criterion met),
+    # the community forecast as a probability. A crowd baseline is scored on the BINARY TRACK ONLY,
+    # never on the continuum, so this — not the continuum placement — is what Brier reads.
+    binary_prob_met: float
 
     ensemble: Ensemble  # the community forecast placed on the 0-100 continuum (median = placement)
     game: GameSpec | None = None  # frozen_at + resolution_rubric, so `schelling seal` accepts it

@@ -58,7 +58,7 @@ from schelling.schemas.forecast import (
     DraftMetadata,
     FetchedSource,
 )
-from schelling.schemas.question import GameSpec
+from schelling.schemas.question import GameSpec, ResolutionRubric
 from schelling.schemas.stakeholders import TriangularEstimate
 from schelling.solver.config import RangeMode, SolverConfig
 
@@ -1257,6 +1257,9 @@ def crowd(
     justify: str = typer.Option(
         "", "--justify", help="Written justification (required to record)."
     ),
+    no_match: str | None = typer.Option(
+        None, "--no-match", help="Record an explicit searched-and-found-nothing null (D47.4)."
+    ),
     budget: int = typer.Option(5, "--budget", min=1),
     output: Path | None = typer.Option(None, "-o", "--output", help="Crowd record out (sealable)."),
 ) -> None:
@@ -1265,8 +1268,11 @@ def crowd(
     Without --id, prints candidates for inspection — never auto-matched. To record, name a genuine
     --id and give a written --justify; the community forecast is placed on the 0-100 continuum
     (--placement, or a binary community probability x 100). Record seals as model=crowd-metaculus.
+    When no genuine match exists, --no-match writes an explicit null note (D47.4), so the absence is
+    documented rather than silent.
     """
     from schelling.evidence.metaculus import (
+        CrowdNull,
         build_crowd_record,
         metaculus_question,
         metaculus_search,
@@ -1277,6 +1283,17 @@ def crowd(
     except ValueError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
+    if no_match is not None:  # document the absence explicitly (D47.4) — no live call needed
+        null = CrowdNull(
+            question_id=game.question_id,
+            searched_topic=search_topic or game.question_id,
+            note=no_match,
+            searched_at=date.today().isoformat(),
+        )
+        out = output or fixture.with_suffix(".crowd-null.json")
+        out.write_text(null.model_dump_json(indent=2) + "\n")
+        typer.echo(f"Recorded 'no Metaculus match' for {game.question_id} → {out}.")
+        return
     sess = _live_session(budget)
     if metaculus_id is None:
         matches = metaculus_search(
@@ -1387,15 +1404,24 @@ def compare(
         Path("runs"), "--runs", help="Records dir for the proper-score panel (draws needed)."
     ),
 ) -> None:
-    """Pre-registered comparison across challenge, compromise, and llm-judgment on the live ledger.
+    """Pre-registered comparison across the ledger families, in two SEPARATE tracks (D47.1).
 
-    The primary ranking is over |median - actual| (D27.4) and stays exploratory until 10 graded
-    questions — the harness REFUSES to rank before then, the discipline the coercive reading holds.
-    Beside it, when the sealed records are present locally, the proper scores (Brier / log for
-    banded rubrics, CRPS for arithmetic ones) are reported per graded record, secondary (D40.1).
+    Continuum track: the |median - actual| ranking (D27.4) across challenge/compromise/llm-judgment,
+    exploratory until 10 graded questions, with the proper scores (Brier/log/CRPS) reported
+    alongside per record (D40.1). Binary track: Brier on P(criterion met) for crowd baselines and
+    derived solver P(met), on banded questions that declare a band-to-binary mapping. The two tracks
+    are reported separately and NEVER combined; each refuses to rank on its own graded count.
     """
-    from schelling.backtest.scoring import format_scorecard, load_forecast_records, score_runs
+    from schelling.backtest.scoring import (
+        binary_track,
+        format_binary_track,
+        format_scorecard,
+        load_crowd_records,
+        load_forecast_records,
+        score_runs,
+    )
     from schelling.llm_forecast.compare import compare_baselines
+    from schelling.report.rubric_lookup import lookup_rubric
 
     if not ledger.exists():
         typer.echo(f"ledger not found: {ledger}", err=True)
@@ -1406,20 +1432,36 @@ def compare(
             typer.echo(f"grades file not found: {grades}", err=True)
             raise typer.Exit(code=2)
         grade_map = {str(k): float(v) for k, v in json.loads(grades.read_text()).items()}
+
+    # ---- Continuum track (|median - actual|) ----
+    typer.echo("== Continuum track (|median - actual|) ==")
     result = compare_baselines(ledger.read_text(), grade_map)
+    typer.echo(result.note)
     if result.ready:
-        typer.echo(result.note)
         for i, s in enumerate(result.scores, 1):
             typer.echo(f"  {i}. {s.family:<12} MAE {s.mae:.3f}  (n={s.n})")
-    else:
-        typer.echo(result.note)
-    # Proper-score panel (secondary; needs the cached draws in runs/). Silent when absent.
+    records = load_forecast_records(runs)
     if grade_map:
-        cards = score_runs(load_forecast_records(runs), grade_map)
+        cards = score_runs(records, grade_map)
         if cards:
-            typer.echo("\nProper scores (secondary; from cached draws):")
+            typer.echo("Proper scores (secondary; from cached draws):")
             for card in cards:
                 typer.echo(format_scorecard(card))
+
+    # ---- Binary track (Brier on P(met)) — separate; never combined with the continuum track ----
+    typer.echo("\n== Binary track (Brier on P(criterion met)) ==")
+
+    def rubric_for(qid: str) -> ResolutionRubric | None:
+        for r in records:
+            if r.question_id == qid and r.game is not None and r.game.resolution_rubric is not None:
+                return r.game.resolution_rubric
+        found = lookup_rubric(qid, runs)
+        return found[0] if found is not None else None
+
+    scores = binary_track(records, load_crowd_records(runs), grade_map, rubric_for)
+    for line in format_binary_track(scores):
+        typer.echo(line)
+    typer.echo("(The two tracks are reported separately and are never combined.)")
 
 
 @app.command()

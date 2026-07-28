@@ -56,10 +56,28 @@ OpenTimestamps proof checked with `ots verify` to confirm the commitment predate
   "grading_formula": "Primary <brier|crps>; secondary score(r) = |r.ensemble.median - actual| per sealed record on the 0-100 continuum.",
   "bands": [],
   "primary_metric": "brier",
-  "secondary_metrics": ["absolute_error"]
+  "secondary_metrics": ["absolute_error"],
+  "binary_met_bands": []
 }
 ```
 
 For a banded question, fill `bands` with `{"lo", "hi", "label"}` entries tiling 0-100 and set
 `"primary_metric": "brier"`. For an arithmetic question, leave `bands` empty and set
 `"primary_metric": "crps"`.
+
+## The binary track for a crowd baseline (Session 47, D47.1)
+
+A crowd baseline (a matched Metaculus community forecast, `schelling crowd`) is scored on a **binary
+track only** — the Brier score of `P(criterion met)` against the realized yes/no — and it never mixes
+with the continuum `|median - actual|` track above. To enable it for a banded question, **declare**
+which bands mean the binary criterion is *met* in `binary_met_bands` (a list of band labels). The
+mapping is a pre-registration choice, stated here, never inferred from the band order:
+
+```json
+"binary_met_bands": ["<label of a band that means MET>", "..."]
+```
+
+`P(met)` is then the share of Monte-Carlo draws that fall in those bands, and the realized binary
+outcome is whether the actual settlement lands in one of them. **A crowd baseline cannot be sealed
+against a question whose rubric leaves `binary_met_bands` empty** — the binary track is undefined
+without the declared mapping. Arithmetic (band-less) questions have no binary track.

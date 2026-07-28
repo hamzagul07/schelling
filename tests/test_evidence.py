@@ -28,7 +28,7 @@ from schelling.evidence.metaculus import (
     metaculus_search,
 )
 from schelling.evidence.search import ExaBackend, SearchResult, select_backend
-from schelling.schemas.question import Continuum, GameSpec, ResolutionRubric
+from schelling.schemas.question import Continuum, GameSpec, ResolutionRubric, RubricBand
 from schelling.schemas.stakeholders import Actor, TriangularEstimate
 
 
@@ -65,6 +65,11 @@ def _game() -> GameSpec:
             adjudicating_sources=["s"],
             outcome_mapping="m",
             grading_formula="score = |median - actual|",
+            bands=[
+                RubricBand(lo=0.0, hi=50.0, label="no"),
+                RubricBand(lo=51.0, hi=100.0, label="yes"),
+            ],
+            binary_met_bands=["yes"],  # a crowd baseline needs this declared (D47.1)
         ),
     )
 

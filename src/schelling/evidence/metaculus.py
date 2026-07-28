@@ -19,9 +19,28 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
 
+from pydantic import BaseModel, ConfigDict
+
 from schelling.evidence.http import FetchSession
 from schelling.schemas.forecast import CrowdForecastRecord, Ensemble
 from schelling.schemas.question import GameSpec
+
+
+class CrowdNull(BaseModel):
+    """An explicit searched-and-found-nothing note (Session 47, D47.4).
+
+    Recorded in a question's file when Metaculus was searched and no genuine comparator exists, so
+    the absence is documented rather than silent. Not a ledger record — it seals nothing.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    question_id: str
+    matched: bool = False
+    searched_topic: str
+    note: str  # the human's account of what was searched and why nothing matched
+    searched_at: str | None = None
+
 
 _API = "https://www.metaculus.com/api2/questions/"
 
@@ -93,11 +112,18 @@ def build_crowd_record(
     """Build a sealable crowd record from a chosen match + a human ``justification`` (D46.3).
 
     ``placement`` is the community forecast placed on the question's 0-100 continuum by the analyst
-    (a binary community probability maps to ``prob * 100`` by default). Raises if ``justification``
-    is blank — the match must be justified in writing before a record exists.
+    (a binary community probability maps to ``prob * 100`` by default); its binary-track probability
+    is ``placement / 100``. Raises if ``justification`` is blank, or if the question's rubric lacks
+    the band-to-binary mapping (``binary_met_bands``) the binary track needs (D47.1).
     """
     if not justification.strip():
         raise ValueError("a crowd match must be justified in writing (justification is empty)")
+    rubric = game.resolution_rubric
+    if rubric is None or not rubric.binary_met_bands:
+        raise ValueError(
+            "a crowd baseline can only be sealed against a question whose rubric declares "
+            "binary_met_bands (the band-to-binary mapping); this one does not (D47.1)"
+        )
     ident = json.dumps({"q": game.question_id, "m": match.metaculus_id}, sort_keys=True)
     inputs_hash = hashlib.sha256(ident.encode("utf-8")).hexdigest()
     return CrowdForecastRecord(
@@ -110,6 +136,7 @@ def build_crowd_record(
         community_prediction=match.community_prediction,
         n_forecasters=match.n_forecasters,
         match_justification=justification.strip(),
+        binary_prob_met=placement / 100.0,  # the P(met) the binary track scores (D47.1)
         ensemble=Ensemble(
             median=placement,
             mean=placement,
