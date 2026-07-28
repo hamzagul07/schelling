@@ -152,7 +152,13 @@ def formalize(
     if search:
         game = game.model_copy(update={"frozen_at": run_today})  # freeze discipline (D8.3)
         sources_fetched = [
-            FetchedSource(url=s.url, title=s.title, retrieved_at=run_today, snippet=s.snippet)
+            FetchedSource(
+                url=s.url,
+                title=s.title,
+                retrieved_at=run_today,
+                snippet=s.snippet,
+                backend="anthropic",  # server-side web_search (D46.1)
+            )
             for s in _dedup_sources(fetched)
         ]
 

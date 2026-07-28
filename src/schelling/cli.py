@@ -35,6 +35,7 @@ from schelling.backtest.oracle import oracle_summary
 from schelling.backtest.successor import forecast_candidate as run_forecast_candidate
 from schelling.backtest.successor import leaderboard_markdown, run_successor_search
 from schelling.backtest.writeup import backtest_markdown
+from schelling.evidence.http import FetchSession
 from schelling.formalizer.client import AnthropicClient, WebSearchUnavailableError
 from schelling.formalizer.firewall import IndexLeakageError
 from schelling.formalizer.formalize import formalize as run_formalize
@@ -651,6 +652,9 @@ def formalize(
     judge_models: str | None = typer.Option(
         None, "--judge-models", help="Comma-separated model per ensemble draft, cycled."
     ),
+    backend: str = typer.Option(
+        "anthropic", "--backend", help="Search backend: anthropic (server-side) or exa (D46.1)."
+    ),
 ) -> None:
     """Formalize a situation into a DraftGameSpec. NEVER auto-solves — review, then `solve`."""
     if not situation.exists():
@@ -727,7 +731,41 @@ def formalize(
         )
         return
 
+    # Pluggable search backend (D46.1): exa fetches sources client-side and feeds them as evidence;
+    # anthropic (default, or the fallback when EXA_API_KEY is absent) uses server-side search.
     out_path = output or situation.with_suffix(".draft.json")
+    search_for_formalize = search
+    exa_fetched: list[FetchedSource] = []
+    if search and backend != "anthropic":
+        from schelling.evidence.http import Budget, FetchSession, UrllibFetcher
+        from schelling.evidence.search import EXA_COST_PER_SEARCH, select_backend
+
+        today = date.today().isoformat()
+        sess = FetchSession(
+            UrllibFetcher(), today, budget=Budget(max_searches, EXA_COST_PER_SEARCH)
+        )
+        eff, be = select_backend(backend, session=sess)
+        if be is not None:
+            results = be.search(situation_text, k=max_searches)
+            source_texts.update({r.url: f"{r.title}\n{r.snippet}" for r in results})
+            exa_fetched = [
+                FetchedSource(
+                    url=r.url,
+                    title=r.title,
+                    retrieved_at=today,
+                    snippet=r.snippet,
+                    backend=r.backend,
+                )
+                for r in results
+            ]
+            search_for_formalize = (
+                False  # already gathered evidence; do not also server-side search
+            )
+            typer.echo(f"Searched via {eff}: {len(results)} sources. {sess.spend_report()}")
+        else:
+            typer.echo(
+                f"(backend {backend!r} unavailable — no key; using anthropic search)", err=True
+            )
     try:
         draft = run_formalize(
             situation_text,
@@ -736,7 +774,7 @@ def formalize(
             index=index,
             model=model,
             max_retries=max_retries,
-            search=search,
+            search=search_for_formalize,
             max_searches=max_searches,
             today=date.today().isoformat() if search else None,
         )
@@ -761,6 +799,9 @@ def formalize(
         from schelling.research.confidence import apply_confidence_widths
 
         draft = apply_confidence_widths(draft, corpus)  # confidence -> range width (D38.4)
+
+    if exa_fetched:  # record which backend served each source (D46.1)
+        draft = draft.model_copy(update={"sources_fetched": exa_fetched, "live_searched": True})
 
     out_path.write_text(draft.model_dump_json(indent=2) + "\n")
     typer.echo(_render_draft(draft))
@@ -1153,6 +1194,142 @@ def llm_forecast_cmd(
         typer.echo(f"  CONTAMINATION-RISK: {record.contamination_note}")
     typer.echo("  Non-deterministic: re-running produces different samples; the file SHA-256 is")
     typer.echo(f"  the commitment. Record written: {out_path}")
+
+
+def _live_session(budget_fetches: int, cost_per: float = 0.0) -> FetchSession:
+    from schelling.evidence.http import Budget, UrllibFetcher
+
+    return FetchSession(
+        UrllibFetcher(), date.today().isoformat(), budget=Budget(budget_fetches, cost_per)
+    )
+
+
+@app.command()
+def gdelt(
+    fixture: Path = typer.Argument(
+        ..., help="A GameSpec/DraftGameSpec JSON (for the question id)."
+    ),
+    query: str = typer.Option(..., "--query", help="GDELT query: actors / institution / event."),
+    from_date: str = typer.Option(..., "--from", help="Start date YYYY-MM-DD."),
+    to_date: str = typer.Option(..., "--to", help="End date YYYY-MM-DD."),
+    cameo: str = typer.Option("", "--cameo", help="CAMEO event code the query targets (recorded)."),
+    max_records: int = typer.Option(25, "--max", min=1),
+    budget: int = typer.Option(5, "--budget", min=1, help="Max live fetches."),
+    output: Path | None = typer.Option(None, "-o", "--output", help="Precedents draft out."),
+) -> None:
+    """Fetch GDELT candidate comparable events as UNRATIFIED precedent proposals (D46.2).
+
+    Feeds the precedent layer only, never the evidence river. Each candidate is a PROPOSAL: a human
+    sets its placement, marks it ratified, and quotes a ratification before the panel will use it.
+    """
+    from schelling.evidence.gdelt import candidates_to_precedent_set, gdelt_candidates
+
+    try:
+        game, *_ = _load_solve_input(fixture)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    sess = _live_session(budget)
+    cands = gdelt_candidates(
+        sess, query, start_date=from_date, end_date=to_date, cameo=cameo, max_records=max_records
+    )
+    pset = candidates_to_precedent_set(cands, game.question_id)
+    out = output or fixture.with_suffix(".gdelt.precedents.json")
+    out.write_text(pset.model_dump_json(indent=2) + "\n")
+    typer.echo(f"{len(cands)} GDELT candidates → {out} (UNRATIFIED). {sess.spend_report()}")
+    typer.echo(
+        "Each is a PROPOSAL: set placements, ratified:true, and a ratification_note before use."
+    )
+
+
+@app.command()
+def crowd(
+    fixture: Path = typer.Argument(
+        ..., help="A GameSpec/DraftGameSpec JSON for the sealed question."
+    ),
+    search_topic: str | None = typer.Option(None, "--search", help="Search Metaculus by topic."),
+    after: str = typer.Option("", "--after", help="Only questions closing after YYYY-MM-DD."),
+    before: str = typer.Option("", "--before", help="Only questions closing before YYYY-MM-DD."),
+    metaculus_id: int | None = typer.Option(None, "--id", help="A chosen Metaculus id to record."),
+    placement: float | None = typer.Option(
+        None, "--placement", min=0.0, max=100.0, help="Community forecast on the 0-100 continuum."
+    ),
+    justify: str = typer.Option(
+        "", "--justify", help="Written justification (required to record)."
+    ),
+    budget: int = typer.Option(5, "--budget", min=1),
+    output: Path | None = typer.Option(None, "-o", "--output", help="Crowd record out (sealable)."),
+) -> None:
+    """Query Metaculus for a matching community forecast; record a sealable crowd baseline (D46.3).
+
+    Without --id, prints candidates for inspection — never auto-matched. To record, name a genuine
+    --id and give a written --justify; the community forecast is placed on the 0-100 continuum
+    (--placement, or a binary community probability x 100). Record seals as model=crowd-metaculus.
+    """
+    from schelling.evidence.metaculus import (
+        build_crowd_record,
+        metaculus_question,
+        metaculus_search,
+    )
+
+    try:
+        game, *_ = _load_solve_input(fixture)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    sess = _live_session(budget)
+    if metaculus_id is None:
+        matches = metaculus_search(
+            sess, search_topic or game.question_id, close_after=after, close_before=before
+        )
+        if not matches:
+            typer.echo("No Metaculus candidates found.")
+            return
+        typer.echo("Metaculus candidates (inspect; never auto-matched):")
+        for m in matches:
+            cp = f"{m.community_prediction:.3f}" if m.community_prediction is not None else "—"
+            typer.echo(f"  #{m.metaculus_id}  community {cp}  n={m.n_forecasters}  {m.title}")
+        typer.echo('Record a genuine match: --id N --justify "..." [--placement X].')
+        return
+    match = metaculus_question(sess, metaculus_id)
+    if placement is None:
+        if match.community_prediction is None:
+            typer.echo("No community prediction; pass --placement explicitly.", err=True)
+            raise typer.Exit(code=2)
+        placement = match.community_prediction * 100.0
+    try:
+        record = build_crowd_record(game, match, placement=placement, justification=justify)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    out = output or fixture.with_suffix(".crowd.json")
+    out.write_text(record.model_dump_json(indent=2) + "\n")
+    typer.echo(f"Crowd baseline (crowd-metaculus, median {placement:.1f}) → {out}.")
+    typer.echo(f"Seal it: schelling seal {out}")
+
+
+@app.command()
+def literature(
+    citation: str = typer.Argument(..., help="A DOI or a paper title."),
+    email: str = typer.Option("", "--email", help="Contact email for Unpaywall (recommended)."),
+    budget: int = typer.Option(3, "--budget", min=1),
+) -> None:
+    """Find open-access versions of a citation via OpenAlex/Unpaywall — a read-only aid (D46.4).
+
+    Prints links for a human to follow; nothing is ingested into the case library or evidence river.
+    """
+    from schelling.evidence.literature import literature_lookup
+
+    sess = _live_session(budget)
+    result = literature_lookup(sess, citation, email=email)
+    head = result.title or citation
+    typer.echo(head + (f"  (doi {result.doi})" if result.doi else ""))
+    if result.versions:
+        typer.echo("Open versions (follow by hand — nothing is ingested):")
+        for v in result.versions:
+            typer.echo(f"  [{v.source}] {v.url}")
+    else:
+        typer.echo("No open version found.")
 
 
 @app.command()
