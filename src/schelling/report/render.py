@@ -289,7 +289,8 @@ def _sources_list(sources: list[FetchedSource]) -> str:
     for s in _sorted_sources(sources):
         title = _esc(s.title or s.url)
         link = f'<a href="{_esc(s.url)}" rel="noopener noreferrer">{title}</a>'
-        meta = f'<div class="meta">{_esc(s.url)} · retrieved {_esc(s.retrieved_at)}</div>'
+        via = f" · via {_esc(s.backend)}" if s.backend else ""  # which backend served it (D46.1)
+        meta = f'<div class="meta">{_esc(s.url)}{via} · retrieved {_esc(s.retrieved_at)}</div>'
         # A source Claude fetched but never quoted has no snippet — flag it so a reviewer knows the
         # citation is weaker than one with quoted text (D9.0b).
         snip = (
@@ -458,6 +459,13 @@ def precedent_panel_html(record: ForecastRecord) -> str:
     parts = ['<section class="narr"><h2>Reference class — the outside view</h2>']
     if panel.reference_class:
         parts.append(f"<p class='sub'>Reference class: {_esc(panel.reference_class)}.</p>")
+    # Auto-coding caveat (D46.2): candidates may be machine-sourced (e.g. GDELT), which carries
+    # duplicate / circular / erroneous reporting risks; only human-ratified placements appear here.
+    parts.append(
+        "<p class='sub'><em>Machine-sourced candidates (e.g. GDELT) carry auto-coding hazards — "
+        "duplicate reports of one event, circular reporting, and outright miscodings; only "
+        "human-ratified placements appear below. See docs/PRECEDENTS.md.</em></p>"
+    )
     if not panel.complete:
         # Sessions-at-risk could not be fully sourced: report coverage, NOT a base rate (D30.1).
         frac = coverage_fraction(panel)
