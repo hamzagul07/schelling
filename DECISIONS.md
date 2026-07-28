@@ -2494,3 +2494,60 @@ with the elicitation summary riding as record-level provenance outside the hash.
 on synthetic drafts with known disagreement, widening never narrows, minority actors preserved,
 variance shares sum to 1, the additive decomposition, ensemble provenance, and the report panel +
 scope line (``tests/test_elicitation.py``, 11). The D39.2 gate passes untouched.
+
+### D46.0 — An evidence-acquisition layer, kept behind the same firewalls
+Session 46 adds a new ``src/schelling/evidence/`` package that widens how evidence and comparators are
+gathered — pluggable search backends, GDELT, Metaculus, OpenAlex/Unpaywall — without loosening any of
+the standing discipline. No solver, Monte-Carlo path, or sealed number changes; the D39.2 gate passes
+untouched. Every external fetch goes through one cached, budgeted, **injectable** ``FetchSession``
+(``evidence/http.py``) built on the standard library alone (no new dependency), so tests pass a
+``ReplayFetcher`` and CI never touches the network (rule 2). The two new record-level fields
+(``FetchedSource.backend``, and the new ``CrowdForecastRecord``) sit outside ``inputs_hash``. Nothing
+in this layer produces a probability (rule 1); GDELT and the crowd baseline are proposals a human
+ratifies, never facts the machine asserts.
+
+### D46.1 — Pluggable search backends behind one interface
+The formalizer can research through more than one provider. Anthropic's server-side ``web_search`` is
+the default (a label — its search runs inside the LLM call); **Exa** is a client-side
+``SearchBackend`` (``evidence/search.py``) called over the shared ``FetchSession``. ``--backend`` on
+``formalize`` selects it, the key comes from ``EXA_API_KEY``, and ``select_backend`` **falls back
+gracefully to anthropic when the key is absent** rather than failing. Every fetched source records
+which backend served it (``FetchedSource.backend``), rendered in the sources list, so a draft states
+how it was researched. Exa results are fed to the formalizer as ordinary evidence (subject to the
+concept-library firewall unchanged).
+
+### D46.2 — GDELT feeds the precedent layer only, never the evidence river
+``evidence/gdelt.py`` queries the GDELT DOC 2.0 API for candidate comparable events (a source URL, a
+date, and the CAMEO code the query targeted) and wraps them as an **unratified** ``PrecedentSet`` —
+exactly the LLM finder's contract. Each candidate carries ``ratified: false``, a PLACEMENT-PENDING
+placeholder, and no ratification note, so the reference-class panel ignores it until a human sets its
+placement, marks it ratified, and quotes a ratification. GDELT is never a source for the evidence
+river. The auto-coding hazards — **duplicate** reports of one event, **circular** reporting, and
+outright **erroneous** codings — are documented in a new ``docs/PRECEDENTS.md`` section and surfaced
+inline in the precedent panel whenever precedents are shown. ``schelling gdelt`` writes the draft.
+
+### D46.3 — ``schelling crowd``: a Metaculus community forecast, sealable, never auto-matched
+``evidence/metaculus.py`` searches Metaculus for questions matching a sealed question's topic and
+window and prints candidates for inspection; matching is **never automatic**. To record one, the
+analyst names a genuine ``--id`` and gives a written ``--justify`` (``build_crowd_record`` raises on a
+blank justification). The result is a ``CrowdForecastRecord`` (``model = "crowd-metaculus"``) that
+places the community forecast on the 0-100 continuum and is **structurally seal-compatible** — it
+carries ``ensemble`` and a ``game`` with the frozen date and rubric, so ``schelling seal`` appends a
+``crowd-metaculus`` ledger row exactly as it does for llm-judgment (tested end-to-end). The community
+forecast is external and non-reproducible, so its commitment is the record file's SHA-256.
+
+### D46.4 — ``schelling literature``: an open-version lookup, read-only
+``evidence/literature.py`` resolves a citation (a DOI or a title) to open-access versions via OpenAlex
+and, for a DOI, Unpaywall, and prints the links. It is a read-only acquisition aid for the case
+library: it ingests nothing automatically into the library or the evidence river — a human follows the
+links and does the (blind dual-entry) transcription by hand, as the case-library discipline requires.
+
+### D46.5 — Cost and caching: cached by URL, budgeted per command, spend reported
+Every fetch is cached by request key under a cache directory with its retrieval date; a repeated URL
+is served from disk and **never re-charged**. Each command runs under a ``Budget`` (a cap on live
+fetches) that raises when exhausted, and the ``FetchSession`` reports the spend (live vs cached
+fetches, USD). Retrieval dates come from a supplied ``today``, not a wall clock, so a replayed session
+is byte-reproducible. Tests (``tests/test_evidence.py``, 12) cover caching-without-recharge, the budget
+cap, backend selection + fallback, Exa parsing, GDELT unratified proposals + CLI wiring, the Metaculus
+crowd record + its written-justification guard + sealing as crowd-metaculus, and the literature lookup.
+The D39.2 regression gate passes untouched.
