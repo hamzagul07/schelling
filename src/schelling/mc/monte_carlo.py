@@ -266,7 +266,7 @@ def build_forecast_record(
         trajectory = [rl.weighted_median for rl in run(game, config).rounds]
     else:
         trajectory = []
-    return ForecastRecord(
+    record = ForecastRecord(
         question_id=game.question_id,
         run_id=run_id,
         engine_version=CURRENT_ENGINE_VERSION,
@@ -295,6 +295,15 @@ def build_forecast_record(
         sensitivity=sensitivity,
         sampling=sampling,
     )
+    # Derived binary probability (D47.1): only when the embedded rubric declares the band-to-binary
+    # mapping. Records that look their rubric up (e.g. USIRAN/IAEA) get None here and have P(met)
+    # computed at score/render time from the looked-up rubric.
+    rubric = game.resolution_rubric
+    if rubric is not None and rubric.bands and rubric.binary_met_bands:
+        from schelling.backtest.scoring import binary_prob_met
+
+        record = record.model_copy(update={"binary_prob_met": binary_prob_met(record, rubric)})
+    return record
 
 
 def write_record(record: ForecastRecord, out_dir: str | Path = "runs") -> Path:

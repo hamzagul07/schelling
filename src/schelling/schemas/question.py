@@ -64,6 +64,12 @@ class ResolutionRubric(BaseModel):
     # every question sealed before D40 declared |median - actual| and keeps it untouched.
     primary_metric: str = ""  # "" -> absolute_error; else "brier" (banded) or "crps" (arithmetic)
     secondary_metrics: list[str] = Field(default_factory=list)  # reported alongside, labelled
+    # Band-to-binary mapping for the crowd-baseline binary track (Session 47, D47.1). The band
+    # LABELS whose realized outcome counts as the binary criterion being MET — DECLARED here, never
+    # inferred from the band order. Also grading metadata, EXCLUDED from ``inputs_hash``. A crowd
+    # baseline can only be sealed against a question whose rubric declares this (empty -> no binary
+    # track for the question). P(met) = the share of MC draws that fall in these bands.
+    binary_met_bands: list[str] = Field(default_factory=list)
 
 
 class GameSpec(BaseModel):

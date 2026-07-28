@@ -27,11 +27,12 @@ Brier, CRPS and absolute error are ``lower``-is-better (0 = perfect); the logari
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from schelling.report.bands import BANDED, LINEAR, NONE, band_containing, map_bands
-from schelling.schemas.forecast import ForecastRecord
+from schelling.schemas.forecast import CrowdForecastRecord, ForecastRecord
 from schelling.schemas.question import ResolutionRubric
 
 # Metric names — stable identifiers used in rubric declarations, reports, and tests.
@@ -126,6 +127,43 @@ def crps_empirical(draws: list[float], actual: float) -> float:
     weighted = sum((2 * (i + 1) - n - 1) * x for i, x in enumerate(xs))
     spread = weighted / (n * n)  # = 1/2 * E|X - X'|
     return mean_abs - spread
+
+
+# --------------------------------------------------------- the binary track (Session 47, D47.1)
+BINARY_BRIER = "binary-brier"
+
+
+def binary_prob_met(record: ForecastRecord, rubric: ResolutionRubric | None) -> float | None:
+    """P(binary criterion met) = the share of the record's MC draws that fall in the rubric's
+    ``binary_met_bands`` (D47.1). None unless the rubric is banded AND declares that mapping.
+
+    ``rubric`` is passed explicitly (for records that look their rubric up rather than embed it).
+    The band-to-binary mapping is read from ``rubric.binary_met_bands`` — declared, never inferred.
+    """
+    if rubric is None or not rubric.bands or not rubric.binary_met_bands:
+        return None
+    readout = map_bands(record)
+    if readout.kind != BANDED or not readout.per_band:
+        return None
+    met = set(rubric.binary_met_bands)
+    return sum(bp.probability for bp in readout.per_band if bp.band.label in met)
+
+
+def binary_realized(actual: float, rubric: ResolutionRubric | None) -> bool | None:
+    """Whether the realized ``actual`` lands in a MET band (D47.1); None if no mapping declared."""
+    if rubric is None or not rubric.bands or not rubric.binary_met_bands:
+        return None
+    band = band_containing(actual, rubric)
+    return band is not None and band.label in set(rubric.binary_met_bands)
+
+
+def brier_binary(p_met: float, met: bool) -> float:
+    """Binary Brier score ``(p - y)^2`` for the probability of the criterion being met (D47.1).
+
+    Ranges [0, 1]; 0 is a perfect confident call, lower is better. This is the ONLY track the crowd
+    baseline is scored on, and it never mixes with the continuum ``|median - actual|`` track.
+    """
+    return (p_met - (1.0 if met else 0.0)) ** 2
 
 
 # --------------------------------------------------------------------------- rubric dispatch
@@ -254,6 +292,108 @@ def score_runs(records: list[ForecastRecord], grades: dict[str, float]) -> list[
     scored = [(r, grades[r.question_id]) for r in records if r.question_id in grades]
     scored.sort(key=lambda ra: (ra[0].question_id, ra[0].model, ra[0].run_id))
     return [score_record(r, actual) for r, actual in scored]
+
+
+# ---------------------------------------------------- the binary track for compare (D47.1)
+# The binary track is scored on its own graded count, and NEVER combined with the continuum track.
+MIN_GRADED_BINARY = 10
+
+
+@dataclass(frozen=True)
+class BinaryScore:
+    """One record's binary-track score: P(met), the realized yes/no, and the Brier."""
+
+    question_id: str
+    model: str  # challenge | compromise | llm-judgment (derived P(met)) | crowd-metaculus
+    p_met: float
+    realized_met: bool
+    brier: float
+
+
+def load_crowd_records(runs_dir: Path) -> list[CrowdForecastRecord]:
+    """Load every ``CrowdForecastRecord`` (model=crowd-metaculus) JSON in ``runs_dir``."""
+    records: list[CrowdForecastRecord] = []
+    if not runs_dir.exists():
+        return records
+    for path in sorted(runs_dir.glob("*.json")):
+        try:
+            records.append(CrowdForecastRecord.model_validate_json(path.read_text()))
+        except ValueError:
+            continue  # not a crowd record
+    return records
+
+
+def binary_track(
+    records: list[ForecastRecord],
+    crowd_records: list[CrowdForecastRecord],
+    grades: dict[str, float],
+    rubric_for: Callable[[str], ResolutionRubric | None],
+) -> list[BinaryScore]:
+    """Brier on the binary track for every graded question that declares a band-to-binary mapping.
+
+    Solver records contribute a *derived* P(met) (their met-band draw share); crowd records
+    contribute their own ``binary_prob_met``. Questions without a declared mapping have no binary
+    track and are skipped. Deterministically ordered. Never touches the continuum track (D47.1).
+    """
+    out: list[BinaryScore] = []
+    for r in records:
+        actual = grades.get(r.question_id)
+        if actual is None:
+            continue
+        rubric = rubric_for(r.question_id)
+        met = binary_realized(actual, rubric)
+        p = binary_prob_met(r, rubric)
+        if met is None or p is None:
+            continue
+        out.append(BinaryScore(r.question_id, r.model, p, met, brier_binary(p, met)))
+    for c in crowd_records:
+        actual = grades.get(c.question_id)
+        if actual is None:
+            continue
+        rubric = c.game.resolution_rubric if c.game is not None else None
+        met = binary_realized(actual, rubric)
+        if met is None:
+            continue
+        out.append(
+            BinaryScore(
+                c.question_id, c.model, c.binary_prob_met, met, brier_binary(c.binary_prob_met, met)
+            )
+        )
+    return sorted(out, key=lambda s: (s.question_id, s.model))
+
+
+def format_binary_track(scores: list[BinaryScore]) -> list[str]:
+    """Render the binary track: per-record Brier + a per-family ranking once enough are graded.
+
+    The refuse-to-rank guard applies to THIS track's own count of graded questions (D47.1), separate
+    from the continuum track's; the two are never combined.
+    """
+    if not scores:
+        return [
+            "Binary track (Brier on P(criterion met)): no question graded on the binary track yet."
+        ]
+    lines = ["Binary track (Brier on P(criterion met)) — crowd baselines + derived solver P(met):"]
+    for s in scores:
+        outcome = "MET" if s.realized_met else "not met"
+        lines.append(
+            f"  {s.question_id} {s.model:<14} p={s.p_met:.3f} vs {outcome}, Brier {s.brier:.4f}"
+        )
+    graded_questions = len({s.question_id for s in scores})
+    if graded_questions < MIN_GRADED_BINARY:
+        lines.append(
+            f"  Exploratory: {graded_questions}/{MIN_GRADED_BINARY} questions graded on the binary "
+            "track — no family ranking claimed before the threshold (its own count, D47.1)."
+        )
+    else:
+        by_model: dict[str, list[float]] = {}
+        for s in scores:
+            by_model.setdefault(s.model, []).append(s.brier)
+        ranked = sorted(by_model.items(), key=lambda kv: (sum(kv[1]) / len(kv[1]), kv[0]))
+        for i, (model, briers) in enumerate(ranked, 1):
+            lines.append(
+                f"  {i}. {model:<15} mean Brier {sum(briers) / len(briers):.4f} (n={len(briers)})"
+            )
+    return lines
 
 
 def format_scorecard(card: ScoreCard) -> str:
