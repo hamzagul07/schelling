@@ -55,6 +55,13 @@ _SHARE_SCOPE = (
     "These shares reflect uncertainty in the stated input ranges only. They exclude model error, "
     "coding error, and events outside the modelled game."
 )
+# When an elicitation ensemble has measured it, the scope broadens ONLY where the uncertainty is now
+# measured (D45.4): elicitation and model choice are no longer disclaimed; coding error still is.
+_SHARE_SCOPE_MEASURED = (
+    "These shares reflect the stated input ranges, the elicitation spread across drafts, "
+    "and the choice of solver — all measured here. They still exclude coding error and events "
+    "outside the modelled game."
+)
 
 _CSS = """
 :root { --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --panel:#f9fafb; --accent:#b45309; }
@@ -388,6 +395,8 @@ def _render_forecast_standard(record: ForecastRecord) -> str:
             "<h2>Historical base rates — ICB analogs</h2>",
             _analog_panel(record.analog_panel),
         ]
+    if record.elicitation is not None:
+        parts.append(elicitation_panel_html(record))
     parts.append(_forecast_provenance(record))
     return _page(record.question_id, "".join(parts))
 
@@ -409,6 +418,7 @@ def render_forecast_narrative(record: ForecastRecord, *, rubric_source: str | No
         + _narr_reading(record, game, readout)
         + _narr_brief(record, game, readout)
         + precedent_panel_html(record)
+        + elicitation_panel_html(record)
         + _narr_appendix(record, rubric_source)
     )
     return _page(record.question_id, body, extra_css=_NARR_CSS)
@@ -500,6 +510,49 @@ def precedent_panel_html(record: ForecastRecord) -> str:
             + ".</p>"
         )
     parts.append(f"<p class='sub'>Ratification: <em>{_esc(panel.ratification_note)}</em></p>")
+    parts.append("</section>")
+    return "".join(parts)
+
+
+def _scope_note(record: ForecastRecord) -> str:
+    """The scope note beneath the verdict: broadened only where an ensemble measured it (D45.4)."""
+    return _SHARE_SCOPE_MEASURED if record.elicitation is not None else _SHARE_SCOPE
+
+
+def elicitation_panel_html(record: ForecastRecord) -> str:
+    """The elicitation-uncertainty panel: per-actor agreement + the three variance shares (D45.4).
+
+    Empty unless the record carries an :class:`ElicitationSummary` (a consensus of several drafts).
+    """
+    el = record.elicitation
+    if el is None:
+        return ""
+    parts = [
+        '<section class="narr"><h2>Elicitation uncertainty</h2>',
+        f"<p class='sub'>Consensus of {el.n_drafts} formalizer drafts; every coordinate "
+        "range is widened to span the drafts' disagreement.</p>",
+    ]
+    if el.variance is not None:
+        v = el.variance
+        parts.append(
+            "<p><strong>Variance shares</strong> — elicitation "
+            f"{v.elicitation * 100:.0f}%, input ranges {v.input_ranges * 100:.0f}%, model choice "
+            f"{v.model_choice * 100:.0f}%. <span class='sub'>{_esc(v.method)}</span></p>"
+        )
+    rows = []
+    for a in el.actors:
+        flag = " <em>(low presence)</em>" if a.low_presence else ""
+        spread = "; ".join(f"{c.field} &plusmn;{c.mode_spread:g}" for c in a.coordinates)
+        rows.append(
+            f"<tr><td>{_esc(a.name)}{flag}</td><td>{a.present_in}/{a.n_drafts}</td>"
+            f"<td>{spread}</td></tr>"
+        )
+    parts.append(
+        "<table class='agree'><thead><tr><th>Actor</th><th>Present in</th>"
+        "<th>Coordinate spread (across drafts' modes)</th></tr></thead><tbody>"
+        + "".join(rows)
+        + "</tbody></table>"
+    )
     parts.append("</section>")
     return "".join(parts)
 
@@ -645,7 +698,7 @@ def _narr_verdict(record: ForecastRecord, game: GameSpec, readout: BandReadout) 
             f'<p class="lede">The forecast median is <strong>{e.median:.0f}</strong> on the 0-100 '
             f"scale (CI80 [{e.p10:.0f}, {e.p90:.0f}]). {_esc(readout.note)}</p>"
         )
-    parts.append(f'<p class="scope">{_SHARE_SCOPE}</p>')  # standing scope note (D25.2)
+    parts.append(f'<p class="scope">{_scope_note(record)}</p>')  # scope note (D25.2 / D45.4)
     parts.append(_verdict_strip(record, readout))
     parts.append(_what_would_change(record, game))
     parts.append("</section>")
