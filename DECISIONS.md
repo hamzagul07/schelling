@@ -2602,3 +2602,79 @@ None, the realized binary from the actual, Brier by hand, solver+crowd binary sc
 separation, an empty binary track without a declared mapping, and the crowd-baseline mapping
 requirement; plus the crowd-record and CLI coverage in ``tests/test_evidence.py``. The D39.2 gate
 passes untouched.
+
+### D48.0 — Session 48 was a grading dry run on a throwaway branch (findings only reach main)
+`schelling grade` was rehearsed end-to-end against Q-2026-OPEC-SEP with three invented outcomes on
+branch `grading-rehearsal`, which was then reset and deleted. No ledger row, sealed record, GRADING
+file, or OpenTimestamps proof on main was modified, and no rehearsal code (a prototype `grade`
+command + `backtest/grade.py`) was merged — only the findings below (D48.1–D48.8). The prototype
+existed solely to surface what a real `grade` will need. **What worked:** the per-record continuum
+score `|median − actual|` matched a hand calculation exactly for all six sealed records across both
+vintages (v1-thin, v2-sourced) and all three outcomes — +188 kb/d → continuum 66, rollover → 50,
+−400 kb/d cut → 17; CRPS was reported as a secondary for the four Monte-Carlo records (llm-judgment
+records have no cached draws, so absolute error only, correctly); and the integrity gate did refuse
+to write until every check passed. The eight findings are what a real implementation must fix first.
+
+### D48.1 — `schelling verify` cannot verify the llm-judgment (or crowd) records
+`verify_record` hardcodes `ForecastRecord.model_validate_json`, but the two sealed OPEC llm-judgment
+records are `LLMForecastRecord` (a frozen `extra="forbid"` schema — it rejects a ForecastRecord parse
+on `contamination_risk`/`contamination_note`). So `schelling verify` exits code 2 ("not a readable
+ForecastRecord") on 2 of the 6 sealed OPEC records; crowd baselines would fail identically. A grade
+step that must "run verify on every sealed record" cannot today verify a third of the OPEC ledger.
+Owed: `verify` must dispatch on record schema — full re-solve audit for `ForecastRecord`, and
+ledger-match only for the non-deterministic llm/crowd families (determinism does not apply to them).
+
+### D48.2 — the outcome→continuum mapping is prose-only, so a generic grader cannot execute it
+The OPEC rubric stores its mapping as text ("grade = 50 + adjustment_kbd/600 × 50, clamped, rounded
+to the nearest integer"). There is no machine-readable field, so nothing can turn +188 kb/d into 66
+without per-question code; the rehearsal hard-coded a shim. Owed: `ResolutionRubric` needs a
+structured, executable mapping (arithmetic coefficients for linear questions, band thresholds
+elsewhere) so `grade` maps the real-world figure itself rather than a human transcribing the formula
+at grading time — transcription reintroduces exactly the reverse-fit risk pre-registration exists to
+kill. Related: "nearest integer" is unspecified at the x.5 tie (Python `round` is banker's rounding);
+the tie-break rule must be pinned in the rubric.
+
+### D48.3 — `scoring.score_record` only accepts `ForecastRecord`
+`score_record` reads a `ForecastRecord` (median + cached draws + embedded rubric). The llm-judgment
+records are a different schema with no cached draws, so to score them at all the rehearsal coerced
+each into a minimal `ForecastRecord` shell (yielding `|median − actual|` only, no CRPS — correct,
+they carry no distribution). Owed: scoring should accept the llm/crowd schemas directly instead of
+depending on a coercion shim that a real grader would have to reproduce.
+
+### D48.4 — the OpenTimestamps check cannot gate on `ots verify`'s exit code
+`ots` is installed inside the venv (though `which ots` from a bare shell reports it absent —
+environment-dependent, itself a trap for a naive check). `ots verify` exits non-zero in the normal
+case: it retrieves calendar attestations but cannot confirm the Bitcoin anchor without a local
+Bitcoin node ("Could not connect to Bitcoin node"). A grade that hard-refuses on the exit code would
+refuse forever. The check must distinguish a MISSING or hash-mismatched proof (a real integrity
+failure → refuse) from an unreachable/pending Bitcoin node (proof and attestations exist →
+pass-with-note). The rehearsal only passed the gate after drawing that distinction.
+
+### D48.5 — writing the grade into FORECASTS.md invalidates the ledger's own OTS proof
+The proof is content-addressed by the ledger file's SHA-256. Appending the grade block changed
+FORECASTS.md's bytes (`15d075c4e8a5…` → `d8701d3d84f2…`), so the proof that was just verified no
+longer matches the file — the write invalidates the anchor it just checked. Owed: grades must live
+outside the anchored region (a separate graded-results file), or a re-stamp must immediately follow
+the write, or grading must re-anchor the ledger as an explicit final step.
+
+### D48.6 — two sources of truth for "graded": FORECASTS.md vs GRADING-<qid>.md
+The site counts a question graded by scanning `GRADING-<qid>.md` for an `**Actual outcome:**` line
+(`site.data._graded_questions`); it never reads FORECASTS.md. So writing the grade only into
+FORECASTS.md would not move the site's graded state at all — the rehearsal had to write both files to
+make the count move. Owed: one canonical graded-state source, or an explicit, tested sync, so the two
+records of "is this graded" cannot silently diverge.
+
+### D48.7 — the honesty banner is static prose and becomes false the moment anything is graded
+`site/render.py` hardcodes "Nothing has been graded yet, so no accuracy is claimed." on both the
+index and ledger pages, unconditional on `graded_count`. After grading OPEC the rendered page showed
+"6 GRADED" directly beside "Nothing has been graded yet" — a self-contradiction shipped to readers.
+Owed: the banner must be conditional on `graded_count`, and when it is >0 must state what has and has
+not been graded without asserting any accuracy the evidence does not support.
+
+### D48.8 — `graded_count` counts ledger ROWS, not questions, and overstates the track record
+`graded_count` sums ledger rows whose question is graded, so grading the single OPEC question renders
+"6 GRADED" (its six sealed records). A reader reasonably reads that as six resolved questions — the
+exact overstatement the dry run was told to watch for. One resolved question is one data point, not
+six. Owed: distinguish graded QUESTIONS from graded RECORDS in both the counter and its label, and
+surface no family-accuracy claim off a single question (the refuse-to-rank thresholds already guard
+the compare tracks; the site's headline counter does not).
