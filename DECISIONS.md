@@ -2435,3 +2435,62 @@ clause added:** QRE narrowed the interval while its benchmark accuracy worsened 
 correctness, exactly what a proper scoring rule penalises. (6) **The Nash/KS explanation is labelled a
 conjecture** ("we do not test the conjecture"). (7) Re-assembled: **7,467 words** (was 7,079), no
 unresolved E-tags; regenerated the SSRN preprint manuscript from the revised draft.
+
+### D45.0 — Elicitation ensembles: measure the formalization uncertainty instead of assuming it away
+Formalizing a situation into a game is an act of elicitation, and an LLM does it differently each
+time. Session 45 turns that into a measured quantity rather than a silent one, in a new
+``src/schelling/elicitation/`` package plus two schemas modules. No solver, Monte-Carlo path, or
+sealed number changes — the D39.2 regression gate passes untouched. The two record-level fields this
+adds (``DraftMetadata.draft_index``, ``ForecastRecord.elicitation``) are outside ``inputs_hash``, so
+they cannot move a sealed content-address; every new number comes from the deterministic reconcile /
+variance layer, never an LLM (rule 1).
+
+### D45.1 — ``formalize --ensemble N``: N independent drafts, saved separately with provenance
+``run_ensemble`` runs the existing ``formalize`` ``N`` times (default 1 single draft; 5 recommended),
+optionally cycling a judge model per draft, each recorded in ``DraftMetadata.model`` and tagged with
+its ``draft_index``. The CLI writes ``draft-01..NN.json`` plus an ``ensemble.json`` manifest holding
+each draft file's SHA-256 — the ensemble's commitment (D45.5). The drafts are non-deterministic by
+nature; the reproducible commitment is the set of draft hashes together with the consensus game's
+``inputs_hash``. Tested with a replay client (CI never calls the live API): N drafts, cycled models
+recorded, ``draft_index`` set.
+
+### D45.2 — ``schelling reconcile``: a consensus game whose ranges widen to span the disagreement
+``reconcile`` aligns actors across the drafts by identity and emits a consensus :class:`GameSpec` plus
+an agreement report. Each consensus coordinate's range is ``[min(draft lows), max(draft highs)]`` with
+the mode at the median of the drafts' modes, so **widening never narrows** (the consensus range
+contains every draft's own range; it is unchanged when the drafts agree and grows when they disagree)
+— a property the tests pin directly. The report records, per actor, presence ``k`` of ``N`` and the
+spread of each coordinate across drafts. **Minority actors** (named by fewer than half the drafts,
+``k * 2 < N``) are **retained and flagged** with a ``low_presence`` marker, an evidence note, and a
+line in the game's notes — never silently dropped. Pure and deterministic.
+
+### D45.3 — ``schelling variance``: a three-way decomposition that sums to 1
+``variance`` decomposes total forecast variance into three shares — **elicitation** (across drafts),
+**input ranges** (the Monte-Carlo spread within a draft), and **model choice** (across solvers) —
+solving every draft under every solver on a balanced draft x solver x draw grid and applying the law
+of total variance nested in the order drafts -> solvers -> input ranges. Because the three
+non-negative terms are the population-variance components of that nesting, they sum **exactly** to the
+grid's total variance, so the normalized shares sum to 1; the nesting order (which fixes how
+interaction variance is attributed) is reported with the result. It reuses ``run_monte_carlo`` — the
+engine the Sobol layer builds on; the input-range term is the mean within-cell Monte-Carlo variance,
+the very quantity Sobol apportions among parameters. Hand-verified on an additive fixture
+``f = a(D) + c(M) + b(X)`` with independent components: the shares recover ``Var(a) : Var(b) : Var(c)``
+exactly (25/30, 1/30, 4/30).
+
+### D45.4 — Reports and dossiers gain an elicitation-uncertainty panel; the scope line narrows honestly
+When a solved record carries an :class:`ElicitationSummary` (attached at ``solve --elicitation``), the
+forecast report and the dossier render an **elicitation-uncertainty panel**: the per-actor agreement
+table (presence and per-coordinate spread) and the three variance shares. The standing scope note
+changes **only where the uncertainty is now measured** (the review's instruction): elicitation and
+model choice are no longer disclaimed, while **coding error stays disclaimed** and so do events
+outside the modelled game. Without an ensemble the standing note is byte-unchanged, so existing
+reports are untouched.
+
+### D45.5 — Determinism: the ensemble commits to draft hashes, the consensus solves like any game
+A draft is non-deterministic, so the ensemble's commitment is the set of draft SHA-256 hashes (in the
+manifest and the elicitation report) plus the consensus game's own ``inputs_hash``. The consensus
+game is an ordinary :class:`GameSpec`: it solves deterministically under a seed and seals normally,
+with the elicitation summary riding as record-level provenance outside the hash. Tests: reconciliation
+on synthetic drafts with known disagreement, widening never narrows, minority actors preserved,
+variance shares sum to 1, the additive decomposition, ensemble provenance, and the report panel +
+scope line (``tests/test_elicitation.py``, 11). The D39.2 gate passes untouched.
