@@ -2551,3 +2551,54 @@ is byte-reproducible. Tests (``tests/test_evidence.py``, 12) cover caching-witho
 cap, backend selection + fallback, Exa parsing, GDELT unratified proposals + CLI wiring, the Metaculus
 crowd record + its written-justification guard + sealing as crowd-metaculus, and the literature lookup.
 The D39.2 regression gate passes untouched.
+
+### D47.0 — A crowd-baseline binary scoring track, kept strictly separate from the continuum track
+Session 47 gives the crowd baseline (D46.3) something to be scored on without ever contaminating the
+three sealed questions' pre-registered continuum grading. It adds a **binary track** — P(criterion
+met) scored by Brier — that runs *beside* the ``|median - actual|`` continuum track and never mixes
+with it. No solver, Monte-Carlo path, or sealed number changes; the D39.2 gate passes untouched. The
+two schema additions (``ResolutionRubric.binary_met_bands``, ``ForecastRecord.binary_prob_met``, plus
+``CrowdForecastRecord.binary_prob_met``) are grading/record metadata, all EXCLUDED from
+``inputs_hash``, and every number is a deterministic read of the draws — no LLM (rule 1).
+
+### D47.1 — The band-to-binary mapping is DECLARED in the rubric, never inferred
+``ResolutionRubric.binary_met_bands`` lists the band **labels** whose realized outcome counts as the
+binary criterion being met. ``P(binary criterion met) = the share of Monte-Carlo draws that fall in
+those bands`` (``scoring.binary_prob_met``); the realized binary outcome is whether the actual
+settlement lands in one of them (``scoring.binary_realized``). The mapping is read from the field,
+never inferred from band order or the criterion prose — so which outcomes count as "met" is a
+pre-registration choice on the record, auditable like the bands themselves. A banded record whose
+embedded rubric declares the mapping gets its ``binary_prob_met`` populated at solve time; records
+that look their rubric up (USIRAN/IAEA) have it computed at score/render time from the looked-up
+rubric. Arithmetic (band-less) questions have no binary track. ``schelling seal`` refuses to seal a
+crowd baseline whose question does not declare the mapping — enforced in ``build_crowd_record``, so a
+crowd record cannot even be built without it. The mapping was added to ``docs/GRADING-TEMPLATE.md``;
+the three already-sealed questions are NOT given a mapping this session (no Metaculus match exists to
+seal against, D47.4), so the choice of which bands mean "met" is deferred to whoever seals a crowd
+baseline against a specific question, with the specific Metaculus question in hand.
+
+### D47.2 — Crowd records are scored on the binary track only, and labelled as such
+A ``CrowdForecastRecord`` carries ``binary_prob_met`` (the community forecast as a probability of the
+criterion being met, ``placement / 100``) and is scored by ``brier_binary(p, met) = (p - y)^2`` on the
+binary track **only** — never on the continuum. The continuum ``|median - actual|`` track for the
+three sealed questions is exactly as pre-registered (D40.1) and never mixes with the binary track. The
+report labels the derived binary probability "Binary track — P(criterion met) … scored by Brier,
+separately from the continuum track and never mixed with it."
+
+### D47.3 — ``schelling compare`` reports the two tracks separately and refuses to combine them
+``compare`` now prints a **Continuum track** section (the ``|median - actual|`` ranking + proper
+scores, D27.4/D40.1) and, beneath it, a separate **Binary track** section (Brier on P(met) for crowd
+baselines and derived solver P(met), on questions that declare a mapping). The refuse-to-rank guard
+applies to **each track on its own count of graded questions** — the continuum track at 10 graded
+(``MIN_GRADED``), the binary track at 10 graded on the binary track (``MIN_GRADED_BINARY``), computed
+independently. The command states explicitly that the two tracks are never combined.
+
+### D47.4 — A searched-and-found-nothing null is recorded explicitly
+Where no genuine Metaculus match exists, ``schelling crowd --no-match "<note>"`` writes a
+``CrowdNull`` (``matched: false`` + the searched topic, a written note, and the search date) to the
+question's file, so the absence is documented rather than silent. It is not a ledger record and seals
+nothing. Tests (``tests/test_binary_track.py``, 7): the derived met-band share, the mapping-undeclared
+None, the realized binary from the actual, Brier by hand, solver+crowd binary scoring with track
+separation, an empty binary track without a declared mapping, and the crowd-baseline mapping
+requirement; plus the crowd-record and CLI coverage in ``tests/test_evidence.py``. The D39.2 gate
+passes untouched.
