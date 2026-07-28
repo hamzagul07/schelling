@@ -22,7 +22,7 @@ from schelling.schemas.forecast import (
     ForecastRecord,
     LLMForecastRecord,
 )
-from schelling.schemas.question import LinearMap
+from schelling.schemas.question import LinearMap, ResolutionRubric
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _RUNS = _REPO_ROOT / "runs"
@@ -33,7 +33,7 @@ _needs_runs = pytest.mark.skipif(not _OPEC_RECORDS, reason="runs/ is gitignored 
 
 
 # ------------------------------------------------------------------ D49.2 machine-readable mapping
-def _opec_rubric() -> object:
+def _opec_rubric() -> ResolutionRubric:
     looked = lookup_rubric("Q-2026-OPEC-SEP", _REPO_ROOT)
     assert looked is not None, "OPEC grading file must be findable"
     return looked[0]
@@ -141,26 +141,6 @@ def test_every_sealed_opec_record_verifies(record_path: Path) -> None:
 
 
 # ------------------------------------------------------------------ D49.1 score_record dispatches
-def _synthetic_llm(bands_probs: dict[str, float] | None = None) -> LLMForecastRecord:
-    from schelling.schemas.forecast import Ensemble, LLMSample
-
-    return LLMForecastRecord(
-        question_id="Q-TEST",
-        run_id="r",
-        engine_version="e",
-        inputs_hash="h",
-        judge_model="claude-opus-4-8",
-        temperature=0.0,
-        n_samples=5,
-        prompt_hash="p",
-        cost_usd=0.0,
-        ensemble=Ensemble(median=58.0, mean=58.0, p10=50.0, p90=66.0, n_draws=5),
-        band_probabilities=bands_probs or {},
-        self_consistency=0.0,
-        samples=[LLMSample(point=58.0)],
-    )
-
-
 @_needs_runs
 def test_score_record_dispatches_forecast_and_llm() -> None:
     """A ForecastRecord gets abs-error + CRPS; an LLMForecastRecord gets abs-error only on an
