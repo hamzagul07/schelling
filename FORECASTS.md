@@ -95,6 +95,27 @@ Stated plainly, both facts at once, in the same spirit as the hash-basis correct
 Neither fact is hidden. Re-anchor at any time with `schelling stamp` (no new seal required); each
 distinct ledger state gets its own content-addressed proof.
 
+## Proof-chain semantics — which proof anchors a given row (D49.4, dated 2026-07-29)
+
+An OpenTimestamps proof is content-addressed by the ledger's SHA-256 *at the moment it was written*,
+so this file's bytes change every time a row is sealed or a grade is recorded — and each change
+produces a **new** proof in `ledger-proofs/` (e.g. `FORECASTS.md-<sha12>.ots`). The proofs are
+therefore a **chain**, one link per distinct ledger state, not a single current file. This has three
+consequences, all deliberate:
+
+1. **A sealed row is anchored by the proof that was current when it was sealed**, not by the proof of
+   today's (post-grading) ledger. To verify a row's commitment predated resolution, check it out at
+   the commit that sealed it (`git log -- FORECASTS.md` finds the commit; `git show <commit>:FORECASTS.md`
+   reproduces those exact bytes) and verify **that** state against **its** matching
+   `ledger-proofs/FORECASTS.md-<sha12>.ots`. The `<sha12>` in the proof filename is the SHA-256 of the
+   ledger bytes it anchors, so the pairing is unambiguous and reconstructible from git history alone.
+2. **No proof is ever deleted.** Recording a grade appends to this file and re-stamps, adding a link;
+   it never removes an earlier link. Every historical ledger state stays independently verifiable, so
+   a later edit can never retroactively strip the anchor that proved an earlier commitment.
+3. **Every write re-stamps.** `schelling grade` (like `schelling seal`) anchors the new bytes as its
+   final step, so the head of the chain always matches the current file. If the `ots` client is
+   absent the re-stamp is a logged no-op and the SHA-256 + git commit still stand.
+
 ## Canonicalization epochs and the v1-challenge record (D18.1)
 
 A record's internal content-address (`inputs_hash`) has two epochs. **v1** predates the

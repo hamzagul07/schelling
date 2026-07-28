@@ -37,6 +37,30 @@ class RubricBand(BaseModel):
     label: str  # what this band means, verbatim from the rubric
 
 
+class LinearMap(BaseModel):
+    """Machine-readable form of an ARITHMETIC rubric's outcome mapping (Session 49, D49.2).
+
+    A verbatim structuring of a linear formula already committed in the rubric's ``outcome_mapping``
+    prose — ``continuum = intercept + slope * raw``, then clamped to ``[clamp_lo, clamp_hi]`` and
+    rounded by ``rounding``. It is a *restatement*, not a new rule: the prose governs on any
+    disagreement (see the dated provenance note beside it in the grading file). Like the rest of the
+    rubric it is EXCLUDED from ``inputs_hash``, so declaring it moves no sealed number.
+
+    ``rounding`` is declared explicitly so the ``.5`` boundary is not left to a library default:
+    ``"nearest_int_half_up"`` rounds ties to the larger integer. The clamped continuum is always
+    ``>= 0`` here, so half-up equals round-half-away-from-zero; there is no negative-tie ambiguity.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    unit: str  # what ``raw`` is measured in, e.g. "thousand b/d (collective adjustment)"
+    slope: float  # continuum units per unit of raw
+    intercept: float  # continuum value at raw == 0
+    clamp_lo: float = 0.0
+    clamp_hi: float = 100.0
+    rounding: str = "nearest_int_half_up"  # the ONLY supported rule today; declared, not implicit
+
+
 class ResolutionRubric(BaseModel):
     """How a sealed forecast will be graded once its real-world event resolves (Session 17, D17.1).
 
@@ -70,6 +94,13 @@ class ResolutionRubric(BaseModel):
     # baseline can only be sealed against a question whose rubric declares this (empty -> no binary
     # track for the question). P(met) = the share of MC draws that fall in these bands.
     binary_met_bands: list[str] = Field(default_factory=list)
+    # Machine-readable arithmetic mapping (Session 49, D49.2): the executable form of an arithmetic
+    # question's ``outcome_mapping`` prose, so `schelling grade` can turn a real-world figure into a
+    # 0-100 continuum value WITHOUT a human transcribing the formula at grade time. Present only on
+    # arithmetic (band-less) questions; banded questions use ``bands`` as their structured mapping
+    # (D24.2/D24.4). A verbatim restatement — the prose governs on disagreement — and EXCLUDED from
+    # ``inputs_hash`` with the rest of the rubric. A drift-guard test pins it to the prose.
+    outcome_map: LinearMap | None = None
 
 
 class GameSpec(BaseModel):

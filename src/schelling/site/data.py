@@ -107,6 +107,50 @@ class SiteData:
         return len(self.questions)
 
     @property
+    def graded_questions_count(self) -> int:
+        """How many distinct sealed QUESTIONS have been graded (D49.6).
+
+        Distinct from :attr:`graded_count`, which counts ledger ROWS (records). One resolved
+        question is one data point, not one per record — so the honest headline leads with this.
+        """
+        return sum(1 for qid in self.questions if qid in self.graded_questions)
+
+    @property
+    def graded_counter(self) -> str:
+        """The honest headline: questions first, records second (D49.6).
+
+        "N of M questions graded · R of S records scored" — never records alone, so "6 GRADED"
+        (six records of one question) can no longer read as six resolved questions.
+        """
+        return (
+            f"{self.graded_questions_count} of {self.question_count} questions graded · "
+            f"{self.graded_count} of {self.sealed_count} records scored"
+        )
+
+    def honesty_banner(self, *, ranking_threshold: int = 10) -> str:
+        """The accuracy-honesty banner, generated from the graded state so it can never contradict
+        the counter on the same page (D49.6).
+
+        Zero graded -> nothing is claimed. Above zero but below the ranking guard's threshold -> the
+        question count is stated plainly and no accuracy is claimed, naming the threshold. (At or
+        above the threshold the ranking guard itself governs; this project is far below it.)
+        """
+        n = self.graded_questions_count
+        if n == 0:
+            return (
+                "Nothing here has been graded yet, so no accuracy is claimed. Each row is the "
+                "SHA-256 of a complete forecast record, anchored in the bitcoin blockchain before "
+                "its event resolved."
+            )
+        q = "question" if n == 1 else "questions"
+        return (
+            f"{n} {q} graded so far — far too few for any accuracy claim: the ranking guard "
+            f"requires {ranking_threshold} graded questions before any family is ranked. Each row "
+            "is the SHA-256 of a complete forecast record, anchored in the bitcoin blockchain "
+            "before its event resolved."
+        )
+
+    @property
     def gate_count(self) -> int:
         """How many pre-registered MAE gates the site can source from the backtest / evidence — the
         set the trials figure plots (D35.5). Zero-safe: the element is dropped, not invented."""
@@ -146,6 +190,7 @@ class SiteData:
                 self.grading_date,
                 str(self.sealed_count),
                 str(self.graded_count),
+                str(self.graded_questions_count),
                 str(self.question_count),
                 str(self.gate_count),
                 str(self.canon_cards),

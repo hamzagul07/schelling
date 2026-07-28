@@ -255,19 +255,19 @@ def test_committed_reports_are_offline_clean() -> None:
 
 # --------------------------------------------------------------------------- honesty rules (D31.5)
 def test_honesty_shows_graded_beside_sealed() -> None:
-    """The graded count is always rendered beside the sealed count — as adjacent grid cells on both
-    the index and the ledger page (D31.5, restyled D35), and the sidebar footer states both."""
-    data = _sample_data()  # sealed_count == 2, graded_count == 0
+    """The honest counter is rendered beside the sealed count — questions-first, never records alone
+    (D49.6, was D31.5). One graded question of many records can never read as many graded."""
+    data = _sample_data()  # sealed_count == 2, question_count == 2, graded == 0
     sealed_cell = '<p class="k">FORECASTS SEALED</p><p class="v">2</p>'
-    graded_cell = '<p class="k">GRADED</p><p class="v">0</p>'
+    graded_cell = '<p class="k">QUESTIONS GRADED</p><p class="v">0 of 2</p>'
     for name in ("index.html", "ledger.html"):
         page = build_site(REPO_ROOT, data=data)[name]
         assert sealed_cell in page, name
         assert graded_cell in page, name
         # sealed cell immediately precedes graded cell in the stat grid
         assert page.index(sealed_cell) < page.index(graded_cell), name
-        # the sidebar footer names both counts together
-        assert "0 graded · 2 sealed" in page, name
+        # the sidebar footer names the question-first count
+        assert "0 of 2 questions graded · 2 sealed" in page, name
 
 
 def test_no_accuracy_claim_while_ungraded() -> None:

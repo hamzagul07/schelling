@@ -2000,6 +2000,50 @@ def verify(
         raise typer.Exit(code=1)
 
 
+@app.command()
+def grade(
+    question_id: str = typer.Argument(
+        ..., help="The resolved question to grade, e.g. Q-2026-OPEC-SEP."
+    ),
+    actual: float = typer.Option(..., "--actual", help="The realized real-world outcome value."),
+    justify: str = typer.Option(..., "--justify", help="Written justification for the outcome."),
+    citation: list[str] = typer.Option([], "--citation", help="Source URL(s); repeatable."),
+    repo_root: Path = typer.Option(Path("."), "--repo-root", help="Repository root."),
+    write: bool = typer.Option(
+        True, "--write/--no-write", help="Write the grade (integrity permitting)."
+    ),
+) -> None:
+    """Grade a resolved question: verify every sealed record, check the OTS proof, score, and write.
+
+    Maps the outcome onto the 0-100 continuum via the question's committed machine-readable rubric,
+    scores every sealed record (solver/llm on the continuum, crowd on the binary track), and — only
+    if every blocking integrity check passes — writes the grade into BOTH FORECASTS.md and the
+    grading file's ``**Actual outcome:**`` line, then re-stamps the ledger (D49).
+    """
+    from schelling.backtest.grade import grade_question, render_grade_block, write_grade
+
+    report = grade_question(question_id, actual, justify, list(citation), repo_root)
+    typer.echo(render_grade_block(report))
+    if not report.integrity_ok:
+        typer.echo("REFUSING to write: a blocking integrity check failed (see above).", err=True)
+        raise typer.Exit(code=1)
+    if not write:
+        typer.echo("(--no-write: integrity passed; nothing written.)")
+        return
+
+    ledger = repo_root / "FORECASTS.md"
+    grading = repo_root / f"GRADING-{question_id}.md"
+    if not grading.exists():
+        typer.echo(
+            f"grading file {grading} not found — cannot record the outcome atomically.", err=True
+        )
+        raise typer.Exit(code=2)
+    write_grade(report, ledger, grading)
+    # Re-stamp: ledger bytes changed, so anchor the new state (never deletes the old proof, D49.4).
+    _proof, message = stamp_ledger(ledger, repo_root / "ledger-proofs")
+    typer.echo(f"Wrote grade into {ledger.name} + {grading.name} (atomic); {message}")
+
+
 def _check_evidence_drift(repo_root: Path, out_dir: Path) -> int:
     """Compare committed EVIDENCE.md to a fresh regeneration (D18.3). Returns a process exit code.
 

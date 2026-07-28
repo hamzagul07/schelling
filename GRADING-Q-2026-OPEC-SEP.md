@@ -50,6 +50,27 @@ The prose above is canonical; this block is a faithful structuring of it. -->
     "Wire services of record (Reuters, Associated Press, Bloomberg) corroborating the above"
   ],
   "outcome_mapping": "Arithmetic mapping, no bands. The announced collective adjustment in thousands of b/d maps linearly onto the continuum: grade = 50 + (adjustment_kbd / 600) * 50, clamped to [0, 100] and rounded to the nearest integer. A cut is negative, an increase positive, a rollover is exactly 50. The arithmetic governs; no discretionary band applies. The grader publishes the announced figure, the computed grade, and the citation.",
-  "grading_formula": "score(r) = |r.ensemble.median - actual| per sealed record on the 0-100 continuum. All sealed records are scored (challenge, compromise, llm-judgment); the grade, its justification, and all cited sources are published in FORECASTS.md at grading."
+  "grading_formula": "score(r) = |r.ensemble.median - actual| per sealed record on the 0-100 continuum. All sealed records are scored (challenge, compromise, llm-judgment); the grade, its justification, and all cited sources are published in FORECASTS.md at grading.",
+  "outcome_map": {
+    "unit": "thousand b/d (announced collective September adjustment)",
+    "slope": 0.08333333333333333,
+    "intercept": 50.0,
+    "clamp_lo": 0.0,
+    "clamp_hi": 100.0,
+    "rounding": "nearest_int_half_up"
+  }
 }
 ```
+
+**`outcome_map` provenance (added 2026-07-29, pre-resolution).** The `outcome_map` block above is a
+machine-readable restatement of the mapping rule already committed in `outcome_mapping` and in the
+"Mapping rule" prose: `grade = 50 + (adjustment_kbd / 600) × 50`, i.e. `intercept = 50` and
+`slope = 50/600 = 0.08333…` continuum units per thousand b/d, clamped to `[0, 100]`. It carries **no
+semantic change** — it exists only so `schelling grade` can compute the continuum settlement without
+a human transcribing the formula at grading time (D49.2). The rounding rule, left implicit in the
+prose ("rounded to the nearest integer"), is made explicit here as `nearest_int_half_up` — ties go
+to the larger integer (50.5 → 51); on the clamped `[0, 100]` continuum this equals
+round-half-away-from-zero. **The prose governs on any disagreement.** Like the rest of the rubric the
+`outcome_map` is excluded from `inputs_hash`, so no sealed record, ledger entry, or timestamp is
+affected; a drift-guard test (`test_opec_outcome_map_matches_prose`) pins the executable form to the
+prose formula and checks the `.5` boundary, exactly as D24.4 did for the band arrays.

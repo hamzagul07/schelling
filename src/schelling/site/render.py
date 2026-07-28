@@ -68,7 +68,8 @@ def _sidebar(current: str, prefix: str, data: SiteData) -> str:
             f'<a href="{prefix}index.html#{anchor}"{cur}><span class="n"></span>{_esc(label)}</a>'
         )
     foot = (
-        f"research preview<br>agpl-3.0<br>{data.graded_count} graded · {data.sealed_count} sealed"
+        f"research preview<br>agpl-3.0<br>{data.graded_questions_count} of {data.question_count} "
+        f"questions graded · {data.sealed_count} sealed"
     )
     return (
         "<aside>"
@@ -92,7 +93,8 @@ def _shell(
     host = repo_url.split("://", 1)[-1].upper()
     footer = (
         f'<div class="bleed"><footer>SCHELLING · RESEARCH PREVIEW · {data.sealed_count} SEALED · '
-        f"{data.graded_count} GRADED · {_esc(host)}</footer></div>"
+        f"{data.graded_questions_count} OF {data.question_count} QUESTIONS GRADED · "
+        f"{_esc(host)}</footer></div>"
     )
     return (
         "<!doctype html>"
@@ -170,7 +172,12 @@ def _index_body(data: SiteData, repo_url: str) -> str:
             str(data.sealed_count),
             f"across {data.question_count} live questions",
         ),
-        _cell("GRADED", str(data.graded_count), f"first grading {data.grading_date}"),
+        _cell(
+            "QUESTIONS GRADED",
+            f"{data.graded_questions_count} of {data.question_count}",
+            f"{data.graded_count} of {data.sealed_count} records scored · first grading "
+            f"{data.grading_date}",
+        ),
     ]
     if data.gate_count:
         cells.append(_cell("GATES PRE-REGISTERED", str(data.gate_count), "none moved"))
@@ -204,9 +211,8 @@ def _index_body(data: SiteData, repo_url: str) -> str:
     ledger = _section(
         "ledger",
         "The sealed ledger",
-        '<p class="body">Every forecast below was committed to a public repository and anchored in '
-        "the bitcoin blockchain before its event resolved. Nothing has been graded yet, so no "
-        "accuracy is claimed.</p>"
+        f'<p class="body">Every forecast below was committed to a public repository and anchored in '
+        f"the bitcoin blockchain before its event resolved. {_esc(data.honesty_banner())}</p>"
         + _figure(
             forecast_landscape(data),
             "Fig. 1 — sealed forecast landscape · generated from FORECASTS.md",
@@ -338,14 +344,14 @@ def _ledger_body(data: SiteData, repo_url: str) -> str:
         + _cell(
             "FORECASTS SEALED", str(data.sealed_count), f"across {data.question_count} questions"
         )
-        + _cell("GRADED", str(data.graded_count), f"first grading {data.grading_date}")
+        + _cell(
+            "QUESTIONS GRADED",
+            f"{data.graded_questions_count} of {data.question_count}",
+            f"{data.graded_count} of {data.sealed_count} records scored",
+        )
         + "</div>"
     )
-    honesty = (
-        '<p class="body">Nothing here has been graded yet, so no accuracy is claimed. Each row is '
-        "the SHA-256 of a complete forecast record, anchored in the bitcoin blockchain before its "
-        "event resolved.</p>"
-    )
+    honesty = f'<p class="body">{_esc(data.honesty_banner())}</p>'
     ledger = _section("ledger", "Every sealed forecast", honesty + _ledger_rows(data), rule=False)
     q_cards = []
     for info in data.questions.values():
