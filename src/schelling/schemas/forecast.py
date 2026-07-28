@@ -15,6 +15,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from schelling.schemas.elicitation import ElicitationSummary
 from schelling.schemas.question import GameSpec
 
 
@@ -118,6 +119,7 @@ class DraftMetadata(BaseModel):
     leak_retries: int = 0  # firewall rephrase retries (D6.5)
     searches_used: int = 0  # server-side web searches performed (D8.1)
     created_at: str | None = None  # ISO-8601; left None keeps drafts reproducible in tests
+    draft_index: int | None = None  # position in an elicitation ensemble (D45.1), else None
 
 
 class Ensemble(BaseModel):
@@ -212,6 +214,10 @@ class ForecastRecord(BaseModel):
     # (salience correlated within coalitions) was used. Record-level metadata — NOT part of
     # ``inputs_hash`` (which hashes game + config only), so it never alters a sealed hash.
     sampling: str = "independent"
+    # Elicitation-ensemble summary (Session 45, D45): when this record's game is a reconciled
+    # consensus of several drafts, the per-actor agreement table + variance shares, so the report
+    # can disclose the elicitation uncertainty measured. Record-level, outside ``inputs_hash`` too.
+    elicitation: ElicitationSummary | None = None
 
 
 class AnalogExample(BaseModel):
