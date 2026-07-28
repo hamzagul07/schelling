@@ -527,6 +527,24 @@ def _scope_note(record: ForecastRecord) -> str:
     return _SHARE_SCOPE_MEASURED if record.elicitation is not None else _SHARE_SCOPE
 
 
+def _binary_prob_line(record: ForecastRecord, game: GameSpec) -> str:
+    """The derived binary probability, labelled as a separate track when declared (D47.1)."""
+    rubric = game.resolution_rubric
+    if rubric is None or not rubric.binary_met_bands:
+        return ""
+    from schelling.backtest.scoring import binary_prob_met
+
+    p = binary_prob_met(record, rubric)
+    if p is None:
+        return ""
+    met = ", ".join(rubric.binary_met_bands)
+    return (
+        f"<p class='scope'><strong>Binary track</strong> — P(criterion met) = {p * 100:.0f}%, the "
+        f"draw share in the bands declared &ldquo;met&rdquo; ({_esc(met)}). Scored by Brier, "
+        "separately from the continuum track and never mixed with it.</p>"
+    )
+
+
 def elicitation_panel_html(record: ForecastRecord) -> str:
     """The elicitation-uncertainty panel: per-actor agreement + the three variance shares (D45.4).
 
@@ -707,6 +725,7 @@ def _narr_verdict(record: ForecastRecord, game: GameSpec, readout: BandReadout) 
             f"scale (CI80 [{e.p10:.0f}, {e.p90:.0f}]). {_esc(readout.note)}</p>"
         )
     parts.append(f'<p class="scope">{_scope_note(record)}</p>')  # scope note (D25.2 / D45.4)
+    parts.append(_binary_prob_line(record, game))  # derived P(criterion met), if declared (D47.1)
     parts.append(_verdict_strip(record, readout))
     parts.append(_what_would_change(record, game))
     parts.append("</section>")
