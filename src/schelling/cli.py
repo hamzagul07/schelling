@@ -391,6 +391,9 @@ def solve(
         "--correlated-sampling/--independent-sampling",
         help="Opt into the copula sampler (salience correlated within coalitions, D41.4).",
     ),
+    elicitation_file: Path | None = typer.Option(
+        None, "--elicitation", help="An elicitation report (from `reconcile`) to attach + disclose."
+    ),
     out_dir: Path = typer.Option(Path("runs"), "--out-dir", help="Where the record is written."),
 ) -> None:
     """Solve a game (bare GameSpec or DraftGameSpec) and write the ForecastRecord(s)."""
@@ -410,6 +413,14 @@ def solve(
     except ValueError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
+    elicitation = None
+    if elicitation_file is not None:
+        from schelling.schemas.elicitation import ElicitationSummary
+
+        if not elicitation_file.exists():
+            typer.echo(f"--elicitation report not found: {elicitation_file}", err=True)
+            raise typer.Exit(code=2)
+        elicitation = ElicitationSummary.model_validate_json(elicitation_file.read_text())
     config = SolverConfig(
         range_mode=range_mode,
         q=q,
@@ -446,6 +457,8 @@ def solve(
             record = record.model_copy(update={"analog_panel": panel})
         if prec_panel is not None:
             record = record.model_copy(update={"precedent_panel": prec_panel})
+        if elicitation is not None:
+            record = record.model_copy(update={"elicitation": elicitation})
         write_record(record, out_dir)
         records.append(record)
         e = record.ensemble
@@ -629,6 +642,15 @@ def formalize(
     corpus_dir: Path | None = typer.Option(
         None, "--corpus", help="A research corpus dir — formalize offline from its frozen evidence."
     ),
+    ensemble: int = typer.Option(
+        1,
+        "--ensemble",
+        min=1,
+        help="Run N independent drafts (elicitation ensemble); 5 recommended.",
+    ),
+    judge_models: str | None = typer.Option(
+        None, "--judge-models", help="Comma-separated model per ensemble draft, cycled."
+    ),
 ) -> None:
     """Formalize a situation into a DraftGameSpec. NEVER auto-solves — review, then `solve`."""
     if not situation.exists():
@@ -688,6 +710,23 @@ def formalize(
         )
         raise typer.Exit(code=2)
 
+    if ensemble > 1:
+        _run_ensemble_cli(
+            situation,
+            situation_text,
+            source_texts,
+            index,
+            corpus,
+            ensemble=ensemble,
+            models=judge_models,
+            base_model=model,
+            output=output,
+            max_retries=max_retries,
+            search=search,
+            max_searches=max_searches,
+        )
+        return
+
     out_path = output or situation.with_suffix(".draft.json")
     try:
         draft = run_formalize(
@@ -733,6 +772,178 @@ def formalize(
             "claims; ranges set by the committed confidence rule."
         )
     typer.echo("This is a DRAFT — edit the JSON, then run `schelling solve` to forecast.")
+
+
+def _run_ensemble_cli(
+    situation: Path,
+    situation_text: str,
+    source_texts: dict[str, str],
+    index: object,
+    corpus: object,
+    *,
+    ensemble: int,
+    models: str | None,
+    base_model: str,
+    output: Path | None,
+    max_retries: int,
+    search: bool,
+    max_searches: int,
+) -> None:
+    """Run an elicitation ensemble (formalize --ensemble N): N drafts + a hash manifest (D45.1)."""
+    import hashlib
+
+    from schelling.elicitation.ensemble import run_ensemble
+
+    models_list = [m.strip() for m in models.split(",") if m.strip()] if models else [base_model]
+    out_dir = (
+        output
+        if (output is not None and output.suffix == "")
+        else situation.parent / f"{situation.stem}-ensemble"
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        drafts = run_ensemble(
+            situation_text,
+            source_texts,
+            n=ensemble,
+            models=models_list,
+            index=index,  # type: ignore[arg-type]
+            client_for=lambda _i, m: AnthropicClient(model=m),
+            max_retries=max_retries,
+            search=search,
+            max_searches=max_searches,
+            today=date.today().isoformat() if search else None,
+        )
+    except WebSearchUnavailableError as exc:
+        typer.echo(f"Web search unavailable: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    except IndexLeakageError as exc:
+        typer.echo("Blocked: a draft leaked concept-library phrases into factual fields.", err=True)
+        raise typer.Exit(code=2) from exc
+    except ImportError as exc:
+        typer.echo(f"{_KNOWLEDGE_HINT} Or pass --no-knowledge to formalize ungrounded.", err=True)
+        raise typer.Exit(code=2) from exc
+    if corpus is not None:
+        from schelling.research.confidence import apply_confidence_widths
+
+        drafts = [apply_confidence_widths(d, corpus) for d in drafts]  # type: ignore[arg-type]
+    manifest: list[dict[str, object]] = []
+    for i, d in enumerate(drafts):
+        text = d.model_dump_json(indent=2) + "\n"
+        path = out_dir / f"draft-{i + 1:02d}.json"
+        path.write_text(text)
+        manifest.append(
+            {
+                "file": path.name,
+                "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                "model": d.metadata.model,
+                "draft_index": i,
+            }
+        )
+    (out_dir / "ensemble.json").write_text(
+        json.dumps({"situation": str(situation), "n": ensemble, "drafts": manifest}, indent=2)
+        + "\n"
+    )
+    typer.echo(f"Ensemble of {ensemble} drafts → {out_dir}/ (draft-NN.json + ensemble.json).")
+    typer.echo(
+        f"Next: schelling reconcile {out_dir}/draft-*.json   "
+        f"then   schelling variance {out_dir}/draft-*.json"
+    )
+
+
+def _load_ensemble_games(drafts: list[Path]) -> tuple[list[GameSpec], list[str]]:
+    """Load the game + SHA-256 of each ensemble draft file (a DraftGameSpec, or a bare GameSpec)."""
+    import hashlib
+
+    from schelling.formalizer.schemas import DraftGameSpec
+
+    games: list[GameSpec] = []
+    hashes: list[str] = []
+    for path in drafts:
+        if not path.exists():
+            typer.echo(f"draft not found: {path}", err=True)
+            raise typer.Exit(code=2)
+        raw = path.read_bytes()
+        hashes.append(hashlib.sha256(raw).hexdigest())
+        try:
+            games.append(DraftGameSpec.model_validate_json(raw).game)
+        except ValidationError:
+            try:
+                games.append(GameSpec.model_validate_json(raw))
+            except ValidationError as exc:
+                typer.echo(f"{path} is neither a draft nor a game ({_first_error(exc)}).", err=True)
+                raise typer.Exit(code=2) from exc
+    return games, hashes
+
+
+@app.command()
+def reconcile(
+    drafts: list[Path] = typer.Argument(
+        ..., help="Ensemble draft JSONs (from formalize --ensemble)."
+    ),
+    output: Path = typer.Option(Path("consensus.json"), "-o", "--output", help="Consensus game."),
+    report: Path = typer.Option(
+        Path("elicitation.json"), "--report", help="Per-actor agreement + draft-hash report."
+    ),
+) -> None:
+    """Reconcile ensemble drafts into a consensus game with widened ranges + an agreement report.
+
+    Actors are aligned by identity; each coordinate's consensus range spans every draft's range
+    (widening never narrows); minority actors are retained and flagged, never dropped (D45.2).
+    """
+    from schelling.elicitation.reconcile import reconcile as run_reconcile
+
+    games, hashes = _load_ensemble_games(drafts)
+    consensus, summary = run_reconcile(games, hashes)
+    output.write_text(consensus.model_dump_json(indent=2) + "\n")
+    report.write_text(summary.model_dump_json(indent=2) + "\n")
+    typer.echo(f"Reconciled {len(games)} drafts → {output} (consensus) + {report} (agreement).")
+    for a in summary.actors:
+        flag = "  [LOW PRESENCE]" if a.low_presence else ""
+        spreads = ", ".join(f"{c.field[:3]} spread {c.mode_spread:g}" for c in a.coordinates)
+        typer.echo(f"  {a.name:<22} present {a.present_in}/{a.n_drafts}{flag}   ({spreads})")
+    typer.echo(f"Solve it: schelling solve {output} --elicitation {report}")
+
+
+@app.command()
+def variance(
+    drafts: list[Path] = typer.Argument(
+        ..., help="Ensemble draft JSONs (from formalize --ensemble)."
+    ),
+    solvers: str = typer.Option(
+        "challenge,compromise", "--solvers", help="Comma-separated solver models."
+    ),
+    draws: int = typer.Option(2000, "--draws", min=1, help="Monte-Carlo draws per draft x solver."),
+    seed: int = typer.Option(0, "--seed"),
+    into: Path | None = typer.Option(
+        None, "--into", help="Merge the shares into this elicitation report (from `reconcile`)."
+    ),
+) -> None:
+    """Decompose forecast variance into elicitation / input-range / model-choice shares (D45.3).
+
+    Solves every draft under every solver over the Monte-Carlo input ranges and applies a nested
+    law-of-total-variance decomposition; the three shares sum to 1.
+    """
+    from schelling.elicitation.variance import decompose_question
+    from schelling.schemas.elicitation import ElicitationSummary
+
+    games, _ = _load_ensemble_games(drafts)
+    models = [m.strip() for m in solvers.split(",") if m.strip()]
+    shares = decompose_question(games, models, n_draws=draws, seed=seed)
+    typer.echo("Forecast variance decomposition (shares sum to 1):")
+    typer.echo(f"  elicitation (across drafts):   {shares.elicitation * 100:5.1f}%")
+    typer.echo(f"  input ranges (within a draft): {shares.input_ranges * 100:5.1f}%")
+    typer.echo(f"  model choice (across solvers): {shares.model_choice * 100:5.1f}%")
+    typer.echo(f"  method: {shares.method}")
+    if into is not None:
+        if not into.exists():
+            typer.echo(f"--into report not found: {into}", err=True)
+            raise typer.Exit(code=2)
+        summary = ElicitationSummary.model_validate_json(into.read_text())
+        into.write_text(
+            summary.model_copy(update={"variance": shares}).model_dump_json(indent=2) + "\n"
+        )
+        typer.echo(f"Shares merged into {into}.")
 
 
 def _resolve_rubric(data: dict[str, object], artifact: Path) -> str | None:

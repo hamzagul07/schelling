@@ -30,6 +30,7 @@ from schelling.report.render import (
     _tornado,
     _verdict_strip,
     _what_would_change,
+    elicitation_panel_html,
     precedent_panel_html,
 )
 from schelling.report.vocab import load_vocab, phrase_for
@@ -278,6 +279,9 @@ def assemble_dossier(
     else:
         parts.append("<p class='sub'>No analog panel is attached to this record.</p>")
     parts.append(precedent_panel_html(record))  # the outside view, guarded + never blended (D29.3)
+    parts.append(
+        elicitation_panel_html(record)
+    )  # elicitation uncertainty, when an ensemble measured it
     # 11. What would change this (COMPUTED)
     parts += [
         _h2(11, "What would change this"),
