@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schelling — an open forecasting engine</title>
+<style>
+:root{
+  --bg:#fbfaf8; --surface:#fff; --tint:#f4f2ed;
+  --text:#1a1a19; --text-2:#56554e; --text-3:#8a887f;
+  --line:rgba(0,0,0,.10); --line-2:rgba(0,0,0,.16);
+  --accent:#b45309;
+  --serif:ui-serif,Georgia,"Iowan Old Style","Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#131310;--surface:#1a1a17;--tint:#201f1b;--text:#ecebe5;--text-2:#a9a79e;
+  --text-3:#77756d;--line:rgba(255,255,255,.11);--line-2:rgba(255,255,255,.18);--accent:#e0a24a;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+  font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:760px;margin:0 auto;padding:0 24px}
+a{color:inherit}
+
+nav{border-bottom:1px solid var(--line);padding:18px 0;margin-bottom:64px}
+nav .wrap{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
+.brand{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--text-2)}
+.navlinks{display:flex;gap:20px;font-size:14px}
+.navlinks a{color:var(--text-2);text-decoration:none}
+.navlinks a:hover{color:var(--accent)}
+
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.06em;
+  color:var(--text-3);margin:0 0 28px}
+h1{font-family:var(--serif);font-weight:400;font-size:38px;line-height:1.22;
+  margin:0;max-width:19ch;letter-spacing:-.01em}
+h1 .turn{display:block;color:var(--accent)}
+.lede{font-size:16px;color:var(--text-2);line-height:1.75;margin:24px 0 0;max-width:62ch}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin:28px 0 0}
+.btn{font-size:13px;padding:8px 14px;border:1px solid var(--line-2);border-radius:8px;
+  text-decoration:none;color:var(--text);background:transparent}
+.btn:hover{background:var(--tint)}
+.btn.primary{border-color:var(--accent);color:var(--accent)}
+
+section{margin-top:64px}
+h2{font-family:var(--serif);font-weight:400;font-size:24px;margin:0 0 6px;letter-spacing:-.01em}
+.sub{font-size:14px;color:var(--text-3);margin:0 0 20px}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.stat{background:var(--tint);border-radius:8px;padding:16px 18px}
+.stat .k{font-size:13px;color:var(--text-2);margin:0 0 4px}
+.stat .v{font-size:24px;font-weight:500;margin:0;letter-spacing:-.01em}
+
+.ledger{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.lhead,.lrow{padding:13px 18px}
+.lhead{background:var(--tint);font-size:12px;color:var(--text-2);
+  display:flex;gap:14px;align-items:center}
+.lrow{border-top:1px solid var(--line)}
+.lmain{display:flex;gap:14px;align-items:baseline}
+.q{flex:1;font-size:15px;min-width:0}
+.m{width:104px;font-size:13px;color:var(--text-2)}
+.v{width:60px;text-align:right;font-family:var(--mono);font-size:13px}
+.d{width:96px;text-align:right;font-size:13px;color:var(--text-2)}
+.hash{font-family:var(--mono);font-size:11px;color:var(--text-3);
+  word-break:break-all;margin:7px 0 0;line-height:1.5}
+
+.gates{border-top:1px solid var(--line)}
+.gate{display:flex;gap:14px;align-items:baseline;padding:13px 0;border-bottom:1px solid var(--line)}
+.gate .g{flex:1;font-size:15px}
+.gate .n{font-family:var(--mono);font-size:13px;color:var(--text-2)}
+.gate .r{width:76px;text-align:right;font-size:12px;font-family:var(--mono);color:var(--accent)}
+
+pre{background:var(--tint);border-radius:8px;padding:14px 16px;overflow-x:auto;
+  font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--text-2);margin:16px 0 0}
+.note{font-size:14px;color:var(--text-2);line-height:1.75;margin:16px 0 0;max-width:66ch}
+code{font-family:var(--mono);font-size:.92em}
+
+footer{margin:80px 0 0;border-top:1px solid var(--line);padding:24px 0 64px;
+  font-size:13px;color:var(--text-3)}
+@media(max-width:620px){
+  h1{font-size:30px}
+  .lhead{display:none}
+  .lmain{flex-wrap:wrap;gap:8px}
+  .q{flex:0 0 100%}.m,.v,.d{width:auto}.v{text-align:left}.d{text-align:left;margin-left:auto}
+}
+@media print{nav,.actions{display:none}body{background:#fff}}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <span class="brand">schelling</span>
+  <span class="navlinks">
+    <a href="ledger.html">Ledger</a><a href="findings.html">Findings</a>
+    <a href="paper.html">Paper</a><a href="reports/">Reports</a>
+    <a href="https://github.com/hamzagul07/schelling">Source</a>
+  </span>
+</div></nav>
+
+<div class="wrap">
+
+  <p class="eyebrow">open forecasting engine · agpl · research preview</p>
+  <h1>The CIA's forecasting model was never checkable.<span class="turn">Now it is.</span></h1>
+  <p class="lede">An open replication of the Bueno de Mesquita group decision model, with a
+  measured predictability ceiling, a pre-registered successor search, and every forecast sealed
+  by cryptographic hash before the event resolves.</p>
+  <div class="actions">
+    <a class="btn primary" href="paper.html">Read the paper</a>
+    <a class="btn" href="ledger.html">The sealed ledger</a>
+    <a class="btn" href="https://github.com/hamzagul07/schelling">Source</a>
+  </div>
+
+  <section>
+    <div class="stats">
+      <div class="stat"><p class="k">Forecasts sealed</p><p class="v">8</p></div>
+      <div class="stat"><p class="k">Graded</p><p class="v">0</p></div>
+      <div class="stat"><p class="k">First grading</p><p class="v">1 Sep</p></div>
+      <div class="stat"><p class="k">Tests</p><p class="v">442</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The sealed ledger</h2>
+    <p class="sub">Committed before resolution. Anchored in bitcoin. Verifiable by anyone.</p>
+    <div class="ledger">
+      <div class="lhead"><span class="q">Question</span><span class="m">Model</span>
+        <span class="v">Median</span><span class="d">Grades</span></div>
+
+      <div class="lrow"><div class="lmain">
+        <span class="q">US–Iran, stage two</span><span class="m">compromise</span>
+        <span class="v">39.44</span><span class="d">1 Sep 2026</span></div>
+        <p class="hash">d55ffc3e78fc5543b5224f6bb925b5793226913f436f9af7b9a8f20511dd12f6</p></div>
+
+      <div class="lrow"><div class="lmain">
+        <span class="q">US–Iran, stage two</span><span class="m">challenge</span>
+        <span class="v">29.41</span><span class="d">1 Sep 2026</span></div>
+        <p class="hash">3bc97cd4a4ba53fc1255801154c5775281c72dfaf06bcc632fb91263a3c17372</p></div>
+
+      <div class="lrow"><div class="lmain">
+        <span class="q">US–Iran, stage two</span><span class="m">llm judgment</span>
+        <span class="v">41.00</span><span class="d">1 Sep 2026</span></div>
+        <p class="hash">180da06528d6a03128e4acde8e12e50432045e4cfb49d783105345bbc92bf2d4</p></div>
+
+      <div class="lrow"><div class="lmain">
+        <span class="q">IAEA Board, September</span><span class="m">compromise</span>
+        <span class="v">50.52</span><span class="d">5 Oct 2026</span></div>
+        <p class="hash">e8d10117192f1259b9e9ab6250641f82e0c1d50a4c00c2e73ff193580f867f99</p></div>
+
+      <div class="lrow"><div class="lmain">
+        <span class="q">IAEA Board, September</span><span class="m">llm judgment</span>
+        <span class="v">32.00</span><span class="d">5 Oct 2026</span></div>
+        <p class="hash">074e17529b416a7b6deabb75b6e8ceccc62be1f6feba061c44b0ee47979f52cf</p></div>
+    </div>
+    <p class="note">Each row is the SHA-256 of a complete forecast record, committed to this
+    public repository before its event resolved and anchored in the bitcoin blockchain by
+    OpenTimestamps. Nothing here has been graded yet, so no accuracy is claimed.</p>
+    <pre>schelling verify runs/&lt;record&gt;.json
+ots verify ledger-proofs/FORECASTS.md-&lt;hash&gt;.ots -f FORECASTS.md</pre>
+  </section>
+
+  <section>
+    <h2>What the tests found</h2>
+    <p class="sub">Every gate fixed in writing before the result existed. None was moved.</p>
+    <div class="gates">
+      <div class="gate"><span class="g">Replication of the published reference case</span>
+        <span class="n">9.530</span><span class="r">passed</span></div>
+      <div class="gate"><span class="g">Challenge model vs the weighted mean</span>
+        <span class="n">28.31 / 23.64</span><span class="r">failed</span></div>
+      <div class="gate"><span class="g">The same fight with real capabilities</span>
+        <span class="n">26.83 / 22.99</span><span class="r">failed</span></div>
+      <div class="gate"><span class="g">Two successor models, held-out test split</span>
+        <span class="n">+0.83 / +0.48</span><span class="r">failed</span></div>
+      <div class="gate"><span class="g">Flexible oracle — is there signal left?</span>
+        <span class="n">23.84 / 22.99</span><span class="r">ceiling</span></div>
+    </div>
+    <p class="note">The celebrated model loses to the average of its own inputs, and an
+    overfit-capable probe finds nothing beyond that average to extract. What made the lineage
+    work was never the equations — it was the discipline of turning expert judgement into
+    structured numbers. Structure, not magic.</p>
+  </section>
+
+  <footer>
+    Built with Claude Code · <a href="https://github.com/hamzagul07/schelling">github.com/hamzagul07/schelling</a>
+  </footer>
+
+</div>
+</body>
+</html>

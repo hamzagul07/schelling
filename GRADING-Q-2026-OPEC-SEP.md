@@ -74,3 +74,5 @@ round-half-away-from-zero. **The prose governs on any disagreement.** Like the r
 `outcome_map` is excluded from `inputs_hash`, so no sealed record, ledger entry, or timestamp is
 affected; a drift-guard test (`test_opec_outcome_map_matches_prose`) pins the executable form to the
 prose formula and checks the `.5` boundary, exactly as D24.4 did for the band arrays.
+
+**Actual outcome:** 188 → continuum 66. OPEC statement, 2 August 2026: the seven participating countries decided to implement a production adjustment of 188 thousand barrels per day, to be implemented in September 2026. (graded Q-2026-OPEC-SEP; see FORECASTS.md).

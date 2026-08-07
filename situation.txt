@@ -1,0 +1,113 @@
+QUESTION
+========
+question_id: Q-2026-USIRAN-STAGE2
+frozen_at: 2026-07-21
+primary question (binary): Will the United States and Iran advance from the
+first stage of the 17 June 2026 memorandum of understanding into the wider
+"stage two" negotiations envisaged by that MOU, on or before 31 August 2026?
+(The MOU's initial period is 60 days from 17 June, ending around 16 August.)
+
+CONTINUUM (for the underlying bargain being negotiated)
+=======================================================
+label: Shape of a comprehensive US-Iran settlement
+anchor_0: Maximal US/Israel outcome — permanent zero uranium enrichment,
+  enriched stockpile removed from Iran, verified IAEA inspections, binding
+  ballistic-missile limits, end of support for armed groups, Strait of Hormuz
+  unconditionally reopened, no reparations, sanctions relief only phased and
+  conditional.
+anchor_100: Maximal Iran outcome — right to enrich uranium retained (level
+  negotiable), stockpile stays in Iran, missiles untouched, proxies not
+  covered, sanctions lifted comprehensively, frozen assets released, war
+  reparations paid (including by Gulf states), and firm international
+  guarantees against future attack.
+Intermediate positions map proportionally (e.g., a time-limited enrichment
+moratorium with phased sanctions relief and partial inspections sits near the
+middle).
+
+BACKGROUND (all facts paraphrased from the sources listed in sources/;
+primary anchor: UK House of Commons Library briefing CBP-10637, updated
+July 2026)
+==========================================================================
+
+The war. On 28 February 2026, Israel and the United States began a series of
+air strikes on Iran, stating the aims of regime change and destroying Iran's
+nuclear and ballistic-missile programmes. Supreme Leader Ali Khamenei was
+killed in the strikes; Iran appointed his son, Mojtaba Khamenei, as
+successor. Iran retaliated against US bases, Israel, and sites in Arab Gulf
+states, and closed the Strait of Hormuz. Hezbollah attacked Israel from
+Lebanon and Israel launched ground operations there. [Commons CBP-10637]
+
+The ceasefire. After roughly six weeks of conflict, Pakistan's Prime
+Minister announced on 8 April that the US and Iran had agreed a conditional
+two-week ceasefire, with Pakistan mediating talks. The ceasefire was later
+extended, with the US President saying it would hold until discussions
+conclude "one way or another." First direct talks in Islamabad on 11 April
+made progress but produced no agreement: the US side said most points were
+agreed except the nuclear one; Iran's foreign minister Abbas Araghchi said a
+deal was very close but blamed maximalist US demands. [Commons CBP-10637]
+
+The MOU. On 17 June 2026, the US and Iran signed a 14-point memorandum of
+understanding. It sets out a three-stage process: an initial 60-day period of
+talks covering freedom of navigation in the Strait of Hormuz, Iran's nuclear
+and missile programmes, and sanctions. Stage one requires five measures that
+the parties must begin implementing before wider (stage two) talks can occur.
+The text states that Iran will not have a nuclear weapon. [Commons CBP-10637,
+June-July 2026 update]
+
+The core dispute — enrichment. The standing US position is zero uranium
+enrichment in Iran; Iran insists on retaining the right to enrich while
+saying the amount and level are negotiable. Reported bridging ideas include a
+time-limited enrichment moratorium (a US proposal of around 20 years against
+an Iranian counter of about 5) and transferring enriched uranium abroad
+(offered by Russia), which Iran's foreign ministry has flatly refused.
+As of June 2025 the IAEA had verified an Iranian stockpile of more than
+400 kg enriched to 60%. [Commons CBP-10637]
+
+Verification. IAEA inspectors have had no access to Iranian nuclear sites
+since the June 2025 strikes, so the agency cannot verify the programme's
+current state or damage. IAEA chief Rafael Grossi has said an agreement
+without inspections would be illusory; by June 2026 he signalled inspections
+would happen under the interim arrangement while calling their timing not
+essential. The US and Iran have made contradictory statements about whether
+and when sites will be inspected. [Commons CBP-10637; CBS News, June 2026]
+
+Other issues on the table. (1) Hormuz: both sides maintain blockades (Iran's
+closure; a US counter-blockade of ships bound for Iranian ports); the US,
+UK, and UAE demand unconditional reopening, while Iran has floated a new
+security arrangement for the waterway and toll charges. (2) Missiles and
+proxies: the reported US 15-point plan includes missile-production limits and
+an end to Iranian funding of armed groups such as Hezbollah; Iran has
+historically refused to negotiate its missiles, and both Hamas and Hezbollah
+have rejected disarmament. (3) Reconstruction: Iran claims about USD 270
+billion in war damages, demands reparations (including from Gulf states) and
+release of frozen assets; President Pezeshkian has called reparations the
+only way to end the conflict; the US has not engaged the demand. (4) A
+long-term settlement: Iran seeks firm international guarantees against future
+attack, naming possible guarantor powers including China, Pakistan, Turkey
+and Russia, and rejects further temporary ceasefires. [Commons CBP-10637]
+
+Other actors. Israel says its war aims stand and will be completed by
+diplomacy or by force; its foreign minister called removal of enriched
+material from Iran a precondition for ending the war. The Gulf states were
+all struck by Iran and are split: the UAE (hardest hit) is most hawkish —
+demanding reparations and exploring freezes of Iranian assets — while Oman
+keeps a middle road and welcomed the new Supreme Leader, and Qatar stresses
+coexistence. The E3 (UK, France, Germany) triggered UN snapback sanctions in
+October 2025 and, with the EU, back a comprehensive deal with real nuclear
+expertise at the table. China and Pakistan issued a joint five-point plan
+(sovereignty, reopening the strait); Russia welcomes talks, opposes
+sanctions, and has offered to take Iran's enriched uranium. The US has
+deployed additional forces to the region and says they stay until a real
+agreement is complied with. [Commons CBP-10637]
+
+NOTES FOR THE FORMALIZER
+========================
+- Model the question on the continuum above; the binary stage-two question is
+  the resolution target for this run.
+- Aggregating minor actors into blocs is acceptable if disclosed as an
+  assumption.
+- Any claim not traceable to the files in sources/ must appear in the
+  assumptions list.
+- Model Iran's internal factions as separate actors — Supreme Leader/system
+  core, government negotiating team, IRGC/hardliners — with wide ranges and
+  disclosed assumptions where positions are unsourced.

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schelling — an open forecasting engine</title>
+<style>
+:root{
+  --bg:#faf9f6; --panel:#f2f0ea; --card:#fff;
+  --ink:#16160f; --ink-2:#54534b; --ink-3:#8b8980;
+  --line:rgba(0,0,0,.09); --line-2:rgba(0,0,0,.16);
+  --accent:#a8480d; --teal:#0f6e56;
+  --serif:ui-serif,Georgia,"Iowan Old Style",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f0f0d; --panel:#171714; --card:#1b1b18;
+  --ink:#f0efe9; --ink-2:#a6a49b; --ink-3:#74726a;
+  --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.18);
+  --accent:#e29a4e; --teal:#5dcaa5;}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+ font-size:16px;line-height:1.7;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+
+.shell{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:100vh}
+aside{border-right:1px solid var(--line);padding:40px 28px;position:sticky;top:0;height:100vh;
+ display:flex;flex-direction:column;gap:28px;background:var(--panel)}
+.mark{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--ink-2)}
+.idx{display:flex;flex-direction:column;gap:2px;font-size:13px}
+.idx a{color:var(--ink-2);padding:5px 0;display:flex;gap:12px}
+.idx a:hover{color:var(--accent)}
+.idx .n{font-family:var(--mono);font-size:11px;color:var(--ink-3);width:18px}
+.asidefoot{margin-top:auto;font-size:11px;color:var(--ink-3);font-family:var(--mono);line-height:1.8}
+
+main{padding:0}
+.bleed{padding:0 clamp(28px,5vw,96px)}
+.rule{border-top:1px solid var(--line);margin-top:0}
+.sechead{display:flex;align-items:baseline;gap:16px;padding:18px 0 0}
+.sechead .n{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.1em}
+.sechead h2{font-family:var(--serif);font-weight:400;font-size:clamp(22px,2.2vw,30px);margin:0;letter-spacing:-.015em}
+section{padding-bottom:clamp(56px,7vw,110px)}
+
+.hero{padding-top:clamp(64px,9vw,140px);padding-bottom:clamp(40px,5vw,72px)}
+.hero h1{font-family:var(--serif);font-weight:400;letter-spacing:-.025em;line-height:1.06;
+ font-size:clamp(40px,7.2vw,104px);margin:22px 0 0;max-width:15ch}
+.hero h1 .turn{display:block;color:var(--accent)}
+.lede{font-size:clamp(16px,1.35vw,20px);color:var(--ink-2);line-height:1.65;margin:32px 0 0;max-width:64ch}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:36px}
+.cta a{font-size:14px;padding:11px 20px;border:1px solid var(--line-2);border-radius:10px}
+.cta a:hover{background:var(--panel)}
+.cta a.p{border-color:var(--accent);color:var(--accent)}
+
+.grid{display:grid;gap:1px;background:var(--line);border-top:1px solid var(--line);
+ border-bottom:1px solid var(--line);grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.cell{background:var(--bg);padding:26px clamp(20px,2.4vw,34px)}
+.cell .k{font-size:12px;color:var(--ink-3);margin:0 0 8px;font-family:var(--mono);letter-spacing:.06em}
+.cell .v{font-family:var(--serif);font-size:clamp(30px,3.6vw,46px);line-height:1;margin:0;letter-spacing:-.02em}
+.cell .s{font-size:12px;color:var(--ink-3);margin:8px 0 0}
+
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:clamp(24px,3vw,56px);margin-top:28px}
+p.body{color:var(--ink-2);max-width:68ch;margin:16px 0 0}
+.big{font-family:var(--serif);font-size:clamp(20px,2vw,27px);line-height:1.45;
+ color:var(--ink);max-width:34ch;margin:0;letter-spacing:-.01em}
+
+figure{margin:32px 0 0}
+figcaption{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-top:14px;letter-spacing:.04em}
+
+.rows{margin-top:26px;border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:minmax(0,2.4fr) 1fr .8fr 1fr;gap:20px;align-items:baseline;
+ padding:16px 0;border-bottom:1px solid var(--line)}
+.row .q{font-size:16px}
+.row .m{font-size:13px;color:var(--ink-2)}
+.row .v{font-family:var(--mono);font-size:14px}
+.row .d{font-size:13px;color:var(--ink-2);text-align:right}
+.row .h{grid-column:1/-1;font-family:var(--mono);font-size:11px;color:var(--ink-3);
+ word-break:break-all;margin:-6px 0 0}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:26px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px}
+.card .t{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.08em;margin:0 0 10px}
+.card h3{font-family:var(--serif);font-weight:400;font-size:19px;margin:0 0 8px}
+.card p{font-size:14px;color:var(--ink-2);margin:0;line-height:1.65}
+
+pre{background:var(--panel);border-radius:12px;padding:20px 24px;overflow-x:auto;
+ font-family:var(--mono);font-size:13px;line-height:1.75;color:var(--ink-2);margin:24px 0 0}
+footer{border-top:1px solid var(--line);padding:40px 0 80px;font-size:12px;
+ color:var(--ink-3);font-family:var(--mono)}
+@media(max-width:900px){
+ .shell{grid-template-columns:1fr}
+ aside{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;
+  gap:16px;padding:18px 24px;border-right:0;border-bottom:1px solid var(--line)}
+ .idx{flex-direction:row;flex-wrap:wrap;gap:14px}.idx .n{display:none}.asidefoot{display:none}
+ .row{grid-template-columns:1fr 1fr;gap:8px}.row .d{text-align:left}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<aside>
+  <div class="mark">SCHELLING</div>
+  <nav class="idx">
+    <a href="#finding"><span class="n">01</span>The finding</a>
+    <a href="#ledger"><span class="n">02</span>The sealed ledger</a>
+    <a href="#trials"><span class="n">03</span>The trials</a>
+    <a href="#apparatus"><span class="n">04</span>The apparatus</a>
+    <a href="#canon"><span class="n">05</span>The canon</a>
+    <a href="#record"><span class="n">06</span>The record</a>
+    <a href="#paper"><span class="n">07</span>The paper</a>
+    <a href="#verify"><span class="n">08</span>Verify it yourself</a>
+  </nav>
+  <div class="asidefoot">research preview<br>agpl-3.0<br>0 graded · 8 sealed</div>
+</aside>
+
+<main>
+
+<div class="bleed hero">
+  <div class="mark">an open forecasting engine</div>
+  <h1>The CIA's forecasting model was never checkable.<span class="turn">Now it is.</span></h1>
+  <p class="lede">A complete open replication of the Bueno de Mesquita group decision model —
+  the engine the CIA ran as Policon — evaluated against the benchmark it was never tested on,
+  with every live forecast sealed by cryptographic hash before its event resolves.</p>
+  <div class="cta">
+    <a class="p" href="#paper">Read the paper</a>
+    <a href="#ledger">The sealed ledger</a>
+    <a href="#verify">Verify it yourself</a>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="cell"><p class="k">FORECASTS SEALED</p><p class="v">8</p><p class="s">across 2 live questions</p></div>
+  <div class="cell"><p class="k">GRADED</p><p class="v">0</p><p class="s">first grading 1 Sep 2026</p></div>
+  <div class="cell"><p class="k">GATES PRE-REGISTERED</p><p class="v">6</p><p class="s">none moved</p></div>
+  <div class="cell"><p class="k">DECISIONS LOGGED</p><p class="v">161</p><p class="s">every interpretive choice</p></div>
+  <div class="cell"><p class="k">TESTS</p><p class="v">448</p><p class="s">green on every commit</p></div>
+</div>
+
+<section id="finding" class="bleed">
+  <div class="sechead"><span class="n">01</span><h2>The finding</h2></div>
+  <div class="two">
+    <p class="big">The famous model loses to the average of its own inputs — and nothing else
+    beats that average either.</p>
+    <div>
+      <p class="body">Evaluated on 351 expert-coded European legislative controversies with sourced
+      capabilities and reference points, the challenge model fails a gate fixed in writing before
+      the result existed. A pre-registered search for a successor — its data split committed to
+      version control before any model was written — produced two candidates that both failed on
+      held-out data.</p>
+      <p class="body">A deliberately overfit-capable probe then found no signal left to extract.
+      The simple weighted mean is not merely hard to beat; it sits at the ceiling of what these
+      inputs can predict. What made the lineage work was never the equations. It was the discipline
+      of turning expert judgement into structured numbers — structure, not magic.</p>
+    </div>
+  </div>
+</section>
+
+<section id="ledger" class="bleed rule">
+  <div class="sechead"><span class="n">02</span><h2>The sealed ledger</h2></div>
+  <p class="body">Every forecast below was committed to a public repository and anchored in the
+  bitcoin blockchain before its event resolved. Nothing has been graded yet, so no accuracy is
+  claimed.</p>
+
+  <figure>
+  <svg viewBox="0 0 1200 330" width="100%" role="img" aria-label="Eight sealed forecasts plotted on their outcome continuums">
+    <g font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#8b8980">
+      <text x="300" y="18">challenge</text><text x="430" y="18">compromise</text><text x="580" y="18">llm judgment</text>
+      <text x="1190" y="18" text-anchor="end">bar = 80% of simulated worlds</text>
+    </g>
+    <circle cx="290" cy="14" r="4.5" fill="#a8480d"/><circle cx="420" cy="14" r="4.5" fill="#0f6e56"/><circle cx="570" cy="14" r="4.5" fill="#7f77dd"/>
+    <text x="0" y="62" font-family="ui-serif,Georgia,serif" font-size="17" fill="currentColor">US–Iran, stage two</text>
+    <text x="1190" y="62" text-anchor="end" font-size="12" fill="#8b8980">resolves 31 Aug 2026</text>
+    <g stroke="#8b8980" opacity=".25">
+      <line x1="332" y1="74" x2="332" y2="152"/><line x1="510" y1="74" x2="510" y2="152"/>
+      <line x1="634" y1="74" x2="634" y2="152"/><line x1="777" y1="74" x2="777" y2="152"/>
+      <line x1="857" y1="74" x2="857" y2="152"/><line x1="999" y1="74" x2="999" y2="152"/>
+    </g>
+    <text x="572" y="90" text-anchor="middle" font-size="11" fill="#8b8980">deal on US terms</text>
+    <line x1="420" y1="112" x2="818" y2="112" stroke="#a8480d" stroke-width="2.5" opacity=".4" stroke-linecap="round"/>
+    <circle cx="501" cy="112" r="6" fill="#a8480d"/><text x="838" y="116" font-size="12" fill="#8b8980">29.41 · challenge</text>
+    <line x1="565" y1="136" x2="616" y2="136" stroke="#0f6e56" stroke-width="2.5" opacity=".55" stroke-linecap="round"/>
+    <circle cx="591" cy="136" r="6" fill="#0f6e56"/><text x="838" y="140" font-size="12" fill="#8b8980">39.44 · compromise</text>
+    <circle cx="605" cy="160" r="6" fill="#7f77dd"/><text x="838" y="164" font-size="12" fill="#8b8980">41.00 · llm judgment</text>
+    <text x="0" y="214" font-family="ui-serif,Georgia,serif" font-size="17" fill="currentColor">IAEA Board, September</text>
+    <text x="1190" y="214" text-anchor="end" font-size="12" fill="#8b8980">resolves 30 Sep 2026</text>
+    <g stroke="#8b8980" opacity=".25">
+      <line x1="323" y1="226" x2="323" y2="304"/><line x1="457" y1="226" x2="457" y2="304"/>
+      <line x1="590" y1="226" x2="590" y2="304"/><line x1="768" y1="226" x2="768" y2="304"/>
+      <line x1="902" y1="226" x2="902" y2="304"/><line x1="1036" y1="226" x2="1036" y2="304"/>
+    </g>
+    <text x="679" y="242" text-anchor="middle" font-size="11" fill="#8b8980">no new resolution</text>
+    <line x1="494" y1="264" x2="785" y2="264" stroke="#a8480d" stroke-width="2.5" opacity=".4" stroke-linecap="round"/>
+    <circle cx="600" cy="264" r="6" fill="#a8480d"/><text x="838" y="268" font-size="12" fill="#8b8980">45.84 · challenge</text>
+    <line x1="601" y1="288" x2="683" y2="288" stroke="#0f6e56" stroke-width="2.5" opacity=".55" stroke-linecap="round"/>
+    <circle cx="642" cy="288" r="6" fill="#0f6e56"/><text x="838" y="292" font-size="12" fill="#8b8980">50.52 · compromise</text>
+    <circle cx="475" cy="312" r="6" fill="#7f77dd"/><text x="838" y="316" font-size="12" fill="#8b8980">32.00 · llm judgment</text>
+    <line x1="200" y1="326" x2="1160" y2="326" stroke="#8b8980" opacity=".35"/>
+  </svg>
+  <figcaption>FIG. 1 — SEALED FORECAST LANDSCAPE · GENERATED FROM FORECASTS.MD</figcaption>
+  </figure>
+
+  <div class="rows">
+    <div class="row"><span class="q">US–Iran, stage two</span><span class="m">compromise</span>
+      <span class="v">39.44</span><span class="d">1 Sep 2026</span>
+      <span class="h">d55ffc3e78fc5543b5224f6bb925b5793226913f436f9af7b9a8f20511dd12f6</span></div>
+    <div class="row"><span class="q">US–Iran, stage two</span><span class="m">challenge</span>
+      <span class="v">29.41</span><span class="d">1 Sep 2026</span>
+      <span class="h">3bc97cd4a4ba53fc1255801154c5775281c72dfaf06bcc632fb91263a3c17372</span></div>
+    <div class="row"><span class="q">IAEA Board, September</span><span class="m">compromise</span>
+      <span class="v">50.52</span><span class="d">5 Oct 2026</span>
+      <span class="h">e8d10117192f1259b9e9ab6250641f82e0c1d50a4c00c2e73ff193580f867f99</span></div>
+  </div>
+</section>
+
+<section id="trials" class="bleed rule">
+  <div class="sechead"><span class="n">03</span><h2>The trials</h2></div>
+  <p class="body">Six gates, each fixed in writing before the result existed. None was moved.
+  Mean absolute error against the outcome, model versus baseline, on the same scale.</p>
+  <figure>
+  <svg viewBox="0 0 1200 260" width="100%" role="img" aria-label="Model error against baseline error for each pre-registered gate">
+    <g font-size="13" fill="currentColor" font-family="ui-serif,Georgia,serif">
+      <text x="0" y="46">Challenge, equal capabilities</text>
+      <text x="0" y="102">Challenge, real capabilities</text>
+      <text x="0" y="158">Successor — status-quo gravity</text>
+      <text x="0" y="214">Flexible oracle probe</text>
+    </g>
+    <g>
+      <rect x="330" y="30" width="453" height="14" rx="3" fill="#a8480d" opacity=".85"/>
+      <rect x="330" y="48" width="378" height="14" rx="3" fill="#8b8980" opacity=".45"/>
+      <rect x="330" y="86" width="429" height="14" rx="3" fill="#a8480d" opacity=".85"/>
+      <rect x="330" y="104" width="368" height="14" rx="3" fill="#8b8980" opacity=".45"/>
+      <rect x="330" y="142" width="353" height="14" rx="3" fill="#a8480d" opacity=".85"/>
+      <rect x="330" y="160" width="340" height="14" rx="3" fill="#8b8980" opacity=".45"/>
+      <rect x="330" y="198" width="381" height="14" rx="3" fill="#a8480d" opacity=".85"/>
+      <rect x="330" y="216" width="368" height="14" rx="3" fill="#8b8980" opacity=".45"/>
+    </g>
+    <g font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#8b8980">
+      <text x="795" y="42">28.31 / 23.64</text><text x="1000" y="42" fill="#a8480d">failed</text>
+      <text x="795" y="98">26.83 / 22.99</text><text x="1000" y="98" fill="#a8480d">failed</text>
+      <text x="795" y="154">22.09 / 21.26</text><text x="1000" y="154" fill="#a8480d">failed</text>
+      <text x="795" y="210">23.84 / 22.99</text><text x="1000" y="210" fill="#0f6e56">ceiling</text>
+    </g>
+  </svg>
+  <figcaption>FIG. 2 — PRE-REGISTERED TRIALS, IN RUN ORDER · GENERATED FROM BACKTEST.MD</figcaption>
+  </figure>
+</section>
+
+<section id="apparatus" class="bleed rule">
+  <div class="sechead"><span class="n">04</span><h2>The apparatus</h2></div>
+  <p class="body">A question in plain language becomes a formal game, a distribution over outcomes,
+  a strategy brief for every actor, and a sealed record that a stranger can re-run.</p>
+  <div class="cards">
+    <div class="card"><p class="t">I · READ</p><h3>Formalize</h3>
+      <p>A language model reads the evidence and drafts the game — every actor's position, salience
+      and capability, each with a cited source, each guess disclosed. A firewall keeps the concept
+      library from ever supplying a fact.</p></div>
+    <div class="card"><p class="t">II · PREDICT</p><h3>Solve</h3>
+      <p>Two solvers run side by side across ten thousand sampled worlds — the replicated challenge
+      model and the weighted mean that beat it — producing a distribution, not a guess.</p></div>
+    <div class="card"><p class="t">III · ADVISE</p><h3>Strategy</h3>
+      <p>An exhaustive lever search per actor: best own moves, what survives the opponent's answer,
+      who to persuade, and which recommendations are robust rather than knife-edge.</p></div>
+    <div class="card"><p class="t">IV · SEAL</p><h3>Commit</h3>
+      <p>Every forecast is deterministic, so its hash is a complete commitment. Published before the
+      event, anchored in bitcoin, graded in public against a rubric written in advance.</p></div>
+  </div>
+</section>
+
+<section id="canon" class="bleed rule">
+  <div class="sechead"><span class="n">05</span><h2>The canon</h2></div>
+  <div class="two">
+    <p class="big">Twenty-nine findings from a century of conflict research, each with its evidence
+    strength and a rule for coding it.</p>
+    <p class="body">From Mack on why weak actors win, through Walter on third-party guarantees and
+    Fearon's rationalist mechanisms, to Ibn Khaldun on cohesion and comfort. Every card carries a
+    citation, an honesty tag — robust, supported, contested, theory — and the observable evidence
+    that would instantiate it. The library may classify a situation. It may never testify about
+    one.</p>
+  </div>
+</section>
+
+<section id="record" class="bleed rule">
+  <div class="sechead"><span class="n">06</span><h2>The record</h2></div>
+  <p class="body">Every interpretive choice, every gate, every correction — logged, dated, and
+  public. Corrections are made on top, never by erasure.</p>
+</section>
+
+<section id="paper" class="bleed rule">
+  <div class="sechead"><span class="n">07</span><h2>The paper</h2></div>
+  <p class="big" style="margin-top:20px">Structure, Not Magic: An Open Replication and Predictability
+  Ceiling for the Bueno de Mesquita Forecasting Model</p>
+  <p class="body">Every figure in the manuscript regenerates from a repository artifact by a single
+  command. Zero unresolved citations.</p>
+</section>
+
+<section id="verify" class="bleed rule">
+  <div class="sechead"><span class="n">08</span><h2>Verify it yourself</h2></div>
+  <p class="body">Nothing here asks for trust. Clone the repository and check any forecast against
+  its hash, then check the hash against the blockchain.</p>
+<pre>git clone https://github.com/hamzagul07/schelling
+schelling verify runs/&lt;record&gt;.json
+ots verify ledger-proofs/FORECASTS.md-&lt;hash&gt;.ots -f FORECASTS.md</pre>
+</section>
+
+<div class="bleed"><footer>SCHELLING · RESEARCH PREVIEW · 8 SEALED · 0 GRADED · GITHUB.COM/HAMZAGUL07/SCHELLING</footer></div>
+
+</main>
+</div>
+</body>
+</html>

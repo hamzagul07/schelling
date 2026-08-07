@@ -146,3 +146,22 @@ carries the engine's git SHA (`engine_sha`) for provenance, but the integer is w
   re-derivable under the current engine.* Any record in that state is listed here so the ledger itself
   records which forecasts are hash-authenticated but not currently re-derivable. **As of this seal, no
   record is in that state: all declare engine v1, which this build still ships, and all verify 3/3.**
+
+### GRADED — Q-2026-OPEC-SEP
+
+**Actual outcome:** 188 → continuum **66**. mapped 188 thousand b/d (announced collective September adjustment) -> 66 on the 0-100 continuum via the rubric's linear map (continuum = 50 + 0.0833333 * raw, clamped [0, 100], nearest_int_half_up) (rubric: GRADING-Q-2026-OPEC-SEP.md).
+
+**Justification.** OPEC statement, 2 August 2026: the seven participating countries decided to implement a production adjustment of 188 thousand barrels per day, to be implemented in September 2026.
+
+**Citations.** https://www.opec.org/pr-detail/1854611-2-august-2026.html
+
+**Integrity.** OTS [attestation_only]: calendar attestation retrieved, full verification requires a node. Every sealed record was re-verified at grading; see the per-record integrity column.
+
+| model | vintage | median | primary \|med-actual\| | secondary | binary | integrity |
+|---|---|---:|---:|---|---:|---|
+| challenge | v1-thin | 62.009 | 3.991 | crps 2.422 | — | PASS |
+| compromise | v1-thin | 62.450 | 3.550 | crps 2.264 | — | PASS |
+| llm-judgment | v1-thin | 58.000 | 8.000 | — | — | PASS |
+| challenge | v2-sourced | 63.680 | 2.320 | crps 1.611 | — | PASS |
+| compromise | v2-sourced | 63.434 | 2.566 | crps 1.535 | — | PASS |
+| llm-judgment | v2-sourced | 66.000 | 0.000 | — | — | PASS |
