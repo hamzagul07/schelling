@@ -217,13 +217,35 @@ def test_resolve_non_numeric_value_is_footnote_only() -> None:
     assert "verdict[^ev-E-V]" in out and "(FAILED)" not in out and "E-V" in used
 
 
-def test_resolve_deduplicates_footnote_on_repeat_citation() -> None:
-    # Session 52: a tag cited twice gets ONE footnote marker (on first citation); the repeat still
-    # shows its value but adds no second marker (pandoc would otherwise duplicate the footnote).
+def test_resolve_keeps_marker_at_every_citation() -> None:
+    # Session 54, item 2: a tag cited twice keeps its marker at BOTH sites; the PDF build merges the
+    # rendered footnotes so the repeat REUSES its number (Session 52 had dropped the repeat marker).
     ev = {"E-N": {"value": "42", "source": "s", "prov": "p"}}
     out, _u, _ = _resolve_tags("First [E-N]. Later again [E-N].", ev)
-    assert out.count("[^ev-E-N]") == 1
-    assert out.count("(42)") == 2  # the value still shows at both citation sites
+    assert out.count("[^ev-E-N]") == 2  # marker kept at both citation sites
+    assert out.count("(42)") == 2  # the value shows at both
+
+
+def test_value_stated_in_matches_exact_and_numeric_components() -> None:
+    from schelling.paper.assemble import _value_stated_in
+
+    assert _value_stated_in("351", "comprises 351 scoreable issues")  # exact
+    assert _value_stated_in("140 / 105 / 106", "splits of 140, 105, and 106 issues")  # components
+    assert _value_stated_in("23.84 vs 22.99", "error of 23.84 against 22.99")  # components
+    assert _value_stated_in("-0.84", "a gap of 0.84 in its favor")  # sign-insensitive component
+    assert not _value_stated_in("22.09 vs 21.26", "worse by 0.83 scale units")  # absolutes absent
+
+
+def test_resolve_multitag_footnote_only_when_prose_states_all_values() -> None:
+    # Session 54, item 8: a multi-tag citation whose values the prose already spells out resolves
+    # footnote-only (both markers kept), never a redundant "(23.84 vs 22.99, -0.84)" parenthetical.
+    ev = {
+        "E-MAE": {"value": "23.84 vs 22.99", "source": "s", "prov": "p"},
+        "E-GAP": {"value": "-0.84", "source": "s", "prov": "p"},
+    }
+    out, _u, _ = _resolve_tags("error of 23.84 against 22.99, a gap of 0.84 [E-MAE, E-GAP].", ev)
+    assert "(23.84 vs 22.99" not in out
+    assert out.count("[^ev-E-MAE]") == 1 and out.count("[^ev-E-GAP]") == 1
 
 
 def test_assemble_repo_deterministic_complete_and_consistent() -> None:
@@ -238,12 +260,12 @@ def test_assemble_repo_deterministic_complete_and_consistent() -> None:
     assert "Meehl, P.E. (1954)" in a  # verified bibliography appended
     # Declarations sit after the conclusion and before the References (Session 52 formatting pass)
     assert "## Declarations" in a and a.index("## Declarations") < a.index("## References")
-    # D16.2 + Session 52: E-DEU-N confirms the prose "351" so its value is never echoed inline,
-    # and though it is cited more than once it is footnoted exactly once (dedupe): one marker on
-    # its first citation + one definition line = two occurrences of the bracket.
+    # D16.2 + Session 54: E-DEU-N confirms the prose "351" so its value is never echoed inline; its
+    # marker is kept at every citation site (§1 and §3), so the bracket appears twice as a marker
+    # plus once as the single definition line.
     assert "(351)[^ev-E-DEU-N]" not in a  # the number echo is suppressed
     assert "[^ev-E-DEU-N]:" in a  # provenance footnote still defined (once)
-    assert a.count("[^ev-E-DEU-N]") == 2  # one citation marker + one definition line
+    assert a.count("[^ev-E-DEU-N]") == 3  # two citation markers (§1, §3) + one definition line
 
 
 def test_paper_assemble_cli_reports_no_unresolved(tmp_path: Path) -> None:
