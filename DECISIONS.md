@@ -2998,3 +2998,34 @@ rephrased ("the challenge model and the four further methods") so no "five furth
 parentheticals. **(item 9)** Dateline and running header stamped v4 (2026-08-15) with a changes note.
 manuscript.pdf rebuilt: 17 A4 pages, all nine items verified. Gate green: ruff, mypy, pytest, site
 build --check, paper-evidence --check. Nothing sealed changed.
+
+### D55.0 — The preprint build is homed as `schelling preprint build`
+The manuscript + PDF build lived in two scratchpad scripts (D43.0/D51.5) — not in the repo, not
+CI-tested, the reproduction fragile. Session 55 moves it into the package as a first-class command;
+no solver, Monte-Carlo, or sealed number changes. New `src/schelling/preprint/`: `frontmatter.py`
+(`FrontMatter` + `load_front_matter`, read from `paper/preprint/front-matter.toml` so a version bump
+is a config edit, not a code change), `manuscript.py` (`assemble_manuscript`: DRAFT.md → manuscript.md
+by dropping the paper-assemble banner and prepending the title/author/contact/date/keywords block +
+version note), and `pdf.py` (`inline_figures`, `reuse_footnotes`, `markdown_to_html`, `build_pdf`).
+The CLI gains a `preprint` sub-app with `build` (`--md-only` skips the PDF). The homed command
+reproduces the committed `manuscript.md` **and** `manuscript.pdf` byte-for-byte — verified — so it is
+an exact drop-in for the scratchpad scripts. **Toolchain (PDF only):** the `pandoc` binary and
+WeasyPrint + pango/cairo, both checked with a friendly install hint and neither a package dependency
+(CI builds no PDF); documented in a new `paper/preprint/README.md`. **Item 2's footnote-reuse core is
+now in the repo and tested** — `tests/test_preprint.py` (8 tests) includes the required fixture test
+that duplicate footnotes merge and renumber to one canonical note, plus a drift guard that
+`assemble_manuscript(DRAFT.md, front-matter)` equals the committed manuscript.md byte-for-byte. Gate
+green: ruff, format, mypy, pytest, paper-evidence --check, site build --check. Nothing sealed changed.
+
+### D55.1 — Preprint v5: ORCID iD and a short AI-use statement on page one
+Two additions to the manuscript, built with the now-homed command; prose/metadata only, nothing
+sealed. **(1)** The author's ORCID iD (`0009-0004-5391-4030`) is added to the title block beside the
+corresponding-author email, as a resolvable link — a new `orcid` field on `FrontMatter` and in
+`front-matter.toml`, rendered by `assemble_manuscript`. **(2)** A two-sentence **AI-use** statement is
+placed immediately after the abstract (in `00-abstract.md`, so it is part of the paper and appears on
+page one): both hypothesis generation and implementation used AI assistance under the pre-registered
+gates, with all protocols and verdicts belonging to the deterministic apparatus — the full statement
+stays in the Declarations. Dateline and running header stamped **v5** (2026-08-15). manuscript.pdf
+rebuilt via `schelling preprint build`: 17 A4 pages, both items verified on page one; the drift-guard
+test still holds (assemble(DRAFT, front-matter) == committed manuscript.md). Gate green: ruff, format,
+mypy, pytest, paper-evidence --check, site build --check. Nothing sealed changed.

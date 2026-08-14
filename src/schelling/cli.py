@@ -78,6 +78,10 @@ evidence_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(evidence_app, name="evidence")
+preprint_app = typer.Typer(
+    help="Build the SSRN preprint from the assembled paper (Session 55, D55).", no_args_is_help=True
+)
+app.add_typer(preprint_app, name="preprint")
 
 # Shown when the bge-m3 knowledge extra is needed but not installed (D7.0c).
 _KNOWLEDGE_HINT = (
@@ -2533,6 +2537,48 @@ def evidence_archive(
     )
     _emit_claims(claims, out)
     typer.echo(sess.spend_report())
+
+
+@preprint_app.command("build")
+def preprint_build(
+    repo_root: Path = typer.Option(Path("."), "--repo-root", help="Repository root."),
+    md_only: bool = typer.Option(
+        False, "--md-only", help="Write manuscript.md only; skip the PDF (no pandoc/WeasyPrint)."
+    ),
+) -> None:
+    """Assemble paper/preprint/manuscript.md from paper/DRAFT.md + front matter, then build the PDF.
+
+    manuscript.md = the assembled paper with a title/author/contact/date/keywords block prepended
+    (front matter from paper/preprint/front-matter.toml). The PDF step needs the pandoc binary and
+    WeasyPrint + pango/cairo (paper/preprint/README.md); with --md-only, or when those are absent,
+    the manuscript markdown is still produced and the PDF is skipped with a friendly message.
+    """
+    from schelling.preprint.frontmatter import load_front_matter
+    from schelling.preprint.manuscript import assemble_manuscript
+    from schelling.preprint.pdf import build_pdf
+
+    pre = repo_root / "paper" / "preprint"
+    draft = repo_root / "paper" / "DRAFT.md"
+    if not draft.exists():
+        typer.echo(f"{draft} not found — run `schelling paper-assemble` first.", err=True)
+        raise typer.Exit(code=2)
+    fm = load_front_matter(pre / "front-matter.toml")
+    manuscript = assemble_manuscript(draft.read_text(), fm)
+    md_out = pre / "manuscript.md"
+    md_out.write_text(manuscript)
+    typer.echo(f"manuscript.md: {len(manuscript.split())} words → {md_out}")
+    if md_only:
+        return
+    pdf_out = pre / "manuscript.pdf"
+    try:
+        build_pdf(manuscript, pre / "figures", pdf_out, runhead=fm.runhead)
+    except RuntimeError as exc:
+        typer.echo(str(exc), err=True)
+        typer.echo(
+            "manuscript.md written; PDF skipped — install the toolchain and re-run.", err=True
+        )
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"manuscript.pdf: {pdf_out.stat().st_size} bytes → {pdf_out}")
 
 
 if __name__ == "__main__":  # pragma: no cover

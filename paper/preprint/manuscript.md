@@ -1,16 +1,18 @@
 # Structure, Not Magic: An Open Replication and Predictability Ceiling for the Bueno de Mesquita Forecasting Model
 
 **Hamza Gul Hassan**  
-Independent Researcher · Correspondence: hamzagulkhoso@gmail.com  
-Preprint · 2026-08-15 · v4
+Independent Researcher · Correspondence: hamzagulkhoso@gmail.com · ORCID: [0009-0004-5391-4030](https://orcid.org/0009-0004-5391-4030)  
+Preprint · 2026-08-15 · v5
 
 **Keywords:** Bueno de Mesquita model; Policon; expected-utility model; expert elicitation; political forecasting; reproducibility; pre-registration; weighted mean; predictability ceiling; EU legislative bargaining; DEU dataset; open science; commit-reveal ledger; game theory
 
-*Changes since v3 (review corrections): single-command claims qualified to the one documented third-party dataset; footnote numbers reused on repeat citation; the further-concept count reconciled to four across the abstract, §1, and §4.1; the differing §4 baselines explained; MAE / RMSE defined at first use; Arregui & Perarnaud (2022) and Bueno de Mesquita (2011) now cited in text; §8 grade figures written in prose; a §5 cross-reference corrected.*
+*Changes since v4: an ORCID iD added to the title block; a two-sentence AI-use statement added immediately after the abstract, with the full statement remaining in the Declarations.*
 
 ## Abstract
 
 The expected-utility group-decision model of Bueno de Mesquita — deployed by the CIA as Policon and long credited with striking forecasting accuracy — has never had a complete open implementation or a fair public evaluation. We provide both. Our replication, built from the Scholz–Calbert–Smith reconstruction with every interpretive choice logged, reproduces the published reference case. Evaluated on 351 expert-coded EU legislative controversies with sourced actor capabilities and reference points, the model fails a pre-registered accuracy gate against a far simpler benchmark: the capability-and-salience-weighted mean of actor positions. A pre-registered successor search — its data split committed to version control before any fitting — produces two structurally-motivated candidate models; a tournament of four further solution concepts drawn from the field's other traditions extends the comparison to eight in all, counting the weighted mean and the challenge model, and none separates from the mean on held-out data. A flexible cross-validated oracle then shows the weighted mean sits at the extractable-signal ceiling for this domain and input set. We conclude that the lineage's documented successes, including its models outperforming the very analysts who supplied their inputs, are attributable to structured elicitation rather than to solution dynamics: structure, not magic. The model's home-turf claim — superiority in coercive settings — remains open, pending an ex-ante coded case library we introduce alongside a live, cryptographically sealed forecast ledger, which has now recorded its first graded cycle. All results regenerate by one command from repository artifacts, given the one third-party dataset the paper documents.
+
+**AI use.** Both hypothesis generation — two of the eight compared solution concepts were proposed by a large language model — and implementation, the solver, search harness, and scoring code, used AI assistance, in every case under a pre-registered protocol whose train/development/test split and acceptance thresholds were committed to version control before any code or model existed. All data, protocols, execution, and verdicts belong to the deterministic apparatus; the full statement is in the Declarations.
 
 ## 1. Introduction
 
