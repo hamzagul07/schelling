@@ -459,6 +459,142 @@ def _ledger_items(repo_root: Path) -> tuple[list[EvidenceItem], list[str]]:
     return items, []
 
 
+# --------------------------------------------------------------------------- graded cycle (§8)
+# The first graded question (D51): its announced outcome, per-record scores, and the
+# within-question vintage comparison are read from the GRADED block of FORECASTS.md — the same
+# commit-reveal artifact the ledger rows come from (the runs/ record files are gitignored, so the
+# published grade table *is* the artifact). No number here is recomputed or hand-typed.
+_GRADE_QUESTION = "Q-2026-OPEC-SEP"
+_GRADE_HEADER = f"### GRADED — {_GRADE_QUESTION}"
+_GRADE_ACTUAL = re.compile(
+    r"\*\*Actual outcome:\*\*\s*(?P<raw>-?[\d.]+)\D+?continuum\s*\*\*(?P<cont>-?[\d.]+)\*\*"
+)
+_GRADE_ROW = re.compile(
+    r"^\|\s*(?P<model>challenge|compromise|llm-judgment)\s*\|\s*"
+    r"(?P<vintage>v1-thin|v2-sourced)\s*\|\s*[\d.]+\s*\|\s*"
+    r"(?P<primary>[\d.]+)\s*\|\s*(?P<secondary>[^|]*?)\s*\|"
+)
+_GRADE_FAMILIES = {"challenge": "challenge", "compromise": "compromise", "llm-judgment": "llm"}
+
+
+def _grade_items(repo_root: Path) -> tuple[list[EvidenceItem], list[str]]:
+    """Evidence for §8's first graded cycle, parsed from FORECASTS.md's GRADED block (D51).
+
+    Emits the announced outcome and settlement, the count of re-verified records, the per-family
+    thin->sourced absolute-error pair, and the two sourced-solver rows whose primary metric and
+    CRPS disagree on which was closer — every value quoted from the published grade table.
+    """
+    path = repo_root / "FORECASTS.md"
+    if not path.exists():
+        return [], ["grade: FORECASTS.md not found"]
+    text = path.read_text()
+    start = text.find(_GRADE_HEADER)
+    if start == -1:
+        return [], [f"grade: no '{_GRADE_HEADER}' block (question not yet graded)"]
+    block = text[start:]
+    nxt = block.find("\n### ", 1)  # keep only this question's grade block
+    if nxt != -1:
+        block = block[:nxt]
+
+    am = _GRADE_ACTUAL.search(block)
+    if am is None:
+        return [], ["grade: GRADED block present but no parseable Actual-outcome line"]
+
+    prov = _git_short(repo_root, "FORECASTS.md")
+    sec = "8. Ledger (graded)"
+    src = "FORECASTS.md"
+
+    scores: dict[tuple[str, str], tuple[float, float | None]] = {}
+    for line in block.splitlines():
+        rm = _GRADE_ROW.match(line)
+        if rm is None:
+            continue
+        crps_m = re.search(r"crps\s+([\d.]+)", rm["secondary"])
+        scores[(rm["model"], rm["vintage"])] = (
+            float(rm["primary"]),
+            float(crps_m.group(1)) if crps_m else None,
+        )
+
+    items: list[EvidenceItem] = [
+        EvidenceItem(
+            "E-GRADE-RAW",
+            sec,
+            "Announced OPEC+ September adjustment",
+            am["raw"],
+            src,
+            prov,
+            "thousand b/d; OPEC statement 2 Aug 2026 (cited in GRADING-Q-2026-OPEC-SEP.md)",
+        ),
+        EvidenceItem(
+            "E-GRADE-ACTUAL",
+            sec,
+            "Settlement on the 0-100 continuum",
+            am["cont"],
+            src,
+            prov,
+            "pre-registered linear rubric: 50 + adjustment/600*50, clamped, nearest integer",
+        ),
+        EvidenceItem(
+            "E-GRADE-NSCORED",
+            sec,
+            "Sealed records re-verified and scored at grading",
+            str(len(scores)),
+            src,
+            prov,
+            "2 input vintages x 3 model families; every record PASS at grading",
+        ),
+    ]
+
+    missing: list[str] = []
+    for model, label in _GRADE_FAMILIES.items():
+        thin = scores.get((model, "v1-thin"))
+        sourced = scores.get((model, "v2-sourced"))
+        if thin is None or sourced is None:
+            missing.append(f"grade: {model} missing a vintage row in the GRADED block")
+            continue
+        items.append(
+            EvidenceItem(
+                f"E-GRADE-{label}",
+                sec,
+                f"{model} absolute error, thin vintage then sourced",
+                f"{_f3(thin[0])} → {_f3(sourced[0])}",
+                src,
+                prov,
+                "abs. error of the median; sourced input scored better than thin (within-question)",
+            )
+        )
+
+    ch = scores.get(("challenge", "v2-sourced"))
+    co = scores.get(("compromise", "v2-sourced"))
+    if ch is not None and co is not None and ch[1] is not None and co[1] is not None:
+        items.append(
+            EvidenceItem(
+                "E-GRADE-SOLVER-AE",
+                sec,
+                "Sourced solvers, abs. error: challenge vs compromise",
+                f"{_f3(ch[0])} vs {_f3(co[0])}",
+                src,
+                prov,
+                "primary metric: challenge is nearer the settlement",
+            )
+        )
+        items.append(
+            EvidenceItem(
+                "E-GRADE-SOLVER-CRPS",
+                sec,
+                "Sourced solvers, CRPS: compromise vs challenge",
+                f"{_f3(co[1])} vs {_f3(ch[1])}",
+                src,
+                prov,
+                "secondary metric: compromise is nearer — disagrees with absolute error",
+            )
+        )
+    else:
+        missing.append("grade: sourced-solver CRPS rows absent; cannot form the disagreement tags")
+
+    return items, missing
+
+
 # --------------------------------------------------------------------------- test count
 _CTX_ROW = re.compile(
     r"^\|\s*(?P<model>[^|]+?)\s*\|\s*(?P<mae>\d+\.\d+)\s*\|\s*(?P<subset>[^|]+?)"
@@ -659,6 +795,10 @@ def build_evidence(repo_root: Path) -> EvidenceBundle:
     ledger_items, ledger_open = _ledger_items(repo_root)
     bundle.items += ledger_items
     bundle.open_questions += ledger_open
+
+    grade_items, grade_open = _grade_items(repo_root)
+    bundle.items += grade_items
+    bundle.open_questions += grade_open
 
     bundle.items += _context_items(repo_root)
 

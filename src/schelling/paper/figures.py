@@ -132,18 +132,27 @@ def _leaderboard_svg(report: SuccessorReport) -> str:
                 "yes" if c.beats_compromise else "no",
             )
         )
-    colx = [30, 300, 380, 470, 610]
-    out = _svg_open("Successor leaderboard — TEST scored once (R1)")
+    # Own (wider, shorter) canvas: the four data columns are start-anchored with generous gaps so
+    # the ~120px "delta [95% CI]" cell never overruns the neighbouring MAE column — the shared
+    # _W=640 layout packed comp-MAE (end@380) and delta (end@470) close enough to overlap.
+    w, h = 760, 214
+    colx = [30, 340, 445, 548, 730]
+    anchors = ["start", "start", "start", "start", "end"]
+    out = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" '
+        f'font-family="Helvetica,Arial,sans-serif">',
+        f'<text x="{w // 2}" y="26" text-anchor="middle" font-size="17" font-weight="bold" '
+        f'fill="{_PInk}">Successor leaderboard — TEST scored once (R1)</text>',
+    ]
     y = 70
     for r, row in enumerate(rows):
         weight = "bold" if r == 0 else "normal"
-        for cx, cell in zip(colx, row, strict=True):
-            anchor = "end" if cx > 360 else "start"
+        for cx, cell, anchor in zip(colx, row, anchors, strict=True):
             out.append(
                 f'<text x="{cx}" y="{y}" text-anchor="{anchor}" font-size="12" '
                 f'font-weight="{weight}" fill="{_PInk}">{cell}</text>'
             )
-        out.append(f'<line x1="30" y1="{y + 8}" x2="610" y2="{y + 8}" stroke="#ddd"/>')
+        out.append(f'<line x1="30" y1="{y + 8}" x2="730" y2="{y + 8}" stroke="#ddd"/>')
         y += 34
     sc = report.split_counts
     out.append(

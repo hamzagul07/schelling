@@ -10,7 +10,7 @@ Structure, Not Magic: An Open Replication and Predictability Ceiling for the Bue
 
 ## Author
 
-Hassan [surname], Independent Researcher.
+Hamza Gul Hassan, Independent Researcher.
 
 ## Abstract
 
