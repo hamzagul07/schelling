@@ -35,6 +35,19 @@ def _is_numeric_value(value: str) -> bool:
     return bool(_NUMERIC_LEAD.match(value))
 
 
+def _value_stated_in(value: str, sentence: str) -> bool:
+    """True when the sentence already states the value — the exact string, or every numeric
+    component of it. The component form lets a composite value ("140 / 105 / 106", "23.84 vs 22.99")
+    resolve footnote-only when the prose already lists those numbers, not only when it repeats the
+    value verbatim (Session 54, item 8, extends D16.2)."""
+    if re.search(r"(?<![\w.])" + re.escape(value) + r"(?![\w.])", sentence):
+        return True
+    numbers = re.findall(r"\d+(?:\.\d+)?", value)
+    if not numbers:
+        return False
+    return all(re.search(r"(?<![\w.])" + re.escape(n) + r"(?![\w.])", sentence) for n in numbers)
+
+
 def _current_sentence(prefix: str) -> str:
     """The prose of the sentence that ``prefix`` (text before a citation) ends in."""
     cut = max(prefix.rfind(";"), prefix.rfind(":"), prefix.rfind("\n"))
@@ -109,7 +122,6 @@ def _resolve_tags(
     """Replace every bracketed ``[…E-tag…]`` with resolved values + footnote markers."""
     used: dict[str, dict[str, str]] = {}
     todos: list[str] = []
-    marked: set[str] = set()  # tags whose footnote marker was already emitted (dedupe, Session 52)
 
     def repl_group(m: re.Match[str]) -> str:
         space, inner = m.group(1), m.group(2)
@@ -127,20 +139,22 @@ def _resolve_tags(
             return item["value"]
 
         resolved = _TAG.sub(repl_tag, inner)
-        # One footnote per distinct E-tag (Session 52): emit the ``[^ev-tag]`` marker only on the
-        # tag's FIRST citation. A repeat shows its value but adds no second footnote — pandoc
-        # renders a re-referenced footnote as a duplicate, so we dedupe at the source.
-        fresh = [t for t in dict.fromkeys(marks) if t not in marked]
-        footnotes = "".join(f"[^ev-{t}]" for t in fresh)
-        marked.update(fresh)
-        if len(_TAG.findall(inner)) == 1 and marks:
-            value = used[marks[0]]["value"]
-            # (a) D16.2: the value already appears in the current sentence's prose -> footnote-only.
+        # Every citation keeps its footnote marker, repeats included (Session 54, item 2): the PDF
+        # build merges the rendered footnotes so a repeat REUSES its number rather than adding a
+        # duplicate. (Session 52 dropped the repeat marker; the reviewer wants the number back.)
+        footnotes = "".join(f"[^ev-{t}]" for t in dict.fromkeys(marks))
+        if marks:
+            distinct = list(dict.fromkeys(marks))
             sentence = _current_sentence(m.string[: m.start()])
-            in_prose = re.search(r"(?<![\w.])" + re.escape(value) + r"(?![\w.])", sentence)
-            # (b) Session 52: a non-numeric value (verdict/boolean/description) -> footnote-only,
-            #     never an inline "(FAILED)"/"(True)" parenthetical.
-            if in_prose or not _is_numeric_value(value):
+            # Footnote-only when EVERY cited value is already stated in the sentence prose or by its
+            # numeric components (D16.2 + item 8, single- or multi-tag), or when a lone value is a
+            # non-numeric verdict/description (Session 52) — never a redundant "(351)" echo, a bare
+            # "(FAILED)"/"(188)", or a "(23.84 vs 22.99)" already spelled out in the prose.
+            all_stated = all(_value_stated_in(used[t]["value"], sentence) for t in distinct)
+            lone_nonnumeric = len(distinct) == 1 and not _is_numeric_value(
+                used[distinct[0]]["value"]
+            )
+            if all_stated or lone_nonnumeric:
                 return footnotes
         return f"{space}({resolved}){footnotes}"
 

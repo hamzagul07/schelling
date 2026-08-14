@@ -2960,3 +2960,41 @@ with `pdffonts` — with Times New Roman and PT-Serif as glyph fallbacks); title
 italic (figure labels Helvetica, from the SVGs); footnotes 8.4 pt; running header + page numbers
 8 pt. **(4)** manuscript.pdf rebuilt, still 16 A4 pages, v3 dated 2026-08-15. Gate green: ruff, mypy,
 site build --check, paper-evidence --check, assemble tests. Nothing sealed changed.
+
+### D54.0 — v4 rendering: footnote NUMBER reuse, and extended value suppression
+Review corrections before upload (Session 54, branch paper-v4); prose and rendering only, no artifact
+number changed, nothing sealed. Two mechanism changes. **(a) Footnote reuse (item 2), reversing the
+D52.7 marker-dedup.** The reviewer wants a repeated E-tag citation to reuse its footnote *number*, not
+lose its marker. `assemble.py` again emits the `[^ev-tag]` marker at every citation site; the preprint
+PDF build (`build_pdf.py`) then post-processes pandoc's HTML — pandoc renders each re-reference as a
+*duplicate* note — grouping notes by content, keeping the first of each, renumbering 1..K, and
+rewriting every body reference to point at and display its note's canonical number. Verified: 37
+distinct footnotes, and E-DEU-N's two citations (§1, §3) and E-LEDGER's two (§8) each resolve to one
+shared number. **(b) Extended suppression (item 8a).** `_value_stated_in` now resolves a citation
+footnote-only when the sentence states the value *or every numeric component of it* — so a composite
+like `140 / 105 / 106` (§4 split) or `23.84 vs 22.99, -0.84` (§5 oracle, a multi-tag group) no longer
+echoes a redundant parenthetical the prose already spells out; the single-tag-only guard is gone so
+multi-tag groups suppress too. Tests updated (`test_resolve_keeps_marker_at_every_citation`,
+`test_value_stated_in_matches_exact_and_numeric_components`,
+`test_resolve_multitag_footnote_only_when_prose_states_all_values`; E-DEU-N bracket count 2→3). NOTE:
+the footnote-reuse post-processing lives in the scratchpad preprint build (no CLI builder, D43.0/D51.5),
+so it is not CI-tested; the assembler changes are.
+
+### D54.1 — v4 prose corrections from review
+Prose only, no cited number changed. **(item 1)** The abstract's and §1's "regenerate from public
+artifacts by a single command" is qualified to "by one command from repository artifacts, given the one
+third-party dataset the paper documents", matching the Declarations. **(item 3)** §4 explains in one
+sentence why the two candidates face different compromise baselines (21.26 vs 21.09): the gravity model
+is defined only on reference-point issues and scored on that subset, the regime model on the full test
+split — a subset difference, not different data. **(item 4)** The paired `MAE / RMSE` notation is
+defined at first use in §3. **(item 5)** §5's "we take up the division in Section 8" → Section 9.
+**(item 6)** Arregui & Perarnaud (2022) is cited where DEU III is introduced (§3) and Bueno de Mesquita
+(2011) where §3 refers to the inventor's own later comparisons; a sweep confirms every bibliography
+entry is now cited in text. **(item 7)** The further-concept count is reconciled to one accounting —
+eight concepts = the weighted mean, the challenge model, the two successor candidates, and four further
+methods; the abstract's "five further" → "four further" (matching §1), and §4.1's provenance note is
+rephrased ("the challenge model and the four further methods") so no "five further" remains. **(item
+8b)** §8's `188`, `66`, `6` are written in the prose (with footnotes), never as bare mid-sentence
+parentheticals. **(item 9)** Dateline and running header stamped v4 (2026-08-15) with a changes note.
+manuscript.pdf rebuilt: 17 A4 pages, all nine items verified. Gate green: ruff, mypy, pytest, site
+build --check, paper-evidence --check. Nothing sealed changed.
