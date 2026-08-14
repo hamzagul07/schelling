@@ -236,6 +236,8 @@ def test_assemble_repo_deterministic_complete_and_consistent() -> None:
     assert "figures/fig_deu_error_histogram.svg" in a and "figures/fig_r1_split.svg" in a
     assert "Section 9 limitations. Section 10 concludes." in a  # roadmap fixed (item 5)
     assert "Meehl, P.E. (1954)" in a  # verified bibliography appended
+    # Declarations sit after the conclusion and before the References (Session 52 formatting pass)
+    assert "## Declarations" in a and a.index("## Declarations") < a.index("## References")
     # D16.2 + Session 52: E-DEU-N confirms the prose "351" so its value is never echoed inline,
     # and though it is cited more than once it is footnoted exactly once (dedupe): one marker on
     # its first citation + one definition line = two occurrences of the bracket.

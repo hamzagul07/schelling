@@ -122,6 +122,16 @@ We set out to close an anomaly: a celebrated forecasting model, credited with re
 
 Three recommendations follow for the field. Retire the solution-concept question for cooperative bargaining; the evidence, ours and the literature's, says it is settled. Redirect scrutiny to where the signal enters — elicitation quality and input provenance — including the new question of language-model-assisted elicitation, which our released software implements and which will need exactly the audit standards this domain has lacked. And adopt verifiability as infrastructure, not aspiration: pre-registration in version control and commit-reveal sealing cost almost nothing, and they would have made the last forty years of this literature checkable. One question stays deliberately open, with its apparatus published, its threshold pre-registered, and its verdict withheld until the evidence exists: whether the challenge dynamics earn their keep where coercion, not consensus, sets the rules. We built the courtroom; the trial awaits its evidence. The founding claim of this lineage could never be checked. Every claim in this paper can be. That difference, more than any model or any verdict, is what we hope survives.
 
+## Declarations
+
+**Funding.** This work received no external funding; it was self-funded.
+
+**Competing interests.** The author declares no competing interests.
+
+**Data availability.** The code and all derived artifacts — the backtest tables, the sealed forecast ledger, the evidence file, and the figures — are in the public repository at https://github.com/hamzagul07/schelling. The DEU III dataset is not redistributed here and must be obtained from its open deposit (doi:10.34810/data53, CC BY 4.0) and placed at `data/deu/`. With that dataset in place, the fair-fight, successor-search, and predictability-ceiling results of Sections 3–5 regenerate by a single command; without it, the replication reference case (Section 2), the case library (Section 7), and the sealed forecast ledger (Section 8) still regenerate from committed artifacts, while the DEU-dependent tables are reported as open questions.
+
+**AI-assistance disclosure.** Both hypothesis generation and implementation used AI assistance under pre-registered constraints. The two fitted successor candidates were proposed by a large language model (Section 4), and the implementation — the solver, the search harness, and the scoring code — was developed with AI coding assistance. In every case the train/development/test split and all acceptance thresholds were committed to version control before any model or scoring code was written, so the repository's history certifies that no code, whatever its authorship, could consult held-out data before its verdict was fixed; the protocols, execution, and verdicts belong entirely to the deterministic apparatus.
+
 ## References
 
 - Achen, C.H. (2006). "Evaluating political decision-making models." Chapter 10 in R. Thomson, F.N. Stokman, C.H. Achen & T. König (eds.), *The European Union Decides*, pp. 264–298. Cambridge University Press.
