@@ -4,9 +4,9 @@
 Independent Researcher · Correspondence: hamzagulkhoso@gmail.com  
 Preprint · 2026-08-15 · v3
 
-Data and code availability: the code and all derived artifacts (backtest tables, the sealed ledger, the evidence file, and the figures) are in the repository, https://github.com/hamzagul07/schelling. The DEU III dataset is not redistributed here; it must be obtained from its open deposit (doi:10.34810/data53, CC BY 4.0) and placed at `data/deu/`. With that data present, the fair-fight, successor-search, and predictability-ceiling results (Sections 3–5) regenerate by a single command; without it, the replication reference case (Section 2), the case library (Section 7), and the sealed forecast ledger (Section 8) still regenerate from committed artifacts, while the DEU-dependent tables are reported as open questions.
+**Keywords:** Bueno de Mesquita model; Policon; expected-utility model; expert elicitation; political forecasting; reproducibility; pre-registration; weighted mean; predictability ceiling; EU legislative bargaining; DEU dataset; open science; commit-reveal ledger; game theory
 
-*Changes since v2: first graded ledger cycle recorded in §8; abstract, §1, and §5 updated to the eight-concept tournament; references cleaned; provenance footnotes deduplicated; a data-availability statement and corresponding-author contact added; AI coding assistance disclosed in §4.*
+*Changes since v2: first graded ledger cycle recorded in §8; abstract, §1, and §5 updated to the eight-concept tournament; references cleaned; provenance footnotes deduplicated; corresponding-author contact and keywords added; a Declarations section (funding, competing interests, data availability, AI assistance) added; AI coding assistance also disclosed in §4.*
 
 ## Abstract
 
@@ -127,6 +127,16 @@ The measurement floor comes first, because it bounds everything quantitative. Th
 We set out to close an anomaly: a celebrated forecasting model, credited with remarkable accuracy inside a classified program, that no one could independently run. Closing it took four steps, each smaller than the legend. An open implementation reproduced the published behavior. A fair evaluation on the canonical benchmark — the model's real inputs restored — found it beaten by the weighted mean of its own inputs. A pre-registered search for a better successor produced two candidates that failed on held-out data, one by collapsing onto the baseline it was built to beat. And a ceiling probe found no signal left to extract: on these data, under these inputs, the simple aggregate is not merely hard to beat; there is nothing beyond it to find. What remains of the legend, we argued, is real but relocated — the discipline of structured elicitation, a technology decision science has validated for seventy years, performing exactly as that literature predicts while the equations above it performed theater.
 
 Three recommendations follow for the field. Retire the solution-concept question for cooperative bargaining; the evidence, ours and the literature's, says it is settled. Redirect scrutiny to where the signal enters — elicitation quality and input provenance — including the new question of language-model-assisted elicitation, which our released software implements and which will need exactly the audit standards this domain has lacked. And adopt verifiability as infrastructure, not aspiration: pre-registration in version control and commit-reveal sealing cost almost nothing, and they would have made the last forty years of this literature checkable. One question stays deliberately open, with its apparatus published, its threshold pre-registered, and its verdict withheld until the evidence exists: whether the challenge dynamics earn their keep where coercion, not consensus, sets the rules. We built the courtroom; the trial awaits its evidence. The founding claim of this lineage could never be checked. Every claim in this paper can be. That difference, more than any model or any verdict, is what we hope survives.
+
+## Declarations
+
+**Funding.** This work received no external funding; it was self-funded.
+
+**Competing interests.** The author declares no competing interests.
+
+**Data availability.** The code and all derived artifacts — the backtest tables, the sealed forecast ledger, the evidence file, and the figures — are in the public repository at https://github.com/hamzagul07/schelling. The DEU III dataset is not redistributed here and must be obtained from its open deposit (doi:10.34810/data53, CC BY 4.0) and placed at `data/deu/`. With that dataset in place, the fair-fight, successor-search, and predictability-ceiling results of Sections 3–5 regenerate by a single command; without it, the replication reference case (Section 2), the case library (Section 7), and the sealed forecast ledger (Section 8) still regenerate from committed artifacts, while the DEU-dependent tables are reported as open questions.
+
+**AI-assistance disclosure.** Both hypothesis generation and implementation used AI assistance under pre-registered constraints. The two fitted successor candidates were proposed by a large language model (Section 4), and the implementation — the solver, the search harness, and the scoring code — was developed with AI coding assistance. In every case the train/development/test split and all acceptance thresholds were committed to version control before any model or scoring code was written, so the repository's history certifies that no code, whatever its authorship, could consult held-out data before its verdict was fixed; the protocols, execution, and verdicts belong entirely to the deterministic apparatus.
 
 ## References
 

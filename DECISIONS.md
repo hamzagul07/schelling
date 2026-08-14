@@ -2939,3 +2939,24 @@ so git history certifies no code consulted held-out data before its verdict), al
 LLM-hypothesis-generation note. **(4)** The v3 version note updated to record all of the above; dateline
 and running header stay `2026-08-15 · v3`. Prose/metadata only — no figure or artifact number changed;
 manuscript.pdf rebuilt and verified at 16 A4 pages with every item on page one. Nothing sealed changed.
+
+### D53.2 — Formatting pass: keywords, a Declarations section, typography reported
+A pre-upload formatting pass; prose/layout only, no figure or artifact number changed, nothing
+sealed. **(1)** The title block gains a **Keywords** line (the list already in
+`paper/preprint/ssrn-metadata.md`) beside the corresponding-author email. **(2)** A short
+**Declarations** section is added at the end of `10-conclusion.md`, so it assembles after the
+conclusion and before the References: *Funding* (none — self-funded), *Competing interests* (none),
+*Data availability* (repository link + the DEU III deposit doi:10.34810/data53 and which results
+require it vs. regenerate without it), and the *AI-assistance disclosure* (hypothesis generation +
+implementation, both under the pre-registered gates). The data-availability statement is **moved out
+of the title block into Declarations** (its proper home), leaving the header as author · contact ·
+date · keywords · version note. A drift-guard assertion in
+`test_assemble_repo_deterministic_complete_and_consistent` pins Declarations to sit before the
+References. **(3)** Reported the manuscript's actual typography for a later journal-guide check, no
+change made: A4 (210×297 mm), margins 22 mm top / 20 mm left+right / 18 mm bottom; body **Georgia
+10.5 pt / line-height 1.5**, justified with automatic hyphenation (Georgia is embedded — verified
+with `pdffonts` — with Times New Roman and PT-Serif as glyph fallbacks); title (H1) Georgia-Bold
+19 pt, section headings (H2) 12.5 pt, subheads (H3) 11 pt; code Menlo 8.7 pt; figure captions 8.6 pt
+italic (figure labels Helvetica, from the SVGs); footnotes 8.4 pt; running header + page numbers
+8 pt. **(4)** manuscript.pdf rebuilt, still 16 A4 pages, v3 dated 2026-08-15. Gate green: ruff, mypy,
+site build --check, paper-evidence --check, assemble tests. Nothing sealed changed.
