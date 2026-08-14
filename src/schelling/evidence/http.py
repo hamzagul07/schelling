@@ -23,7 +23,17 @@ from typing import Any, Protocol
 
 
 class FetchError(RuntimeError):
-    """A live fetch failed (network, HTTP error, or timeout)."""
+    """A live fetch failed (network, HTTP error, or timeout).
+
+    Carries the HTTP ``status`` when the failure was an HTTP error (else ``None``) and the ``url``,
+    so a caller can tell 401/403 (a token is required) from 429 (rate-limited) from an offline
+    network and report the right one-line "unavailable" message instead of a traceback (Session 52).
+    """
+
+    def __init__(self, message: str, *, status: int | None = None, url: str | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+        self.url = url
 
 
 class BudgetError(RuntimeError):
@@ -75,8 +85,12 @@ class UrllibFetcher:
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 return str(resp.read().decode("utf-8", errors="replace"))
-        except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            raise FetchError(f"fetch failed for {url}: {exc}") from exc
+        except urllib.error.HTTPError as exc:  # a real HTTP status (401/403/429/5xx)
+            raise FetchError(
+                f"fetch failed for {url}: HTTP {exc.code} {exc.reason}", status=exc.code, url=url
+            ) from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:  # offline / DNS / timeout
+            raise FetchError(f"fetch failed for {url}: {exc}", url=url) from exc
 
 
 @dataclass

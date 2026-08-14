@@ -45,6 +45,15 @@ class CrowdNull(BaseModel):
 _API = "https://www.metaculus.com/api2/questions/"
 
 
+def _auth_headers(token: str) -> dict[str, str] | None:
+    """Metaculus now gates its API behind an account token (checked 2026-08-14; HTTP 403 without).
+
+    A token (``METACULUS_TOKEN``) is sent as ``Authorization: Token <token>``. With no token the
+    request 403s and the caller reports the source unavailable rather than crashing (Session 52).
+    """
+    return {"Authorization": f"Token {token}"} if token.strip() else None
+
+
 @dataclass(frozen=True)
 class MetaculusMatch:
     """One candidate Metaculus question for human inspection (never an automatic match)."""
@@ -82,7 +91,12 @@ def _one(question: dict[str, Any]) -> MetaculusMatch:
 
 
 def metaculus_search(
-    session: FetchSession, topic: str, *, close_after: str = "", close_before: str = ""
+    session: FetchSession,
+    topic: str,
+    *,
+    close_after: str = "",
+    close_before: str = "",
+    token: str = "",
 ) -> list[MetaculusMatch]:
     """Search Metaculus for questions matching ``topic`` (+ optional window) — candidates only."""
     params: dict[str, str] = {"search": topic, "order_by": "-activity", "limit": "10"}
@@ -90,14 +104,16 @@ def metaculus_search(
         params["close_time__gt"] = close_after
     if close_before:
         params["close_time__lt"] = close_before
-    data = session.fetch_json(f"{_API}?{urlencode(params)}")
+    data = session.fetch_json(f"{_API}?{urlencode(params)}", headers=_auth_headers(token))
     results = data.get("results", data if isinstance(data, list) else [])
     return [_one(q) for q in results]
 
 
-def metaculus_question(session: FetchSession, metaculus_id: int) -> MetaculusMatch:
+def metaculus_question(
+    session: FetchSession, metaculus_id: int, *, token: str = ""
+) -> MetaculusMatch:
     """Fetch a single Metaculus question by id (the match the analyst chose)."""
-    data = session.fetch_json(f"{_API}{metaculus_id}/")
+    data = session.fetch_json(f"{_API}{metaculus_id}/", headers=_auth_headers(token))
     return _one(data)
 
 

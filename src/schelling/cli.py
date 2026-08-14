@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 import os
 import webbrowser
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
 
@@ -35,6 +37,7 @@ from schelling.backtest.oracle import oracle_summary
 from schelling.backtest.successor import forecast_candidate as run_forecast_candidate
 from schelling.backtest.successor import leaderboard_markdown, run_successor_search
 from schelling.backtest.writeup import backtest_markdown
+from schelling.evidence.claim import EvidenceClaim
 from schelling.evidence.http import FetchSession
 from schelling.formalizer.client import AnthropicClient, WebSearchUnavailableError
 from schelling.formalizer.firewall import IndexLeakageError
@@ -69,6 +72,12 @@ knowledge_app = typer.Typer(help="Transcript concept index (BUILD_PLAN §7).", n
 app.add_typer(knowledge_app, name="knowledge")
 site_app = typer.Typer(help="Static site generation (Session 31, D31).", no_args_is_help=True)
 app.add_typer(site_app, name="site")
+evidence_app = typer.Typer(
+    help="Structured evidence providers behind one interface (Session 52, D52). "
+    "Each supplies citable claims (provider + id + retrieval date); none writes a coordinate.",
+    no_args_is_help=True,
+)
+app.add_typer(evidence_app, name="evidence")
 
 # Shown when the bge-m3 knowledge extra is needed but not installed (D7.0c).
 _KNOWLEDGE_HINT = (
@@ -1204,6 +1213,34 @@ def _live_session(budget_fetches: int, cost_per: float = 0.0) -> FetchSession:
     )
 
 
+@contextmanager
+def _evidence_guard() -> Iterator[None]:
+    """Turn an evidence-layer fetch failure into a friendly one-line message, never a traceback.
+
+    A missing token surfaces as 401/403, a throttle as 429, an offline network as no status — each
+    gets a plain "unavailable" line and a non-zero exit (Session 52, item 0). The item-2 discipline
+    ("report unavailable rather than degrade silently") is enforced here for every evidence command.
+    """
+    from schelling.evidence.http import BudgetError, FetchError
+
+    try:
+        yield
+    except FetchError as exc:
+        if exc.status in (401, 403):
+            msg = f"Source unavailable — authentication required (HTTP {exc.status}): {exc}"
+        elif exc.status == 429:
+            msg = f"Source rate-limited (HTTP 429) — wait and retry: {exc}"
+        elif exc.status is not None:
+            msg = f"Source unavailable (HTTP {exc.status}): {exc}"
+        else:
+            msg = f"Source unavailable (network/offline): {exc}"
+        typer.echo(msg, err=True)
+        raise typer.Exit(code=1) from exc
+    except BudgetError as exc:
+        typer.echo(f"Fetch budget exhausted — raise --budget: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+
 @app.command()
 def gdelt(
     fixture: Path = typer.Argument(
@@ -1230,9 +1267,15 @@ def gdelt(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
     sess = _live_session(budget)
-    cands = gdelt_candidates(
-        sess, query, start_date=from_date, end_date=to_date, cameo=cameo, max_records=max_records
-    )
+    with _evidence_guard():
+        cands = gdelt_candidates(
+            sess,
+            query,
+            start_date=from_date,
+            end_date=to_date,
+            cameo=cameo,
+            max_records=max_records,
+        )
     pset = candidates_to_precedent_set(cands, game.question_id)
     out = output or fixture.with_suffix(".gdelt.precedents.json")
     out.write_text(pset.model_dump_json(indent=2) + "\n")
@@ -1295,10 +1338,16 @@ def crowd(
         typer.echo(f"Recorded 'no Metaculus match' for {game.question_id} → {out}.")
         return
     sess = _live_session(budget)
+    token = os.environ.get("METACULUS_TOKEN", "")  # Metaculus now gates its API behind a token
     if metaculus_id is None:
-        matches = metaculus_search(
-            sess, search_topic or game.question_id, close_after=after, close_before=before
-        )
+        with _evidence_guard():
+            matches = metaculus_search(
+                sess,
+                search_topic or game.question_id,
+                close_after=after,
+                close_before=before,
+                token=token,
+            )
         if not matches:
             typer.echo("No Metaculus candidates found.")
             return
@@ -1308,7 +1357,8 @@ def crowd(
             typer.echo(f"  #{m.metaculus_id}  community {cp}  n={m.n_forecasters}  {m.title}")
         typer.echo('Record a genuine match: --id N --justify "..." [--placement X].')
         return
-    match = metaculus_question(sess, metaculus_id)
+    with _evidence_guard():
+        match = metaculus_question(sess, metaculus_id, token=token)
     if placement is None:
         if match.community_prediction is None:
             typer.echo("No community prediction; pass --placement explicitly.", err=True)
@@ -1338,7 +1388,8 @@ def literature(
     from schelling.evidence.literature import literature_lookup
 
     sess = _live_session(budget)
-    result = literature_lookup(sess, citation, email=email)
+    with _evidence_guard():
+        result = literature_lookup(sess, citation, email=email)
     head = result.title or citation
     typer.echo(head + (f"  (doi {result.doi})" if result.doi else ""))
     if result.versions:
@@ -2272,6 +2323,216 @@ def site_build(
     typer.echo(f"site: {len(written)} file(s) → {docs_dir}")
     for rel in written:
         typer.echo(f"  {rel}")
+
+
+def _emit_claims(claims: list[EvidenceClaim], out: Path | None) -> None:
+    """Print each claim's citation (provider + id + retrieval date); optionally write them out."""
+    for c in claims:
+        typer.echo(f"  {c.citation()}")
+        if c.title:
+            typer.echo(f"      {c.title}")
+        if c.url:
+            typer.echo(f"      {c.url}")
+    if out is not None:
+        payload = [json.loads(c.model_dump_json()) for c in claims]
+        out.write_text(json.dumps(payload, indent=2) + "\n")
+        typer.echo(
+            f"{len(claims)} claim(s) → {out} (citations, NOT coordinates — a human cites them)."
+        )
+
+
+@evidence_app.command("providers")
+def evidence_providers() -> None:
+    """List the registered evidence providers and whether each is usable in this environment."""
+    from schelling.evidence.providers import availability_report
+
+    typer.echo(
+        "Structured evidence providers (one interface; each supplies citations, not coordinates):"
+    )
+    for info, avail in availability_report(os.environ):
+        mark = "available" if avail.available else f"UNAVAILABLE — {avail.reason}"
+        typer.echo(f"  {info.name:9} [{info.kind:15}] {mark}")
+        typer.echo(f"      {info.purpose}")
+
+
+@evidence_app.command("dbnomics")
+def evidence_dbnomics(
+    query: str = typer.Argument("", help="Search datasets by text (step 1: which dataset)."),
+    series: list[str] = typer.Option(
+        [],
+        "--series",
+        help="Fetch a series 'PROVIDER/DATASET/CODE' (repeatable; 2+ → widened range).",
+    ),
+    in_dataset: str = typer.Option(
+        "", "--in", help="List series in a dataset 'PROVIDER/DATASET' (step 2: which series)."
+    ),
+    limit: int = typer.Option(10, "--limit", min=1),
+    budget: int = typer.Option(10, "--budget", min=1),
+    out: Path | None = typer.Option(None, "-o", "--out", help="Write claims JSON (citations)."),
+) -> None:
+    """DBnomics indicator source: search → dataset → series, as citable claims (item 1).
+
+    Capability/salience sourcing — fiscal breakevens, production weights, budget dependence, GDP.
+    Two or more --series print the WIDENED range of their values; disagreement never resolves.
+    """
+    from schelling.evidence.claim import widen_range
+    from schelling.evidence.dbnomics import (
+        dbnomics_search,
+        dbnomics_series,
+        dbnomics_series_in_dataset,
+    )
+
+    sess = _live_session(budget)
+    if in_dataset:
+        parts = in_dataset.split("/", 1)
+        if len(parts) != 2:
+            typer.echo("--in must be 'PROVIDER/DATASET'.", err=True)
+            raise typer.Exit(code=2)
+        with _evidence_guard():
+            found = dbnomics_series_in_dataset(sess, parts[0], parts[1], query=query, limit=limit)
+        if not found:
+            typer.echo("No series in that dataset (try a narrower search query).")
+            return
+        typer.echo(f"Series in {in_dataset} (pick one, then --series {in_dataset}/CODE):")
+        for s in found:
+            typer.echo(f"  {s.series_code}  {s.name}")
+        typer.echo(sess.spend_report())
+        return
+    if series:
+        specs = [s.split("/", 2) for s in series]
+        if any(len(p) != 3 for p in specs):
+            typer.echo("--series must be 'PROVIDER/DATASET/CODE'.", err=True)
+            raise typer.Exit(code=2)
+        claims: list[EvidenceClaim] = []
+        with _evidence_guard():
+            try:
+                claims = [dbnomics_series(sess, p[0], p[1], p[2]) for p in specs]
+            except ValueError as exc:
+                typer.echo(str(exc), err=True)
+                raise typer.Exit(code=2) from exc
+        _emit_claims(claims, out)
+        widened = widen_range(claims)
+        if len(claims) > 1 and widened is not None:
+            typer.echo("Widened range (sources disagree → union, never a single point):")
+            typer.echo(f"  {widened.as_note()}")
+        typer.echo(sess.spend_report())
+        return
+    if not query:
+        typer.echo("Give a search query, or one or more --series.", err=True)
+        raise typer.Exit(code=2)
+    with _evidence_guard():
+        hits = dbnomics_search(sess, query, limit=limit)
+    if not hits:
+        typer.echo("No DBnomics datasets matched.")
+        return
+    typer.echo("DBnomics datasets (pick one, then --series PROVIDER/DATASET/CODE):")
+    for h in hits:
+        typer.echo(f"  {h.provider_code}/{h.dataset_code}  ({h.nb_series} series)  {h.name}")
+    typer.echo(sess.spend_report())
+
+
+@evidence_app.command("ucdp")
+def evidence_ucdp(
+    country: str = typer.Option("", "--country", help="UCDP/Gleditsch-Ward country code."),
+    start_date: str = typer.Option("", "--from", help="Start date YYYY-MM-DD."),
+    end_date: str = typer.Option("", "--to", help="End date YYYY-MM-DD."),
+    violence: str = typer.Option("", "--violence", help="type_of_violence code (1/2/3)."),
+    version: str = typer.Option("24.1", "--version", help="UCDP dataset version."),
+    pagesize: int = typer.Option(50, "--pagesize", min=1),
+    budget: int = typer.Option(5, "--budget", min=1),
+    out: Path | None = typer.Option(None, "-o", "--out", help="Write claims JSON (citations)."),
+) -> None:
+    """UCDP reference class for outside-view base rates (item 2). Needs UCDP_ACCESS_TOKEN."""
+    from schelling.evidence.providers import REGISTRY
+    from schelling.evidence.ucdp import ucdp_reference_class
+
+    avail = REGISTRY["ucdp"].availability(os.environ)
+    if not avail.available:
+        typer.echo(f"ucdp unavailable — {avail.reason}", err=True)
+        raise typer.Exit(code=1)
+    sess = _live_session(budget)
+    with _evidence_guard():
+        rc = ucdp_reference_class(
+            sess,
+            token=os.environ["UCDP_ACCESS_TOKEN"],
+            version=version,
+            country=country,
+            start_date=start_date,
+            end_date=end_date,
+            type_of_violence=violence,
+            pagesize=pagesize,
+        )
+    typer.echo(f"UCDP reference class — {rc.summary.citation()}")
+    typer.echo(f"  {rc.summary.note}")
+    _emit_claims(rc.events, out)
+    typer.echo(sess.spend_report())
+
+
+@evidence_app.command("acled")
+def evidence_acled(
+    country: str = typer.Option("", "--country", help="Country name (ACLED spelling)."),
+    start_date: str = typer.Option("", "--from", help="Start date YYYY-MM-DD."),
+    end_date: str = typer.Option("", "--to", help="End date YYYY-MM-DD."),
+    event_type: str = typer.Option("", "--event-type", help="ACLED event_type filter."),
+    limit: int = typer.Option(50, "--limit", min=1),
+    budget: int = typer.Option(5, "--budget", min=1),
+    out: Path | None = typer.Option(None, "-o", "--out", help="Write claims JSON (citations)."),
+) -> None:
+    """ACLED reference class for base rates (item 2). Needs ACLED_API_KEY + ACLED_EMAIL."""
+    from schelling.evidence.acled import acled_reference_class
+    from schelling.evidence.providers import REGISTRY
+
+    avail = REGISTRY["acled"].availability(os.environ)
+    if not avail.available:
+        typer.echo(f"acled unavailable — {avail.reason}", err=True)
+        raise typer.Exit(code=1)
+    sess = _live_session(budget)
+    with _evidence_guard():
+        rc = acled_reference_class(
+            sess,
+            key=os.environ["ACLED_API_KEY"],
+            email=os.environ["ACLED_EMAIL"],
+            country=country,
+            start_date=start_date,
+            end_date=end_date,
+            event_type=event_type,
+            limit=limit,
+        )
+    typer.echo(f"ACLED reference class — {rc.summary.citation()}")
+    typer.echo(f"  {rc.summary.note}")
+    _emit_claims(rc.events, out)
+    typer.echo(sess.spend_report())
+
+
+@evidence_app.command("archive")
+def evidence_archive(
+    body: str = typer.Argument(..., help="A body: iaea, opec, eu (or any with --url)."),
+    since: str = typer.Option("", "--since", help="Only records on/after YYYY-MM-DD."),
+    until: str = typer.Option("", "--until", help="Only records on/before YYYY-MM-DD."),
+    url: str = typer.Option(
+        "", "--url", help="An explicit RSS/Atom feed URL (overrides the preset)."
+    ),
+    budget: int = typer.Option(5, "--budget", min=1),
+    out: Path | None = typer.Option(None, "-o", "--out", help="Write claims JSON (candidates)."),
+) -> None:
+    """Enumerate a body's published session/statement records — the precedent denominator (item 3).
+
+    Candidates only: each record is a citation, none is placed on a continuum, a human ratifies.
+    """
+    from schelling.evidence.archives import archive_enumerate
+
+    sess = _live_session(budget)
+    with _evidence_guard():
+        try:
+            claims = archive_enumerate(sess, body, since=since, until=until, url=url)
+        except ValueError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=2) from exc
+    typer.echo(
+        f"{len(claims)} candidate record(s) for {body} (a human ratifies before any counts):"
+    )
+    _emit_claims(claims, out)
+    typer.echo(sess.spend_report())
 
 
 if __name__ == "__main__":  # pragma: no cover
