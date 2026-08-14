@@ -2752,3 +2752,62 @@ has been graded yet, so no accuracy is claimed"; above zero and below the rankin
 questions before any family is ranked". The grid cell, sidebar, and footer all switched to the
 question-first count. Tests in `test_grading_site.py`; the D48 self-contradiction ("6 GRADED" beside
 "Nothing has been graded yet") is structurally impossible now.
+
+### D51.0 — Session 51: the first graded cycle recorded in the paper, author line, preprint PDF
+A paper/consolidation session; no solver, Monte-Carlo path, or sealed record was touched, and the
+Q-2026-OPEC-SEP grade committed earlier (`cc6124d`) was read, never edited. Three deliverables: the
+manuscript now reports the first graded cycle (D51.1), carries a real author line (D51.2), and ships
+as a PDF preprint (D51.3), with two latent defects the PDF surfaced fixed at their source (D51.4).
+The 14 sealed rows, six graded records, medians, hashes and OTS proofs are byte-identical; the D39.2
+regression gate is untouched.
+
+### D51.1 — §8/§9: the first graded cycle, every figure an E-tag, no accuracy claimed
+Section 8 gained a graded-cycle paragraph and Section 9's stale "sealed forecasts but zero graded
+cycles" was corrected to "a single graded cycle … far too few to be a track record or to support any
+claim of accuracy" (the false clause was in §9, not §8 as the brief assumed). Every figure resolves
+from a new `E-GRADE-*` family in `evidence.py::_grade_items`, parsed — never hand-typed — from
+FORECASTS.md's `### GRADED` block: the announced +188 kb/d → 66 settlement, the six re-verified
+records, the per-family thin→sourced absolute error (challenge 3.991→2.320, compromise 3.550→2.566,
+llm 8.000→0.000, sourced better in every family), and the metric disagreement on the sourced solvers
+(abs. error 2.320 vs 2.566 favours challenge; CRPS 1.535 vs 1.611 favours compromise). The caveats
+are stated in the body, not buried: n=1 is no evidence of accuracy; the outcome was the analysts'
+consensus so the question had little discriminating power; and the two metrics disagree, reported not
+resolved. Drift-guarded by `test_grade_items_parse_the_committed_grade_block`. `E-GRADE-*` is excluded
+from `inputs_hash` like every other rubric/grade field, so nothing sealed is affected.
+
+### D51.2 — author line set to Hamza Gul Hassan (matches git authorship → no disclosure)
+The manuscript and `ssrn-metadata.md` placeholder "Hassan [surname]" is now "Hamza Gul Hassan,
+Independent Researcher". `git log --format='%an' | sort -u` is a single name, "Hamza Gul Hassan", so
+the committed history and the manuscript author agree and the Section-4 audit invitation needs no
+authorship-mismatch disclosure (the disclosure sentence is added only when they differ). Not applied
+this session: the `[surname]` placeholder in the unrelated `docs/outreach/scholz-email.md` and the
+`BLOCKED ON HASSAN` note in `STATUS.md`, which are outside the preprint package.
+
+### D51.3 — preprint PDF via the dossier's WeasyPrint @page path; WeasyPrint venv-only
+`paper/preprint/manuscript.pdf` is built markdown → HTML (pandoc, for footnote/heading lexing) → PDF
+(WeasyPrint, reusing the dossier's `@page` pagination: running header + "Page N of M"), with the four
+SVG figures inlined as raw `<figure>` blocks so the PDF is self-contained (no external refs, one
+caption each). WeasyPrint 69 was installed into the venv ONLY via `uv pip install` — deliberately NOT
+added to `pyproject.toml`/`uv.lock`, so CI stays light and the dependency remains optional (the
+existing `dossier/pdf.py::weasyprint_available` guard already treats it as such). Verified, not
+assumed: 16 A4 pages, selectable text, title/author/abstract on page one, all four figures rendered
+(SVG-internal labels present) with a single caption apiece, and zero surviving `{{tags}}`, `[^ev-`, or
+`[surname]` placeholders.
+
+### D51.4 — two defects the PDF build surfaced, both fixed at the generator, not patched over
+(a) `assemble.py` emitted the provenance-footnote blockquote immediately abutting the first `[^ev-…]:`
+definition; with no blank line between them pandoc read every footnote definition as a lazy
+continuation of the blockquote and rendered none — the references leaked into the text as literal
+`[^ev-…]`. Fixed by one blank line after the blockquote; DRAFT.md regenerates with the same content,
+now convertible. (b) `figures.py::_leaderboard_svg` packed the columns on the shared 640-wide canvas
+so the ~120px "delta [95% CI]" cell (end-anchored at 470) overran the neighbouring comp-MAE cell
+(end-anchored at 380) — legible enough on screen at native width, colliding in print. Fixed with a
+wider 760×214 canvas and start-anchored, generously-spaced columns. The figure is not embedded in the
+site, and the byte-stability test only pins determinism, so the change is contained to the paper.
+
+### D51.5 — DRAFT and preprint kept in lockstep; full gate green
+The preprint build is a deterministic transform of `paper/DRAFT.md` (drop the generated-by banner,
+prepend a title/author/date block) so the two agree by construction — closing the prior drift where
+`manuscript.md` had lost the §1 roadmap and a section header. Gate green end to end: ruff, ruff
+format, mypy (strict, whole package), pytest, `paper-evidence --check`, `site build --check`. E-TESTS
+and the site's test/decision counts refreshed; docs rebuilt. Nothing sealed changed.

@@ -12,6 +12,7 @@ from schelling.paper.assemble import _resolve_tags, assemble, parse_evidence
 from schelling.paper.evidence import (
     EvidenceBundle,
     EvidenceItem,
+    _grade_items,
     _ledger_items,
     _replication_items,
     evidence_markdown,
@@ -32,6 +33,25 @@ def test_ledger_items_parse_the_committed_forecasts_ledger() -> None:
     assert medians["E-LEDGER-compromise-v1"] == "41.636"
     assert medians["E-LEDGER-challenge-v2"] == "29.407"
     assert medians["E-LEDGER-compromise-v2"] == "39.443"
+    assert all(it.source == "FORECASTS.md" for it in items)
+
+
+def test_grade_items_parse_the_committed_grade_block() -> None:
+    """§8's first-graded-cycle evidence is read (not typed) from FORECASTS.md's GRADED block, and
+    pinned here so a future edit to the block or the parser fails loudly (drift guard, D51)."""
+    items, open_q = _grade_items(REPO)
+    assert open_q == []
+    v = {it.tag: it.value for it in items}
+    assert v["E-GRADE-RAW"] == "188"  # announced +188 kb/d
+    assert v["E-GRADE-ACTUAL"] == "66"  # settlement on the 0-100 continuum
+    assert v["E-GRADE-NSCORED"] == "6"  # 2 vintages x 3 families, all re-verified
+    # within-question: the sourced vintage beat the thin one in every family (thin -> sourced)
+    assert v["E-GRADE-challenge"] == "3.991 → 2.320"
+    assert v["E-GRADE-compromise"] == "3.550 → 2.566"
+    assert v["E-GRADE-llm"] == "8.000 → 0.000"
+    # the primary metric and CRPS disagree on which sourced solver was closer
+    assert v["E-GRADE-SOLVER-AE"] == "2.320 vs 2.566"  # abs. error: challenge nearer
+    assert v["E-GRADE-SOLVER-CRPS"] == "1.535 vs 1.611"  # CRPS: compromise nearer
     assert all(it.source == "FORECASTS.md" for it in items)
 
 

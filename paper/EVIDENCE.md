@@ -39,10 +39,18 @@
 | E-QRE-CI80-usiran | 4. Successor | Median-lock: CI80 width, challenge → QRE (US-Iran stage two) | 44.65 → 25.02 | `analyses/usiran/usiran-v2.json` | `sha256:8868b82c14e5` | seed 42, 10000 draws; QRE tightens rather than widens (D41.6) |
 | E-QRE-ZEROSWING-iaea | 4. Successor | Median-lock: zero-swing sensitivity rows, challenge → QRE (IAEA September) | 13/20 → 13/20 | `analyses/iaea/iaea.json` | `sha256:afa36056cc44` | seed 42; QRE leaves the pinned-median count near-unchanged (D41.6) |
 | E-QRE-CI80-iaea | 4. Successor | Median-lock: CI80 width, challenge → QRE (IAEA September) | 32.71 → 22.28 | `analyses/iaea/iaea.json` | `sha256:afa36056cc44` | seed 42, 10000 draws; QRE tightens rather than widens (D41.6) |
-| E-LEDGER-challenge-v1 | 8. Ledger | Sealed challenge v1 median | 34.576 | `FORECASTS.md` | `45bbdca` | frozen 2026-07-21; sha256 aece91bdcfd8… (gitignored — commit-reveal) |
-| E-LEDGER-compromise-v1 | 8. Ledger | Sealed compromise v1 median | 41.636 | `FORECASTS.md` | `45bbdca` | frozen 2026-07-21; sha256 c87d91ae7f05… (gitignored — commit-reveal) |
-| E-LEDGER-challenge-v2 | 8. Ledger | Sealed challenge v2 median | 29.407 | `FORECASTS.md` | `45bbdca` | frozen 2026-07-21; sha256 3bc97cd4a4ba… (gitignored — commit-reveal) |
-| E-LEDGER-compromise-v2 | 8. Ledger | Sealed compromise v2 median | 39.443 | `FORECASTS.md` | `45bbdca` | frozen 2026-07-21; sha256 d55ffc3e78fc… (gitignored — commit-reveal) |
+| E-LEDGER-challenge-v1 | 8. Ledger | Sealed challenge v1 median | 34.576 | `FORECASTS.md` | `cc6124d` | frozen 2026-07-21; sha256 aece91bdcfd8… (gitignored — commit-reveal) |
+| E-LEDGER-compromise-v1 | 8. Ledger | Sealed compromise v1 median | 41.636 | `FORECASTS.md` | `cc6124d` | frozen 2026-07-21; sha256 c87d91ae7f05… (gitignored — commit-reveal) |
+| E-LEDGER-challenge-v2 | 8. Ledger | Sealed challenge v2 median | 29.407 | `FORECASTS.md` | `cc6124d` | frozen 2026-07-21; sha256 3bc97cd4a4ba… (gitignored — commit-reveal) |
+| E-LEDGER-compromise-v2 | 8. Ledger | Sealed compromise v2 median | 39.443 | `FORECASTS.md` | `cc6124d` | frozen 2026-07-21; sha256 d55ffc3e78fc… (gitignored — commit-reveal) |
+| E-GRADE-RAW | 8. Ledger (graded) | Announced OPEC+ September adjustment | 188 | `FORECASTS.md` | `cc6124d` | thousand b/d; OPEC statement 2 Aug 2026 (cited in GRADING-Q-2026-OPEC-SEP.md) |
+| E-GRADE-ACTUAL | 8. Ledger (graded) | Settlement on the 0-100 continuum | 66 | `FORECASTS.md` | `cc6124d` | pre-registered linear rubric: 50 + adjustment/600*50, clamped, nearest integer |
+| E-GRADE-NSCORED | 8. Ledger (graded) | Sealed records re-verified and scored at grading | 6 | `FORECASTS.md` | `cc6124d` | 2 input vintages x 3 model families; every record PASS at grading |
+| E-GRADE-challenge | 8. Ledger (graded) | challenge absolute error, thin vintage then sourced | 3.991 → 2.320 | `FORECASTS.md` | `cc6124d` | abs. error of the median; sourced input scored better than thin (within-question) |
+| E-GRADE-compromise | 8. Ledger (graded) | compromise absolute error, thin vintage then sourced | 3.550 → 2.566 | `FORECASTS.md` | `cc6124d` | abs. error of the median; sourced input scored better than thin (within-question) |
+| E-GRADE-llm | 8. Ledger (graded) | llm-judgment absolute error, thin vintage then sourced | 8.000 → 0.000 | `FORECASTS.md` | `cc6124d` | abs. error of the median; sourced input scored better than thin (within-question) |
+| E-GRADE-SOLVER-AE | 8. Ledger (graded) | Sourced solvers, abs. error: challenge vs compromise | 2.320 vs 2.566 | `FORECASTS.md` | `cc6124d` | primary metric: challenge is nearer the settlement |
+| E-GRADE-SOLVER-CRPS | 8. Ledger (graded) | Sourced solvers, CRPS: compromise vs challenge | 1.535 vs 1.611 | `FORECASTS.md` | `cc6124d` | secondary metric: compromise is nearer — disagrees with absolute error |
 | E-CTX-1 | 3. Fair fight (context) | Published: Old Model (expected-utility / challenge) | 21.5 | `BACKTEST.md` | `c71f138` | 9 issues w/ resolve data — BdM 2011, Table 1 (regime/ordering only, NOT like-for-like) |
 | E-CTX-2 | 3. Fair fight (context) | Published: Weighted mean, round 1 | 11.8 | `BACKTEST.md` | `c71f138` | 9 issues w/ resolve data — BdM 2011, Table 1 (regime/ordering only, NOT like-for-like) |
 | E-CTX-3 | 3. Fair fight (context) | Published: Weighted median, round 1 | 29.4 | `BACKTEST.md` | `c71f138` | 9 issues w/ resolve data — BdM 2011, Table 1 (regime/ordering only, NOT like-for-like) |
@@ -54,7 +62,7 @@
 | E-CHINA-ROWS | 7. Case library | China Tables 2+3 rows verified (blind dual entry) | 60/60 (26 + 34) | `data/coercive-cases/ktab-china-2014.json` | `ca65c05` | two independent blind transcriptions agree; every Exercised-Power checksum reproduces |
 | E-CHINA-VERIFIED | 7. Case library | China transcription.verified | True | `data/coercive-cases/ktab-china-2014.json` | `ca65c05` | flipped true only on human ratification (D13.0) |
 | E-DOMAIN-VERDICT | 7. Case library | Domain verdicts | cooperative: compromise mean wins; coercive: PENDING | `BACKTEST.md` | `c71f138` | coercive classics paywalled (D11.1); domestic cases out-of-domain, never counted |
-| E-TESTS | Repro | Test count (pytest --collect-only) | 579 | `tests/` | `45bbdca` | regenerated live; green gate is the acceptance bar |
+| E-TESTS | Repro | Test count (pytest --collect-only) | 580 | `tests/` | `e7deba3` | regenerated live; green gate is the acceptance bar |
 
 ## Open questions — numbers no artifact could source
 - (none — every cited number resolved to an artifact)
