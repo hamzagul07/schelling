@@ -209,6 +209,23 @@ def test_resolve_keeps_echo_when_value_absent_from_prose() -> None:
     assert "(9.530)[^ev-E-M]" in out  # no prose number -> value echoed
 
 
+def test_resolve_non_numeric_value_is_footnote_only() -> None:
+    # Session 52: a verdict/boolean/description (FAILED, True, PENDING) resolves footnote-only —
+    # never an inline "(FAILED)"/"(True)" parenthetical.
+    ev = {"E-V": {"value": "FAILED", "source": "s", "prov": "p"}}
+    out, used, _ = _resolve_tags("the gate verdict [E-V].", ev)
+    assert "verdict[^ev-E-V]" in out and "(FAILED)" not in out and "E-V" in used
+
+
+def test_resolve_deduplicates_footnote_on_repeat_citation() -> None:
+    # Session 52: a tag cited twice gets ONE footnote marker (on first citation); the repeat still
+    # shows its value but adds no second marker (pandoc would otherwise duplicate the footnote).
+    ev = {"E-N": {"value": "42", "source": "s", "prov": "p"}}
+    out, _u, _ = _resolve_tags("First [E-N]. Later again [E-N].", ev)
+    assert out.count("[^ev-E-N]") == 1
+    assert out.count("(42)") == 2  # the value still shows at both citation sites
+
+
 def test_assemble_repo_deterministic_complete_and_consistent() -> None:
     a, todos_a, missing_a = assemble(REPO)
     b, _todos_b, _missing_b = assemble(REPO)
@@ -219,9 +236,12 @@ def test_assemble_repo_deterministic_complete_and_consistent() -> None:
     assert "figures/fig_deu_error_histogram.svg" in a and "figures/fig_r1_split.svg" in a
     assert "Section 9 limitations. Section 10 concludes." in a  # roadmap fixed (item 5)
     assert "Meehl, P.E. (1954)" in a  # verified bibliography appended
-    # duplicate-number suppression (D16.2): E-DEU-N confirms the prose "351" -> footnote-only
-    assert "issues[^ev-E-DEU-N]" in a and "(351)[^ev-E-DEU-N]" not in a
-    assert "[^ev-E-DEU-N]:" in a  # provenance footnote still defined
+    # D16.2 + Session 52: E-DEU-N confirms the prose "351" so its value is never echoed inline,
+    # and though it is cited more than once it is footnoted exactly once (dedupe): one marker on
+    # its first citation + one definition line = two occurrences of the bracket.
+    assert "(351)[^ev-E-DEU-N]" not in a  # the number echo is suppressed
+    assert "[^ev-E-DEU-N]:" in a  # provenance footnote still defined (once)
+    assert a.count("[^ev-E-DEU-N]") == 2  # one citation marker + one definition line
 
 
 def test_paper_assemble_cli_reports_no_unresolved(tmp_path: Path) -> None:

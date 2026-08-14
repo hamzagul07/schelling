@@ -2879,3 +2879,35 @@ RSS/Atom parsing + IAEA date + window filtering + undated-kept + unknown-body, a
 (providers, dbnomics series + widened range, archive enumeration, ucdp-unavailable, and the crowd-403
 now-friendly path) — all via `ReplayFetcher`, so CI stays offline. Gate green: ruff, format, mypy
 (162 files), pytest, `paper-evidence --check`, `site build --check`. Nothing sealed changed.
+
+### D52.7 — Assembler rendering: non-numeric values footnote-only, one footnote per E-tag
+Preprint corrections before upload (a second Session-52 milestone, branch paper-v3): prose and
+rendering only, no artifact number changes; nothing sealed touched. Two `assemble.py` changes extend
+the D16.2 suppression rule. **(a) Status tags resolve footnote-only.** A resolved value renders as an
+inline `(…)` parenthetical only when it is a *measured quantity* — it begins with a digit or a numeric
+delimiter (`_is_numeric_value`, `^\s*[-+(\[]*\s*\.?\d`). A value that begins with a letter is a
+verdict, boolean, or description (FAILED, True, PENDING, a method description) and resolves
+footnote-only, so `(FAILED)`/`(True)` no longer appear inline (the surrounding prose already carries
+the verdict; the footnote carries the provenance). **(b) One footnote per distinct E-tag.** pandoc
+renders a re-referenced footnote as a *duplicate*, so the assembler now emits the `[^ev-tag]` marker
+only on a tag's FIRST citation; a repeat still shows its value but adds no second marker. Body markers
+dropped 46 → 37 (= the 37 distinct tags); the PDF footnote list is 37 entries, not 83. New tests
+`test_resolve_non_numeric_value_is_footnote_only` and `test_resolve_deduplicates_footnote_on_repeat_citation`; the numeric-value D16.2 tests are unchanged.
+
+### D52.8 — Preprint prose reconciled with the current results and ledger state
+Prose corrections across the draft sections, no cited number changed. **Abstract:** the successor
+sentence now reports the full tournament — a pre-registered successor search plus five further
+solution concepts from the field's other traditions, eight concepts in all counting the mean, none
+separating from it — and a clause records that the ledger has now taken its first graded cycle.
+**§1 third contribution:** the two fitted candidates AND the four Phase-C solution concepts, with the
+multiplicity caveat (the lone nominal winner's margin lies inside its own interval) referenced forward
+to §4. **§5 first sentence:** "Three failures" → "Seven failures", consistent with §4's seven attacks
+on the mean. **§8:** the ledger description is reconciled with its actual state — three pre-registered
+questions and fourteen records, of which one question and its six records are graded (the first graded
+cycle, reported in the same section); the four-forecast US-Iran case is reframed as the earliest
+sealed instance, not the whole ledger. **References:** the internal build-note preamble ("Verified
+full citations (Session 16, D16.1)… Appended to paper/DRAFT.md by schelling paper-assemble") is
+removed from `BIBLIOGRAPHY.md`; the reference list contains references only. Re-assembled (8,033
+words, no unresolved E-tags), manuscript.md + manuscript.pdf rebuilt: 16 A4 pages, no `(True)`/
+`(FAILED)` parenthetical, 37 deduped footnotes. Gate green: ruff, format, mypy, pytest,
+`paper-evidence --check`, `site build --check`. Nothing sealed changed.

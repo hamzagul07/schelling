@@ -23,6 +23,17 @@ _GROUP = re.compile(r"( ?)\[([^\[\]]*E-[A-Za-z0-9_-]+[^\[\]]*)\]")
 # ignores abbreviation dots ("et al. 2006", "e.g.") so the current-sentence window is not truncated.
 _SENTENCE_END = re.compile(r"[.!?]\s+(?=[A-Z])")
 
+# A resolved value renders as an inline parenthetical only when it is a *measured quantity* — i.e.
+# it begins with a digit or a numeric delimiter (sign, paren, bracket). A value that begins with a
+# letter is a verdict, boolean, or description (FAILED, True, PENDING, a method description) and
+# resolves FOOTNOTE-ONLY, never as an inline "(FAILED)"/"(True)" (Session 52, extends D16.2).
+_NUMERIC_LEAD = re.compile(r"^\s*[-+(\[]*\s*\.?\d")
+
+
+def _is_numeric_value(value: str) -> bool:
+    """True when a resolved value reads as a number/measurement, False for a verdict/description."""
+    return bool(_NUMERIC_LEAD.match(value))
+
 
 def _current_sentence(prefix: str) -> str:
     """The prose of the sentence that ``prefix`` (text before a citation) ends in."""
@@ -98,6 +109,7 @@ def _resolve_tags(
     """Replace every bracketed ``[…E-tag…]`` with resolved values + footnote markers."""
     used: dict[str, dict[str, str]] = {}
     todos: list[str] = []
+    marked: set[str] = set()  # tags whose footnote marker was already emitted (dedupe, Session 52)
 
     def repl_group(m: re.Match[str]) -> str:
         space, inner = m.group(1), m.group(2)
@@ -115,13 +127,20 @@ def _resolve_tags(
             return item["value"]
 
         resolved = _TAG.sub(repl_tag, inner)
-        footnotes = "".join(f"[^ev-{t}]" for t in dict.fromkeys(marks))
-        # Duplicate-number suppression (D16.2): a single tag whose value already appears in the
-        # current sentence's prose resolves footnote-only — no redundant parenthetical echo.
+        # One footnote per distinct E-tag (Session 52): emit the ``[^ev-tag]`` marker only on the
+        # tag's FIRST citation. A repeat shows its value but adds no second footnote — pandoc
+        # renders a re-referenced footnote as a duplicate, so we dedupe at the source.
+        fresh = [t for t in dict.fromkeys(marks) if t not in marked]
+        footnotes = "".join(f"[^ev-{t}]" for t in fresh)
+        marked.update(fresh)
         if len(_TAG.findall(inner)) == 1 and marks:
             value = used[marks[0]]["value"]
+            # (a) D16.2: the value already appears in the current sentence's prose -> footnote-only.
             sentence = _current_sentence(m.string[: m.start()])
-            if re.search(r"(?<![\w.])" + re.escape(value) + r"(?![\w.])", sentence):
+            in_prose = re.search(r"(?<![\w.])" + re.escape(value) + r"(?![\w.])", sentence)
+            # (b) Session 52: a non-numeric value (verdict/boolean/description) -> footnote-only,
+            #     never an inline "(FAILED)"/"(True)" parenthetical.
+            if in_prose or not _is_numeric_value(value):
                 return footnotes
         return f"{space}({resolved}){footnotes}"
 

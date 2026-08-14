@@ -1,10 +1,5 @@
 ## References
 
-> Verified full citations (Session 16, D16.1). The three prior `[VERIFY]` fields were resolved
-> against the sources (Achen chapter pages 264–298; BdM 2011 doi 10.1177/0738894210388127; Feder
-> 1987 pages 41–57 + the 1995 Westerfield reprint). Appended to `paper/DRAFT.md` by `schelling
-> paper-assemble`.
-
 - Achen, C.H. (2006). "Evaluating political decision-making models." Chapter 10 in R. Thomson, F.N. Stokman, C.H. Achen & T. König (eds.), *The European Union Decides*, pp. 264–298. Cambridge University Press.
 - Arregui, J., & Perarnaud, C. (2022). "A new dataset on legislative decision-making in the European Union: the DEU III dataset." *Journal of European Public Policy* 29(1): 12–22. doi:10.1080/13501763.2021.1991983. Data deposit: doi:10.34810/data53 (2021).
 - Bueno de Mesquita, B. (2011). "A New Model for Predicting Policy Choices: Preliminary Tests." *Conflict Management and Peace Science* 28(1): 65–87. doi:10.1177/0738894210388127.
