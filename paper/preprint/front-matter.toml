@@ -1,0 +1,10 @@
+# Front matter for the SSRN preprint build (`schelling preprint build`, Session 55 / D55).
+# A version bump is a config edit here — not a code change. Every field is required.
+author = "Hamza Gul Hassan"
+affiliation = "Independent Researcher"
+contact = "hamzagulkhoso@gmail.com"
+orcid = "0009-0004-5391-4030"
+dateline = "Preprint · 2026-08-15 · v5"
+runhead = "Structure, Not Magic · Hassan · preprint 2026-08-15 · v5"
+keywords = "Bueno de Mesquita model; Policon; expected-utility model; expert elicitation; political forecasting; reproducibility; pre-registration; weighted mean; predictability ceiling; EU legislative bargaining; DEU dataset; open science; commit-reveal ledger; game theory"
+version_note = "Changes since v4: an ORCID iD added to the title block; a two-sentence AI-use statement added immediately after the abstract, with the full statement remaining in the Declarations."
