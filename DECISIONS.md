@@ -2811,3 +2811,71 @@ prepend a title/author/date block) so the two agree by construction — closing 
 `manuscript.md` had lost the §1 roadmap and a section header. Gate green end to end: ruff, ruff
 format, mypy (strict, whole package), pytest, `paper-evidence --check`, `site build --check`. E-TESTS
 and the site's test/decision counts refreshed; docs rebuilt. Nothing sealed changed.
+
+### D52.0 — Structured evidence sources, behind one interface, no coordinate ever auto-written
+Session 52 widens the evidence-acquisition layer (`src/schelling/evidence/`) with structured data
+providers — DBnomics, UCDP, ACLED, and institutional archives — under the same discipline as D46. No
+solver, Monte-Carlo path, or sealed number changes; the D39.2 gate passes untouched. Every provider
+returns `EvidenceClaim`s (provider + identifier + retrieval date), never an actor coordinate; a human
+or the formalizer cites a claim when placing an actor. All fetches use the existing cached, budgeted,
+injectable `FetchSession`, so CI never calls a live API (replay fixtures only). The concepts firewall
+is untouched — these are evidence sources, not the concept index.
+
+### D52.1 — Item 0 first: the Session-46 tools were broken; reported, then fixed
+Run against the three ledger questions before building anything (the brief's gate): **`crowd`
+(Metaculus) → HTTP 403** — Metaculus now gates its API behind an account token ("The API is only
+available to authenticated users… use your API token"), a change since Session 46; **`gdelt` → HTTP
+429** — GDELT throttles to one request per five seconds; **`exa` → no `EXA_API_KEY`**, so
+`select_backend` falls back to anthropic (handled, unlike the other two). All three failed as raw
+tracebacks. Fixes: `FetchError` now carries the HTTP `status` (`UrllibFetcher` catches `HTTPError`
+separately) so a caller can tell 401/403 from 429 from offline; a CLI `_evidence_guard` turns every
+evidence fetch failure into one friendly "unavailable"/"rate-limited" line + non-zero exit, never a
+traceback; `crowd` sends `METACULUS_TOKEN` as `Authorization: Token …`; `gdelt` retries once on 429
+after GDELT's own 5-second cadence, then reports the throttle plainly. Wired into gdelt/crowd/
+literature and every new command.
+
+### D52.2 — DBnomics indicator client (item 1): capability & salience sourcing
+`evidence/dbnomics.py` walks **search → dataset → series** against DBnomics' free, keyless aggregation
+of official providers (IMF, World Bank, Eurostat, OECD, national offices). The latest observation of
+a series becomes an `EvidenceClaim` (provider, exact series id, value, unit, period, retrieval date, a
+db.nomics.world link) — a citation for a fiscal breakeven, production weight, budget dependence, or
+GDP that backs a coordinate, not the coordinate itself. Verified live: `IMF/WEO:latest/SAU.NGDPD` →
+1374.16 (U.S. dollars, 2030). `quote(dataset, safe=":")` keeps DBnomics' literal-colon dataset codes.
+
+### D52.3 — UCDP + ACLED reference-class clients (item 2); UCDP now needs a portal token
+`evidence/ucdp.py` and `evidence/acled.py` return reference-class summaries (event count = the
+outside-view denominator, plus fatalities) and the events as candidate claims. **Checked whether a
+portal token is now required (the brief asked): YES for UCDP** — the API returns `HTTP 401 — "API
+token required. Add header: x-ucdp-access-token: <your-token>"` (keyless in earlier releases). The
+client sends `UCDP_ACCESS_TOKEN` in that header; absent, the source reports unavailable with the
+registration step. ACLED sits behind `ACLED_API_KEY` + `ACLED_EMAIL` (register at
+developer.acleddata.com); absent, it reports unavailable — never a silent degrade — and the key/email
+never appear in a claim's identifier.
+
+### D52.4 — Institutional archive fetcher (item 3): the sessions-at-risk denominator
+`evidence/archives.py` enumerates a body's published session/statement records for a date range as
+candidate claims (value `None` — records to count, not numbers), feeding the precedent layer's
+denominator (D30.2). It parses RSS and Atom via the standard library, normalising RFC-822, ISO, and
+the IAEA feed's non-standard `YY-MM-DD`; undated entries are kept and flagged, never dropped. IAEA is
+live-verified (`iaea.org/feeds/topnews`, 200/RSS); OPEC and the EU Council bot-block their listings,
+so their presets report unavailable until a reachable `--url` is supplied. Candidates only; a human
+ratifies before any counts.
+
+### D52.5 — One interface, and the two disciplines in code (items 4 & 5)
+`evidence/claim.py` (`EvidenceClaim` + `widen_range`) and `evidence/providers.py` (a `ProviderInfo`
+registry with `availability(env)`) are the spine. **Provenance is mandatory** — a claim cannot exist
+without provider + identifier + retrieval date. **Disagreement widens, never resolves** —
+`widen_range` returns the union `[min, max]` of disagreeing values with every claim attached, never an
+average or a winner (demonstrated in the CLI: two GDP series print `[490.9, 1374.2] … WIDENED to their
+union, not resolved to one side`). All providers register behind **one** CLI sub-app, `schelling
+evidence` (`providers` / `dbnomics` / `ucdp` / `acled` / `archive`) — a single evidence surface, not
+six new agent tools; `evidence providers` prints each source's availability and the step to enable it.
+
+### D52.6 — Replay fixtures; CI never calls a live API
+`tests/test_evidence_sources.py` (26 tests) covers the item-0 fixes (status-carrying `FetchError`,
+Metaculus auth header, GDELT 429 retry + clear message), DBnomics search/series/latest-observation,
+the claim + widening discipline, UCDP/ACLED parsing + credential guards + key never leaked, archive
+RSS/Atom parsing + IAEA date + window filtering + undated-kept + unknown-body, and the CLI
+(providers, dbnomics series + widened range, archive enumeration, ucdp-unavailable, and the crowd-403
+now-friendly path) — all via `ReplayFetcher`, so CI stays offline. Gate green: ruff, format, mypy
+(162 files), pytest, `paper-evidence --check`, `site build --check`. Nothing sealed changed.

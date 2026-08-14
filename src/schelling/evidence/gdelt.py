@@ -16,15 +16,43 @@ injectable :class:`FetchSession`, so CI never calls GDELT live.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlencode
 
-from schelling.evidence.http import FetchSession
+from schelling.evidence.http import FetchError, FetchSession
 from schelling.precedents.schemas import PrecedentSet
 from schelling.schemas.forecast import Precedent
 
 GDELT_DOC_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 _PLACEMENT_PENDING = 50.0  # neutral placeholder; the human sets the real placement at ratification
+_GDELT_PAUSE = 5.0  # GDELT allows one request per 5 seconds; pace a 429 retry to that
+
+
+def _gdelt_fetch(session: FetchSession, url: str, *, sleep: float = _GDELT_PAUSE) -> Any:
+    """Fetch GDELT JSON, retrying ONCE on a 429 after GDELT's own 5-second cadence (D52).
+
+    GDELT throttles to one request every five seconds and answers a burst with HTTP 429. On a 429
+    we wait and retry once; a second 429 becomes a clear "rate-limited" message, never a traceback.
+    """
+    try:
+        return session.fetch_json(url)
+    except FetchError as exc:
+        if exc.status != 429:
+            raise
+        time.sleep(sleep)
+        try:
+            return session.fetch_json(url)
+        except FetchError as exc2:
+            if exc2.status == 429:
+                raise FetchError(
+                    "GDELT is rate-limited (HTTP 429): it allows one request every 5 seconds. "
+                    "Wait a few seconds and retry.",
+                    status=429,
+                    url=url,
+                ) from exc2
+            raise
 
 
 @dataclass(frozen=True)
@@ -71,7 +99,7 @@ def gdelt_candidates(
             "sort": "datedesc",
         }
     )
-    data = session.fetch_json(f"{GDELT_DOC_URL}?{params}")
+    data = _gdelt_fetch(session, f"{GDELT_DOC_URL}?{params}")
     out: list[GdeltCandidate] = []
     seen: set[str] = set()
     for art in data.get("articles", []):
