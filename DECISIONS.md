@@ -2911,3 +2911,14 @@ removed from `BIBLIOGRAPHY.md`; the reference list contains references only. Re-
 words, no unresolved E-tags), manuscript.md + manuscript.pdf rebuilt: 16 A4 pages, no `(True)`/
 `(FAILED)` parenthetical, 37 deduped footnotes. Gate green: ruff, format, mypy, pytest,
 `paper-evidence --check`, `site build --check`. Nothing sealed changed.
+
+### D53.0 — Preprint stamped v3 with a version note
+The preprint metadata is bumped to record the D52.7/D52.8 corrections as a distinct version before
+upload. The manuscript dateline is now `Preprint · 2026-08-15 · v3` (running header likewise), and a
+one-line italic version note under the author block records what changed since v2: "first graded
+ledger cycle recorded in §8; abstract, §1, and §5 updated to the eight-concept tournament; references
+cleaned; provenance footnotes deduplicated." Metadata only — no prose, figure, or artifact number
+changed; `manuscript.pdf` rebuilt and re-verified at 16 A4 pages with the note on page one. The
+dateline and note live in the (uncommitted, scratchpad) preprint build scripts, as the preprint has
+no CLI builder (D43.0/D51.5); the committed outputs are `manuscript.md` + `manuscript.pdf`. Nothing
+sealed changed.

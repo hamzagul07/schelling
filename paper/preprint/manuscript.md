@@ -2,9 +2,11 @@
 
 **Hamza Gul Hassan**  
 Independent Researcher  
-Preprint · 2026-08-14 · v2
+Preprint · 2026-08-15 · v3
 
 Code, data, and one-command reproduction: https://github.com/hamzagul07/schelling
+
+*Changes since v2: first graded ledger cycle recorded in §8; abstract, §1, and §5 updated to the eight-concept tournament; references cleaned; provenance footnotes deduplicated.*
 
 ## Abstract
 
