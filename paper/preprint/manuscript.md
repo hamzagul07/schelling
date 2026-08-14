@@ -1,12 +1,12 @@
 # Structure, Not Magic: An Open Replication and Predictability Ceiling for the Bueno de Mesquita Forecasting Model
 
 **Hamza Gul Hassan**  
-Independent Researcher  
+Independent Researcher · Correspondence: hamzagulkhoso@gmail.com  
 Preprint · 2026-08-15 · v3
 
-Code, data, and one-command reproduction: https://github.com/hamzagul07/schelling
+Data and code availability: the code and all derived artifacts (backtest tables, the sealed ledger, the evidence file, and the figures) are in the repository, https://github.com/hamzagul07/schelling. The DEU III dataset is not redistributed here; it must be obtained from its open deposit (doi:10.34810/data53, CC BY 4.0) and placed at `data/deu/`. With that data present, the fair-fight, successor-search, and predictability-ceiling results (Sections 3–5) regenerate by a single command; without it, the replication reference case (Section 2), the case library (Section 7), and the sealed forecast ledger (Section 8) still regenerate from committed artifacts, while the DEU-dependent tables are reported as open questions.
 
-*Changes since v2: first graded ledger cycle recorded in §8; abstract, §1, and §5 updated to the eight-concept tournament; references cleaned; provenance footnotes deduplicated.*
+*Changes since v2: first graded ledger cycle recorded in §8; abstract, §1, and §5 updated to the eight-concept tournament; references cleaned; provenance footnotes deduplicated; a data-availability statement and corresponding-author contact added; AI coding assistance disclosed in §4.*
 
 ## Abstract
 
@@ -70,7 +70,7 @@ Quantal response is a pointed test of whether that lock lives in the bargaining 
 
 That points to the fix in kind, without claiming it is the only one. The weighted *mean* is the simplest operator that is continuous in every input, moves whenever any actor moves, and cannot lock — and it is the one that wins here. It is not the only such aggregator: other smooth functions of the same inputs exist, and we have not tested them. But the mean is not a rival mechanism that merely happens to score well; it is the kind of smoothing the median lacks and, being discontinuous, structurally cannot supply. The tournament then carries a single moral: the predictive content of these games lives in an average, and a solution concept that refines the *dynamics* while keeping the median *operator* inherits the operator's insensitivity and forfeits the gain.
 
-A note on provenance, reported because methods sections should describe what actually occurred. The two fitted candidates were proposed by a large language model working from Section 3's failure diagnostics; the five further solution concepts are standard constructions drawn from the game-theory literature, not machine-generated. In every case the protocol, execution, and verdicts belong entirely to the deterministic apparatus. The division — hypotheses proposed, from whatever source, and a pre-registered harness disposing of them — functioned exactly as intended, here by killing every proposal. We record the pattern without advocacy, as one datum on how candidate models can be subjected to conventional falsification standards.
+A note on provenance, reported because methods sections should describe what actually occurred. The two fitted candidates were proposed by a large language model working from Section 3's failure diagnostics; the five further solution concepts are standard constructions drawn from the game-theory literature, not machine-generated. The implementation itself — the solver, the search harness, and the scoring code — was likewise developed with AI coding assistance, under the same pre-registered discipline: the train/development/test split and every acceptance threshold were committed to version control before any model or its scoring code was written, so the repository's history certifies that no code, whatever authored it, could consult held-out data before its verdict was fixed. In every case the protocol, execution, and verdicts belong entirely to the deterministic apparatus. The division — hypotheses proposed, from whatever source, and a pre-registered harness disposing of them — functioned exactly as intended, here by killing every proposal. We record the pattern without advocacy, as one datum on how candidate models can be subjected to conventional falsification standards.
 
 Seven attacks on the mean — a celebrated mechanism restored to full strength, its quantal-response softening, two axiomatic bargaining solutions, the probabilistic-Condorcet method of the field's own successor library, and two fitted blends on held-out data — have now failed. The remaining question is no longer *which* model beats the weighted mean on these data, but whether *any* model can. Section 5 gives the answer.
 

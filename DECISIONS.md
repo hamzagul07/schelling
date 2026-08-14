@@ -2922,3 +2922,20 @@ changed; `manuscript.pdf` rebuilt and re-verified at 16 A4 pages with the note o
 dateline and note live in the (uncommitted, scratchpad) preprint build scripts, as the preprint has
 no CLI builder (D43.0/D51.5); the committed outputs are `manuscript.md` + `manuscript.pdf`. Nothing
 sealed changed.
+
+### D53.1 — Pre-upload accuracy corrections to the preprint front matter
+Four honesty/completeness fixes before the SSRN upload (still v3, dated 2026-08-15). **(1)
+Data-availability statement.** The old header "Code, data, and one-command reproduction" overclaimed
+— the DEU III data is *not* redistributed in the repo. Replaced with an accurate statement: the code
+and all derived artifacts are in the repository, but DEU III must be obtained from its open deposit
+(doi:10.34810/data53, CC BY 4.0) and placed at `data/deu/`; with it, the fair-fight, successor-search,
+and ceiling results (§§3–5) regenerate by one command; without it, the replication case (§2), the case
+library (§7), and the sealed ledger (§8) still regenerate from committed artifacts, and the
+DEU-dependent tables are reported as open questions. **(2)** A corresponding-author contact email
+(hamzagulkhoso@gmail.com, supplied by Hassan) added to the title block. **(3)** One sentence in §4's
+provenance note discloses that the implementation — solver, harness, scoring code — was developed with
+AI coding assistance under the same pre-registered gates (split + thresholds committed before any code,
+so git history certifies no code consulted held-out data before its verdict), alongside the existing
+LLM-hypothesis-generation note. **(4)** The v3 version note updated to record all of the above; dateline
+and running header stay `2026-08-15 · v3`. Prose/metadata only — no figure or artifact number changed;
+manuscript.pdf rebuilt and verified at 16 A4 pages with every item on page one. Nothing sealed changed.
