@@ -84,6 +84,13 @@ def render_chart(data: BriefData) -> str:
         f"reality — {data.actual_continuum:g}</text>"
     )
 
+    # faint gridlines at each tick (the instrument graticule), behind the marks
+    grid = "".join(
+        f'<line x1="{_n(x(t))}" y1="{_n(_RULE_Y1)}" x2="{_n(x(t))}" y2="{_n(_AXIS_Y)}"/>'
+        for t in ticks
+    )
+    parts.insert(0, f'<g stroke="var(--rule-3)" stroke-width="1">{grid}</g>')
+
     # axis rule + ticks + scale caption
     parts.append(
         f'<line x1="{_n(_PLOT_X0)}" y1="{_n(_AXIS_Y)}" x2="{_n(_AXIS_X1)}" y2="{_n(_AXIS_Y)}" '

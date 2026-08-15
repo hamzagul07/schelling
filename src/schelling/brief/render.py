@@ -36,15 +36,71 @@ def _flat(text: str) -> str:
     return " ".join(text.split())
 
 
-def _beat(text: str) -> str:
-    """One ``date | Title`` + body beat cell; the date label is upper-cased like the reference."""
+def _beat(text: str, *, sig: bool = False) -> str:
+    """One ``date | Title`` + body node in the dossier timeline (the resolved node is accented)."""
     head, _, body = text.partition("\n")
     date, _, title = head.partition("|")
+    cls = "beat sig" if sig else "beat"
     return (
-        '<div class="beat">'
+        f'<div class="{cls}">'
         f'<p class="d">{_esc(date.strip().upper())}</p>'
         f'<p class="t">{_esc(title.strip())}</p>'
         f'<p class="s">{_esc(_flat(body))}</p></div>'
+    )
+
+
+def _masthead() -> str:
+    """The brand bar: wordmark, then honest status tags (an OPEN, GRADED record)."""
+    return (
+        '<div class="masthead"><span class="mk">SCHELLING</span>'
+        '<span class="rt"><span class="tag">OPEN RECORD</span>'
+        '<span class="tag sig">GRADED</span></span></div>'
+        '<div class="rule-full"><hr></div>'
+    )
+
+
+def _record_panel(data: BriefData) -> str:
+    """The dossier record panel: the question's identity and headline result, from artifacts."""
+    rows = [
+        ("Ref", _esc(data.question_id), ""),
+        ("Records", str(len(data.records)), ""),
+        ("Settlement", f"{data.actual_continuum:g}", "big"),
+        ("Adjustment", f"{data.tag_values()['barrels_actual']} b/d", ""),
+    ]
+    body = "".join(
+        f'<div class="row"><dt>{k}</dt><dd class="{c}">{v}</dd></div>'
+        if c
+        else f'<div class="row"><dt>{k}</dt><dd>{v}</dd></div>'
+        for k, v, c in rows
+    )
+    return f'<div class="record"><div class="rh">Sealed record</div><dl>{body}</dl></div>'
+
+
+def _sec(eyebrow: str, title: str, note: str, inner: str) -> str:
+    return (
+        '<section class="sec">'
+        f'<p class="sec-ey">{_esc(eyebrow)}</p>'
+        f"<h2>{_esc(title)}</h2>"
+        f'<p class="note">{_esc(note)}</p>'
+        f"{inner}</section>"
+    )
+
+
+def _verify(data: BriefData, resolved: dict[str, str], *, repo_url: str, site_url: str) -> str:
+    repo_display = repo_url.split("://", 1)[-1].rstrip("/")
+    site_display = site_url.split("://", 1)[-1].rstrip("/")
+    source = f"{resolved['source-label']}, {data.resolved_date}"
+    return (
+        '<div class="verify"><div class="vh"><p class="seal">'
+        f"{_esc(resolved['footer-note'])}</p></div>"
+        '<div class="vb">'
+        f'<span class="k">Ledger &amp; code</span> '
+        f'<a href="{_esc(repo_url)}">{_esc(repo_display)}</a>'
+        f'&nbsp; · &nbsp;<span class="k">Site</span> '
+        f'<a href="{_esc(site_url)}">{_esc(site_display)}</a>'
+        f'&nbsp; · &nbsp;<span class="k">Source for the outcome</span> '
+        f'<a href="{_esc(data.citation)}">{_esc(source)}</a>'
+        "</div></div>"
     )
 
 
@@ -86,24 +142,10 @@ def _table(data: BriefData) -> str:
             f'<td class="num">{r.error:.2f}</td></tr>'
         )
     return (
-        "<table><thead><tr>"
+        '<div class="table-wrap"><table><thead><tr>'
         "<th>Method</th><th>Evidence</th><th>Forecast</th>"
         "<th>In barrels</th><th>Off by</th>"
-        f"</tr></thead><tbody>{''.join(trs)}</tbody></table>"
-    )
-
-
-def _footer(data: BriefData, resolved: dict[str, str], *, repo_url: str, site_url: str) -> str:
-    repo_display = repo_url.split("://", 1)[-1].rstrip("/")
-    site_display = site_url.split("://", 1)[-1].rstrip("/")
-    source = f"{resolved['source-label'].upper()}, {data.resolved_date.upper()}"
-    return (
-        "<footer>"
-        f"{_esc(resolved['footer-note'].upper())}<br>"
-        f'LEDGER AND CODE · <a href="{_esc(repo_url)}">{_esc(repo_display)}</a> · '
-        f'SITE · <a href="{_esc(site_url)}">{_esc(site_display)}</a><br>'
-        f'SOURCE FOR THE OUTCOME · <a href="{_esc(data.citation)}">{_esc(source)}</a>'
-        "</footer>"
+        f"</tr></thead><tbody>{''.join(trs)}</tbody></table></div>"
     )
 
 
@@ -116,33 +158,46 @@ def render_html(
 ) -> str:
     """Assemble the full brief page from artifact figures, resolved prose, and the chart."""
     title = f"Graded forecast brief — {data.question_id}"
-    body = (
-        '<div class="wrap">'
-        f'<p class="eyebrow">{_esc(resolved["eyebrow"])}</p>'
-        f"<h1>{_esc(resolved['headline'])}</h1>"
-        f'<p class="stand">{_esc(_flat(resolved["standfirst"]))}</p>'
-        '<div class="beats">'
-        + _beat(resolved["beat-sealed"])
-        + _beat(resolved["beat-resolved"])
-        + _beat(resolved["beat-graded"])
-        + "</div>"
-        f"<h2>{_esc(resolved['landed-title'])}</h2>"
-        f'<p class="note">{_esc(_flat(resolved["landed-note"]))}</p>'
-        "<figure>"
+    chart_panel = (
+        '<figure><div class="panel-hd"><span>Outcome continuum</span>'
+        "<span>Generated, not drawn</span></div>"
         + render_chart(data)
         + f"<figcaption>{_esc(resolved['chart-caption'].upper())}</figcaption></figure>"
-        f"<h2>{_esc(resolved['scores-title'])}</h2>"
-        f'<p class="note">{_esc(_flat(resolved["scores-note"]))}</p>'
-        + _table(data)
+    )
+    body = (
+        _masthead() + '<div class="wrap">'
+        f'<p class="eyebrow">{_esc(resolved["eyebrow"])}</p>'
+        '<div class="hero"><div>'
+        f"<h1>{_esc(resolved['headline'])}</h1>"
+        f'<p class="stand">{_esc(_flat(resolved["standfirst"]))}</p>'
+        "</div>" + _record_panel(data) + "</div>"
+        '<div class="beats">'
+        + _beat(resolved["beat-sealed"])
+        + _beat(resolved["beat-resolved"], sig=True)
+        + _beat(resolved["beat-graded"])
+        + "</div>"
+        + _sec(
+            "Outcome continuum",
+            resolved["landed-title"],
+            _flat(resolved["landed-note"]),
+            chart_panel,
+        )
+        + _sec(
+            "Scored by distance",
+            resolved["scores-title"],
+            _flat(resolved["scores-note"]),
+            _table(data),
+        )
+        + '<section class="sec"><p class="sec-ey">The reading</p>'
         + f"<h2>{_esc(resolved['shows-title'])}</h2>"
-        '<div class="cols"><div>'
+        + '<div class="cols"><div>'
         + _paragraphs(resolved["commentary-pull"], "pull")
         + _paragraphs(resolved["commentary-body"], "body")
         + "</div><div>"
         + _paragraphs(resolved["caveats-pull"], "pull")
         + _caveats(resolved["caveats"])
-        + "</div></div>"
-        + _footer(data, resolved, repo_url=repo_url, site_url=site_url)
+        + "</div></div></section>"
+        + _verify(data, resolved, repo_url=repo_url, site_url=site_url)
         + "</div>"
     )
     return (

@@ -168,7 +168,7 @@ class BriefData:
         HTML (outside the chart/style, which are computed) that is absent here was not sourced.
         """
         strings: set[str] = set(self.tag_values().values())
-        strings.update({self.question_id, self.citation})
+        strings.update({self.question_id, self.citation, str(len(self.records))})
         for r in self.records:
             strings.add(f"{r.median:.2f}")
             strings.add(self.barrels_display(r.median))

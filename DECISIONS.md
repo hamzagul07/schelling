@@ -3089,3 +3089,22 @@ generated data-scaled chart, mark positions from the values, determinism, the un
 missing-slot failures, offline-cleanliness, and committed-brief-vs-fresh-build drift. Gate green:
 ruff, format, mypy --strict (whole package), pytest (635), paper-evidence --check, site build
 --check. Nothing sealed changed.
+
+### D57.0 — Brief restyled: a sealed-dossier treatment, still fully generated
+Presentation-only pass on the brief at Hassan's request ("improve the UI"); no figure, no artifact,
+nothing sealed changed. The generated page keeps the approved warm-archival identity (so it stays
+consistent with the live site) but elevates it into a precise, publicly-verifiable **dossier**:
+a brand masthead with honest status tags (OPEN RECORD · GRADED — the inverse of a classified file),
+a hero split with a monospace **record panel** (ref, record count, settlement, adjustment, all
+sourced), the three phases as a **dated timeline** with an accented "resolved" node, the chart in a
+framed panel with header/footer bars and a faint tick graticule, an **accented results table** (the
+closest forecast carries a signal-red left bar and tint), and a **verification plate** for the
+SHA-256 / anchored-in-Bitcoin footer. The palette is a chosen archival neutral (not a default cream)
+with a single signal-red accent reserved for reality and the best result; monospace carries every
+label and figure. `brief/css.py` is now theme-aware three ways (bare `:root` light, guarded
+`prefers-color-scheme: dark`, and `:root[data-theme="dark"]`) so the page holds on any host ground.
+The hard walls are untouched: every number still comes from `BriefData` (record count added to the
+provenance whitelist), the chart is byte-identical and computed, the page stays self-contained and
+offline-clean, and the no-hand-typed-figures test passes with the restyle. Also published a private
+Artifact preview so the redesign could be reviewed before shipping. Gate green: ruff, format, mypy
+--strict, pytest, paper-evidence --check, site build --check.
