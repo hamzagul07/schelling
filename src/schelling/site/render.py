@@ -15,8 +15,10 @@ import html
 import re
 from pathlib import Path
 
+from schelling.brief.data import slug_for
+from schelling.brief.render import DEFAULT_SITE_URL
 from schelling.site.css import SITE_CSS
-from schelling.site.data import SiteData, gather, trial_gates
+from schelling.site.data import QuestionInfo, SiteData, gather, trial_gates
 from schelling.site.figures import forecast_landscape, trials
 
 DEFAULT_REPO_URL = "https://github.com/hamzagul07/schelling"
@@ -217,7 +219,12 @@ def _index_body(data: SiteData, repo_url: str) -> str:
             forecast_landscape(data),
             "Fig. 1 — sealed forecast landscape · generated from FORECASTS.md",
         )
-        + _deep("ledger.html", f"The full ledger — all {data.sealed_count} forecasts"),
+        + _deep("ledger.html", f"The full ledger — all {data.sealed_count} forecasts")
+        + (
+            _deep("briefs/index.html", "The graded-forecast briefs")
+            if data.graded_questions_count
+            else ""
+        ),
     )
 
     n_gates = data.gate_count
@@ -355,13 +362,19 @@ def _ledger_body(data: SiteData, repo_url: str) -> str:
     ledger = _section("ledger", "Every sealed forecast", honesty + _ledger_rows(data), rule=False)
     q_cards = []
     for info in data.questions.values():
-        graded = "graded" if info.question_id in data.graded_questions else "sealed"
+        is_graded = info.question_id in data.graded_questions
+        graded = "graded" if is_graded else "sealed"
+        brief_link = (
+            f" {_deep(f'briefs/{slug_for(info.question_id)}.html', 'Read the brief')}"
+            if is_graded
+            else ""
+        )
         q_cards.append(
             '<div class="card">'
             f'<p class="t">{_esc(graded).upper()} · RESOLVES {_esc(info.resolution_date)}</p>'
             f"<h3>{_esc(info.question_id)}</h3>"
             f"<p>Pre-registered grading rubric, fixed in writing before resolution. "
-            f"{_blob(repo_url, info.rubric_file, 'Read the rubric')}.</p></div>"
+            f"{_blob(repo_url, info.rubric_file, 'Read the rubric')}.{brief_link}</p></div>"
         )
     questions = _section(
         "questions", "Questions and rubrics", f'<div class="cards">{"".join(q_cards)}</div>'
@@ -507,6 +520,40 @@ def _reports_body(data: SiteData, repo_url: str) -> str:
     return hero + _section("reports", "Published reports", inner, rule=False)
 
 
+# ============================================================================ briefs index
+def _graded_questions_in_order(data: SiteData) -> list[QuestionInfo]:
+    """The sealed questions that have been graded, in ledger order — each one owed a brief."""
+    return [info for qid, info in data.questions.items() if qid in data.graded_questions]
+
+
+def _briefs_index_body(data: SiteData, repo_url: str) -> str:
+    hero = _hero(
+        "the graded-forecast briefs",
+        "One page per",
+        "graded question.",
+        "A shareable single-page brief for each graded question — what was sealed, what reality "
+        "answered, and how every method scored. Each figure is generated from the ledger, so a "
+        "brief can never drift from the record it summarises.",
+        "",
+    )
+    graded = _graded_questions_in_order(data)
+    if graded:
+        cards = "".join(
+            '<div class="card"><p class="t">GRADED FORECAST</p>'
+            f'<h3><a href="{_esc(slug_for(info.question_id))}.html">'
+            f"{_esc(info.question_id)}</a></h3>"
+            f'<p><a href="{_esc(slug_for(info.question_id))}.html">Read the brief →</a></p></div>'
+            for info in graded
+        )
+        inner = f'<div class="cards">{cards}</div>'
+    else:
+        inner = (
+            '<p class="body">No question has been graded yet — a brief appears here for each '
+            "question as it resolves.</p>"
+        )
+    return hero + _section("briefs", "Graded-forecast briefs", inner, rule=False)
+
+
 def build_site(
     repo_root: Path, *, repo_url: str = DEFAULT_REPO_URL, data: SiteData | None = None
 ) -> dict[str, str]:
@@ -551,6 +598,13 @@ def build_site(
             "../",
             "Index of rendered dossiers and reports.",
         ),
+        "briefs/index.html": (
+            _briefs_index_body(d, repo_url),
+            "Briefs — Schelling",
+            "ledger",
+            "../",
+            "Index of shareable single-page briefs, one per graded question.",
+        ),
     }
     out: dict[str, str] = {"site.css": SITE_CSS + "\n", ".nojekyll": ""}
     for path, (body, title, current, prefix, desc) in pages.items():
@@ -584,5 +638,62 @@ def check_site(repo_root: Path, docs_dir: Path, *, repo_url: str = DEFAULT_REPO_
     for rel, content in files.items():
         dest = docs_dir / rel
         if not dest.exists() or dest.read_text() != content:
+            drift.append(rel)
+    return sorted(drift)
+
+
+# ============================================================================ briefs coverage (D56)
+def write_briefs(
+    repo_root: Path,
+    docs_dir: Path,
+    *,
+    repo_url: str = DEFAULT_REPO_URL,
+    site_url: str = DEFAULT_SITE_URL,
+) -> list[str]:
+    """(Re)generate every graded question's standalone brief under ``docs_dir/briefs/``; return the
+    written relative paths. Keeps the briefs in step with the ledger from one ``site build`` (D56)."""
+    from schelling.brief.render import BRIEFS_SUBDIR, build_brief
+
+    data = gather(repo_root)
+    written: list[str] = []
+    for info in _graded_questions_in_order(data):
+        build_brief(
+            info.question_id, repo_root, docs_dir=docs_dir, repo_url=repo_url, site_url=site_url
+        )
+        written.append(f"{BRIEFS_SUBDIR}/{slug_for(info.question_id)}.html")
+    return sorted(written)
+
+
+def check_briefs(
+    repo_root: Path,
+    docs_dir: Path,
+    *,
+    repo_url: str = DEFAULT_REPO_URL,
+    site_url: str = DEFAULT_SITE_URL,
+) -> list[str]:
+    """Return sorted drift messages so a committed brief can never diverge from the ledger (D56).
+
+    Flags a graded question whose prose is missing, whose brief cannot build, or whose committed
+    HTML differs from a fresh regeneration. Empty when every graded question has an up-to-date brief.
+    """
+    from schelling.brief.prose import BriefProseError
+    from schelling.brief.render import BRIEFS_SUBDIR, prose_path, render_page
+
+    data = gather(repo_root)
+    drift: list[str] = []
+    for info in _graded_questions_in_order(data):
+        qid = info.question_id
+        slug = slug_for(qid)
+        rel = f"{BRIEFS_SUBDIR}/{slug}.html"
+        if not prose_path(repo_root, slug).exists():
+            drift.append(f"{BRIEFS_SUBDIR}/{slug}.md (missing prose for graded {qid})")
+            continue
+        try:
+            _slug, html = render_page(qid, repo_root, repo_url=repo_url, site_url=site_url)
+        except (BriefProseError, ValueError) as exc:
+            drift.append(f"{rel} (build error: {exc})")
+            continue
+        dest = docs_dir / BRIEFS_SUBDIR / f"{slug}.html"
+        if not dest.exists() or dest.read_text() != html:
             drift.append(rel)
     return sorted(drift)

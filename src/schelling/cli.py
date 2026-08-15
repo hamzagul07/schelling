@@ -82,6 +82,11 @@ preprint_app = typer.Typer(
     help="Build the SSRN preprint from the assembled paper (Session 55, D55).", no_args_is_help=True
 )
 app.add_typer(preprint_app, name="preprint")
+brief_app = typer.Typer(
+    help="Shareable single-page briefs for a graded question (Session 56, D56).",
+    no_args_is_help=True,
+)
+app.add_typer(brief_app, name="brief")
 
 # Shown when the bge-m3 knowledge extra is needed but not installed (D7.0c).
 _KNOWLEDGE_HINT = (
@@ -2283,6 +2288,9 @@ def site_build(
     repo_url: str = typer.Option(
         "https://github.com/hamzagul07/schelling", "--repo-url", help="Public repo URL for links."
     ),
+    site_url: str = typer.Option(
+        "https://schelling-ashen.vercel.app", "--site-url", help="Public site URL for brief links."
+    ),
     check: bool = typer.Option(
         False,
         "--check",
@@ -2302,7 +2310,7 @@ def site_build(
     build. ``--refresh-intervals`` regenerates the hero figure's interval snapshot from the (local,
     gitignored) records; the committed snapshot is what the build and ``--check`` read.
     """
-    from schelling.site.render import check_site, write_site
+    from schelling.site.render import check_briefs, check_site, write_briefs, write_site
 
     if refresh_intervals:
         from schelling.site.intervals import refresh_intervals as _refresh
@@ -2312,21 +2320,62 @@ def site_build(
 
     if check:
         drift = check_site(repo_root, docs_dir, repo_url=repo_url)
+        drift += check_briefs(repo_root, docs_dir, repo_url=repo_url, site_url=site_url)
         if drift:
             typer.echo(
                 f"SITE DRIFT — build fails ({len(drift)} file(s) differ from HEAD):", err=True
             )
             for rel in drift:
                 typer.echo(f"  ✗ {rel}", err=True)
-            typer.echo("Regenerate with `schelling site build` and re-commit.", err=True)
+            typer.echo(
+                "Regenerate with `schelling site build` (briefs included) and re-commit.", err=True
+            )
             raise typer.Exit(code=1)
         typer.echo("site is in sync with HEAD — no drift.")
         return
 
     written = write_site(repo_root, docs_dir, repo_url=repo_url)
-    typer.echo(f"site: {len(written)} file(s) → {docs_dir}")
-    for rel in written:
+    briefs = write_briefs(repo_root, docs_dir, repo_url=repo_url, site_url=site_url)
+    typer.echo(f"site: {len(written) + len(briefs)} file(s) → {docs_dir}")
+    for rel in [*written, *briefs]:
         typer.echo(f"  {rel}")
+
+
+@brief_app.command("build")
+def brief_build(
+    question_id: str = typer.Argument(..., help="The graded question, e.g. Q-2026-OPEC-SEP."),
+    repo_root: Path = typer.Option(Path("."), "--repo-root", help="Repository root."),
+    docs_dir: Path = typer.Option(Path("docs"), "--docs-dir", help="Where docs/ lives."),
+    repo_url: str = typer.Option(
+        "https://github.com/hamzagul07/schelling", "--repo-url", help="Public repo URL for links."
+    ),
+    site_url: str = typer.Option(
+        "https://schelling-ashen.vercel.app", "--site-url", help="Public site URL for links."
+    ),
+) -> None:
+    """Generate a shareable single-page brief for a GRADED question (D56).
+
+    Writes ``docs/briefs/<slug>.html`` from the committed artifacts (the grading file, the ledger's
+    GRADED block, the rubric's ``outcome_map``) and the committed prose ``docs/briefs/<slug>.md``.
+    Every figure — the outcome and its citation, each record's median/model/error, the barrels
+    column (inverted from the rubric), the seal/resolution/grading dates — is computed, never typed.
+    Refuses an ungraded question, and fails if any prose ``{{tag}}`` is unresolved.
+    """
+    from schelling.brief.data import BriefNotGradedError, BriefUnsupportedError
+    from schelling.brief.prose import BriefProseError
+    from schelling.brief.render import build_brief
+
+    try:
+        out = build_brief(
+            question_id, repo_root, docs_dir=docs_dir, repo_url=repo_url, site_url=site_url
+        )
+    except BriefNotGradedError as exc:
+        typer.echo(f"REFUSED — {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    except (BriefUnsupportedError, BriefProseError) as exc:
+        typer.echo(f"brief build failed — {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"brief: {out}")
 
 
 def _emit_claims(claims: list[EvidenceClaim], out: Path | None) -> None:

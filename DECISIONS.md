@@ -3029,3 +3029,63 @@ stays in the Declarations. Dateline and running header stamped **v5** (2026-08-1
 rebuilt via `schelling preprint build`: 17 A4 pages, both items verified on page one; the drift-guard
 test still holds (assemble(DRAFT, front-matter) == committed manuscript.md). Gate green: ruff, format,
 mypy, pytest, paper-evidence --check, site build --check. Nothing sealed changed.
+
+### D56.0 — The graded-forecast brief, generated from artifacts (`schelling brief build`)
+New `schelling brief build <question-id>` command and `src/schelling/brief/` package. It renders
+Hassan's approved `first-graded-forecast.html` design into `docs/briefs/<slug>.html`, but EVERY
+figure is computed from the committed artifacts, never copied from the reference file (CLAUDE.md
+§1/§2). It refuses an ungraded question — no `### GRADED` block for the id raises
+`BriefNotGradedError` and the command exits 1. Sources: the actual outcome (188 -> 66) and its
+citation from the grading file's GRADED block in FORECASTS.md; each record's median, vintage, model
+and error from that same block; the seal date from the ledger's `frozen_at`, the resolution date
+from the announcement date stated in the justification, the grading date from the ledger header.
+The **barrels** column is the rubric's `outcome_map` INVERTED — `(continuum - intercept)/slope`,
+i.e. `(median - 50) x 12` — so 66.0 -> 192,000 b/d and 58.0 -> 96,000; it is never the announced
+188. The command reads gitignored `runs/` never — it parses only committed text — so it builds on
+CI. Nothing sealed changed.
+
+### D56.1 — Where the brief and the reference legitimately differ: the artifacts govern
+The reference is the DESIGN target (layout, type, colour), not a figure source. Where its
+illustrative numbers diverge from the committed artifacts, the artifacts win: the "Sealed" beat
+reads **24 July 2026** (the uniform `frozen_at`), not the mock-up's "24–25 July"; "Graded" reads
+**6 August 2026** (the ledger Grading date), not "7 August". These divergences are intended and
+load-bearing — a brief that reproduced the mock-up's dates would be quoting the mock-up, not the
+ledger. The one figure test asserts each date against its artifact so the coupling can't rot.
+
+### D56.2 — The chart is generated and scaled to the data, not copied
+`brief/chart.py` builds the continuum chart as a deterministic inline SVG: each mark from its
+forecast's value on the 0-100 continuum, the reality rule from the graded value, each family's
+thin->researched pair joined by a dashed connector. The axis is **scaled to the spread** by a
+nice-number routine (10% pad, a 1/2/2.5/5 × 10^k step targeting ~5 intervals) — for this data it
+picks **56–68**, not the reference's hardcoded 54–70; a differently-spread question gets its own
+bounds. Byte-identical on re-run (integer-precision coordinates via `report.svg._n`, no clock or
+RNG), no `<script>`, `role="img"` with a generated `<title>` and `<desc>`, and colours as CSS
+custom properties so it stays legible in dark mode. The chart geometry is excluded from the
+no-hand-typed scan (it is computed) and its plotted values are checked against the artifacts
+separately, mirroring the site figures' discipline.
+
+### D56.3 — Prose behind the same hard wall as the dossier
+The words live in a committed `docs/briefs/<slug>.md` — eyebrow, headline, standfirst, the three
+beats, the section notes, the commentary and the caveats — with `{{tags}}` wherever a figure
+belongs; the prose types no numeral of its own. `brief/prose.py` resolves every tag from the
+artifact-sourced `BriefData.tag_values()` and FAILS the build on an unresolved tag or a missing
+required slot (`BriefProseError`), exactly the dossier narrative's discipline. The
+no-hand-typed-figures test covers the brief page: every numeral outside the computed chart/style
+traces to `BriefData.provenance()` (each figure string and its numeric sub-tokens), or is one of a
+tiny structural set (viewport `1`, UTF-`8`, SHA-`256`).
+
+### D56.4 — Wired into the site so a brief can't drift from the ledger
+`build_site` now emits `docs/briefs/index.html` — a site-shell index of the graded-question briefs;
+the home page's ledger section and the ledger page link to it, and each graded question's ledger
+card links to its brief. `site build` regenerates every graded question's standalone brief alongside
+the pages (`write_briefs`), and `site build --check` fails on a graded question whose prose is
+missing, whose brief will not build, or whose committed HTML differs from a fresh render
+(`check_briefs`) — so both the set and the content of the briefs can never diverge from the graded
+ledger. The standalone briefs stay out of `build_site` itself (they carry their own full-page design
+and a scores `<table>`, which the site's reference-design guard forbids); they are covered at the
+command layer instead. First brief generated for **Q-2026-OPEC-SEP**. Tests (`tests/test_brief.py`,
+15): refusal on ungraded, figure provenance, barrels-invert-the-rubric, dates-from-the-ledger, a
+generated data-scaled chart, mark positions from the values, determinism, the unresolved-tag and
+missing-slot failures, offline-cleanliness, and committed-brief-vs-fresh-build drift. Gate green:
+ruff, format, mypy --strict (whole package), pytest (635), paper-evidence --check, site build
+--check. Nothing sealed changed.
