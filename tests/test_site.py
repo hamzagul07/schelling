@@ -166,6 +166,7 @@ def test_build_writes_the_expected_fileset() -> None:
         "findings.html",
         "paper.html",
         "reports/index.html",
+        "briefs/index.html",
         "site.css",
         ".nojekyll",
     }
