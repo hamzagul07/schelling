@@ -129,3 +129,51 @@ byte-frozen with this pre-registration.
   ]
 }
 ```
+
+---
+
+## Pre-resolution analyst note (2026-08-16)
+
+**This note changes NO grading rule and no sealed value.** It records a reading *before* the outcome
+is known, so it is on the record ex ante and cannot be reverse-fit after resolution. Every figure in
+the two tables is COMPUTED from the sealed ledger medians and the committed band midpoints (by
+`schelling.report.analyst_note`; a drift-guard test pins the tables to the ledger and the rubric) —
+none is hand-typed. Like the rest of this file the note is excluded from `inputs_hash`, so no sealed
+record, ledger entry, or OpenTimestamps proof is affected.
+
+The four **plausible** bands are collapse (11–30), largely-US-terms (31–44), balanced (45–60) and
+Iranian-leaning (61–69); the two full-capitulation poles and the comprehensive-Iranian-deal band are
+set aside as implausible for this horizon. Under the midpoint-default rule the graded value in each
+band is its midpoint.
+
+**Table (a) — graded value and each record's error, per plausible band.**
+
+| Plausible band | Graded (midpoint) | challenge v1 | challenge v2 | compromise v1 | compromise v2 | llm-judgment v2 | Closest |
+|---|---:|---:|---:|---:|---:|---:|---|
+| Collapse (11–30) | 20.5 | 14.076 | 8.907 | 21.136 | 18.943 | 20.500 | challenge v2 |
+| US terms (31–44) | 37.5 | 2.924 | 8.093 | 4.136 | 1.943 | 3.500 | compromise v2 |
+| Balanced (45–60) | 52.5 | 17.924 | 23.093 | 10.864 | 13.057 | 11.500 | compromise v1 |
+| Iranian-leaning (61–69) | 65 | 30.424 | 35.593 | 23.364 | 25.557 | 24.000 | compromise v1 |
+
+**Table (b) — does the v2-beats-v1 sourcing finding replicate, per band?**
+
+| Plausible band | challenge: v1 err → v2 err | compromise: v1 err → v2 err | Sourcing (v2 beats v1?) |
+|---|---|---|---|
+| Collapse (11–30) | 14.076 → 8.907 (v2 wins) | 21.136 → 18.943 (v2 wins) | REPLICATES |
+| US terms (31–44) | 2.924 → 8.093 (v1 wins) | 4.136 → 1.943 (v2 wins) | SPLIT |
+| Balanced (45–60) | 17.924 → 23.093 (v1 wins) | 10.864 → 13.057 (v1 wins) | FAILS |
+| Iranian-leaning (61–69) | 30.424 → 35.593 (v1 wins) | 23.364 → 25.557 (v1 wins) | FAILS |
+
+**Reading (a).** The closest family flips across the plausible range. The challenge model — whose
+lower, US-leaning median sits near the collapse band — is closest *only* if the talks collapse; the
+compromise model is closest in every other plausible band (on its v2 record in the US-terms band, on
+its v1 record in the balanced and Iranian-leaning bands). No sealed record lands in the balanced or
+Iranian-leaning bands, so every model is far if the settlement tilts Iranian.
+
+**Reading (b).** The v2-beats-v1 (sourced-beats-thin) finding from the graded `Q-2026-OPEC-SEP` cycle
+**replicates here only at the low end**: if the talks collapse, both families' sourced v2 records beat
+their thin v1 records. The US-terms band **splits** — the compromise v2 record wins, the challenge v1
+record wins. In the balanced and Iranian-leaning bands the finding **fails**: the thin v1 records,
+sitting higher on the scale, are closer. The sourcing revision pulled both models toward the US pole
+(D10.4), which helps when the outcome is low and hurts when it is high. Nothing here is a forecast or
+a grade — it is the ex-ante reading, placed on record so it exists before the outcome is known.
