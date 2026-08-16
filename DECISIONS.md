@@ -3189,3 +3189,29 @@ outcome is low and hurts when it is high. The note is excluded from `inputs_hash
 rubric); a drift-guard test (`tests/test_analyst_note.py`) pins the committed tables to a fresh
 computation, so the note can never diverge from the records it reads. Nothing solved, sealed, or
 graded. Gate green: ruff, format, mypy --strict, pytest, paper-evidence --check, site build --check.
+
+### D58.1 — Directional caveat: sourced-beats-thin is confounded with the revision's direction
+A caveat appended to the D58.0 analyst note (still dated 2026-08-16, still changing no rule). Computed
+from the sealed ledger: the v2 revision moved forecasts **upward** on `Q-2026-OPEC-SEP` (challenge
++1.671, compromise +0.984, llm-judgment +8.000) and **downward** on `Q-2026-USIRAN-STAGE2` (challenge
+−5.169, compromise −2.193). A "sourced-beats-thin" result is therefore **confounded** with whether the
+revision's direction happened to match reality's: on OPEC-SEP the outcome was an increase and the
+upward revision moved toward it, so the sourced vintage won — but one such case cannot separate
+*"better evidence improves accuracy"* from *"the revision moved the right way."* Distinguishing the two
+needs graded questions on which the revision direction **varies**, and the two now in flight supply
+exactly that contrast (up on OPEC, down on US-Iran) — so a v2-beats-v1 result on the down-revised
+US-Iran question, once graded, would be evidence OPEC-SEP alone cannot give. Directions are computed by
+`revision_direction`/`revision_caveat_table` and pinned by a drift-guard test; the caveat asserts no
+outcome. Nothing sealed changed.
+
+### D58.2 — Paper §8 wording flagged as an overclaim; replacement proposed, sealed text unchanged
+§8 (Ledger) currently reads that the sourced-beats-thin result is "a coherent within-question signal
+that better inputs help." Given the D58.1 confound that is stronger than one graded question supports.
+Per instruction the committed/sealed paper text is **left unchanged now**; a proposed replacement — one
+that states the result is *consistent with but does not on its own establish* the thesis, and names the
+directional contrast needed to test it — is recorded in a new `paper/REVISION-NOTES.md` (a first-class
+place for next-revision proposals), with the source file (`paper/draft/08-ledger.md`), the current
+wording, the problem, and the replacement. `paper/REVISION-NOTES.md` is not read by `paper-evidence`,
+so it moves no science number and the evidence gate is unaffected. Apply at the next revision (edit the
+section, reassemble `DRAFT.md`, rebuild the preprint). Gate green: ruff, format, mypy --strict, pytest,
+paper-evidence --check, site build --check.

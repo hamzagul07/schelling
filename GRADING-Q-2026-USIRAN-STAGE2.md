@@ -177,3 +177,21 @@ record wins. In the balanced and Iranian-leaning bands the finding **fails**: th
 sitting higher on the scale, are closer. The sourcing revision pulled both models toward the US pole
 (D10.4), which helps when the outcome is low and hurts when it is high. Nothing here is a forecast or
 a grade — it is the ex-ante reading, placed on record so it exists before the outcome is known.
+
+**Directional caveat on comparison (b) (added 2026-08-16; D58.1; changes no rule).** The v2 revision
+did not move the two live questions the same way: it moved forecasts **upward** on `Q-2026-OPEC-SEP`
+and **downward** on `Q-2026-USIRAN-STAGE2` (computed from the sealed medians below). So a
+"sourced-beats-thin" result is **confounded** with whether the revision's direction happened to match
+reality's. On OPEC-SEP the realized outcome was an increase, which the upward revision moved toward,
+so the sourced vintage won — but that single case cannot separate *"better evidence improves
+accuracy"* from *"the revision happened to move the right way."* Distinguishing the two requires
+graded questions on which the revision direction **varies**. The two questions now in flight supply
+exactly that contrast — the sourcing revision points up on one and down on the other — so a
+v2-beats-v1 result on `Q-2026-USIRAN-STAGE2` (where the revision points down) would, once graded, be
+evidence for the accuracy claim that OPEC-SEP alone cannot provide. This is the ex-ante reason the
+two-question contrast matters; it asserts no outcome.
+
+| Question | v1→v2 revision | per-family shift (thin → sourced, Δ) |
+|---|---|---|
+| Q-2026-OPEC-SEP | upward | challenge 62.009 → 63.680 (+1.671); compromise 62.450 → 63.434 (+0.984); llm-judgment 58.000 → 66.000 (+8.000) |
+| Q-2026-USIRAN-STAGE2 | downward | challenge 34.576 → 29.407 (-5.169); compromise 41.636 → 39.443 (-2.193) |
