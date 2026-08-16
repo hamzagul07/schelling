@@ -82,6 +82,33 @@ def test_round_half_up_ties_go_up() -> None:
     assert round_half_up(50.4999) == 50.0
 
 
+def test_round_half_up_two_decimals_ties_go_up() -> None:
+    """Two-decimal precision (D57.1): ties at the hundredth go up, not banker's rounding."""
+    assert round_half_up(65.665, 2) == 65.67
+    assert round_half_up(20.005, 2) == 20.01
+    assert round_half_up(45.0667, 2) == 45.07
+    assert round_half_up(45.0644, 2) == 45.06
+
+
+def test_nearest_hundredth_half_up_map() -> None:
+    """A two-decimal arithmetic map keeps a tight continuum's grade off the integer grid (D57.1).
+
+    slope 100/750, intercept 20 (the OPEC-OCT continuum: 0 = a 150 kb/d cut, 100 = a 600 kb/d rise,
+    a rollover at 20). Each anchor lands exactly; an intermediate figure keeps two decimals.
+    """
+    m = LinearMap(
+        unit="thousand b/d",
+        slope=100.0 / 750.0,
+        intercept=20.0,
+        rounding="nearest_hundredth_half_up",
+    )
+    assert apply_linear_map(m, -150.0) == 0.0  # cut of 150 kb/d -> pole
+    assert apply_linear_map(m, 0.0) == 20.0  # rollover sits at 20, not the midpoint (D28.0)
+    assert apply_linear_map(m, 600.0) == 100.0  # +600 kb/d -> pole
+    assert apply_linear_map(m, 188.0) == 45.07  # an intermediate figure keeps two decimals
+    assert apply_linear_map(m, -400.0) == 0.0 and apply_linear_map(m, 900.0) == 100.0  # clamped
+
+
 def test_linear_map_clamps() -> None:
     m = LinearMap(unit="x", slope=1.0, intercept=50.0)
     assert apply_linear_map(m, 100.0) == 100.0  # clamped high

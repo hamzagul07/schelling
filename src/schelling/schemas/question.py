@@ -47,8 +47,9 @@ class LinearMap(BaseModel):
     rubric it is EXCLUDED from ``inputs_hash``, so declaring it moves no sealed number.
 
     ``rounding`` is declared explicitly so the ``.5`` boundary is not left to a library default:
-    ``"nearest_int_half_up"`` rounds ties to the larger integer. The clamped continuum is always
-    ``>= 0`` here, so half-up equals round-half-away-from-zero; there is no negative-tie ambiguity.
+    ``"nearest_int_half_up"`` rounds ties to the larger integer, ``"nearest_hundredth_half_up"``
+    (D57.1) does the same at two decimals. The clamped continuum is always ``>= 0`` here, so half-up
+    equals round-half-away-from-zero; there is no negative-tie ambiguity.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -58,7 +59,9 @@ class LinearMap(BaseModel):
     intercept: float  # continuum value at raw == 0
     clamp_lo: float = 0.0
     clamp_hi: float = 100.0
-    rounding: str = "nearest_int_half_up"  # the ONLY supported rule today; declared, not implicit
+    # one of {"nearest_int_half_up", "nearest_hundredth_half_up"} (backtest.mapping); declared,
+    # never a library default. Two decimals keep a tight continuum's grade off the integer grid.
+    rounding: str = "nearest_int_half_up"
 
 
 class ResolutionRubric(BaseModel):

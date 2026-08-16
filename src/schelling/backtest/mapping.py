@@ -12,6 +12,9 @@ point using the rubric's structured mapping — the executable form of the ``out
 The rounding rule is declared on the map, never left to a library default (Python ``round`` is
 banker's rounding, which resolves a ``.5`` tie differently). ``nearest_int_half_up`` rounds ties
 to the larger integer; on the clamped ``[0, 100]`` continuum that equals round-half-away-from-zero.
+``nearest_hundredth_half_up`` (Session 57, D57.1) does the same at two-decimal precision — for a
+continuum whose grade should not be flattened to whole integers (a tight arithmetic question where a
+0.13-per-kbd slope makes single-integer grading throw away real resolution).
 """
 
 from __future__ import annotations
@@ -21,25 +24,28 @@ import math
 from schelling.schemas.question import LinearMap, ResolutionRubric
 
 NEAREST_INT_HALF_UP = "nearest_int_half_up"
+NEAREST_HUNDREDTH_HALF_UP = "nearest_hundredth_half_up"
+_ROUNDING_DP = {NEAREST_INT_HALF_UP: 0, NEAREST_HUNDREDTH_HALF_UP: 2}
 
 
-def round_half_up(value: float) -> float:
-    """Round to the nearest integer, ties to the larger integer (D49.2).
+def round_half_up(value: float, dp: int = 0) -> float:
+    """Round to ``dp`` decimals, ties to the larger value (D49.2; two-decimal variant D57.1).
 
-    ``math.floor(value + 0.5)`` sends ``x.5`` up to ``x+1`` (50.5 -> 51), unlike ``round`` which
-    would give 50 (banker's rounding). The continuum is clamped ``>= 0`` so there is no ambiguity
-    about which way a negative tie should go.
+    ``math.floor(value * 10**dp + 0.5)`` sends ``x.5`` up (50.5 -> 51, 65.665 -> 65.67), unlike
+    ``round`` which would resolve the tie by banker's rounding. The continuum is clamped ``>= 0`` so
+    there is no ambiguity about which way a negative tie should go. ``dp=0`` is the integer default.
     """
-    return float(math.floor(value + 0.5))
+    scale: int = 10**dp
+    return math.floor(value * scale + 0.5) / scale
 
 
 def apply_linear_map(mapping: LinearMap, raw: float) -> float:
     """``clamp(intercept + slope * raw)`` then the declared rounding — the continuum settlement."""
-    if mapping.rounding != NEAREST_INT_HALF_UP:
+    if mapping.rounding not in _ROUNDING_DP:
         raise ValueError(f"unsupported rounding rule {mapping.rounding!r}")
     continuum = mapping.intercept + mapping.slope * raw
     clamped = max(mapping.clamp_lo, min(mapping.clamp_hi, continuum))
-    return round_half_up(clamped)
+    return round_half_up(clamped, _ROUNDING_DP[mapping.rounding])
 
 
 def map_outcome(rubric: ResolutionRubric | None, raw: float) -> tuple[float, str]:
