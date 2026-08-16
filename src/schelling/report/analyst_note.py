@@ -130,6 +130,50 @@ def sourcing_table(medians: dict[tuple[str, str], float], bands: list[_Band]) ->
     return "\n".join(lines)
 
 
+def revision_direction(
+    forecasts_md: str, question_id: str
+) -> list[tuple[str, float, float, float]]:
+    """(family, thin median, sourced median, sourced-minus-thin) per family with both vintages.
+
+    Handles both vintage namings — OPEC-SEP labels its rows ``v1-thin`` / ``v2-sourced``, US-Iran
+    ``v1`` / ``v2`` — by matching on the ``v1`` / ``v2`` prefix.
+    """
+    by_fam: dict[str, dict[str, float]] = {}
+    for (fam, vin), med in sealed_medians(forecasts_md, question_id).items():
+        by_fam.setdefault(fam, {})[vin] = med
+    out: list[tuple[str, float, float, float]] = []
+    for fam in sorted(by_fam):
+        vins = by_fam[fam]
+        thin = next((m for v, m in vins.items() if v.startswith("v1")), None)
+        sourced = next((m for v, m in vins.items() if v.startswith("v2")), None)
+        if thin is not None and sourced is not None:
+            out.append((fam, thin, sourced, sourced - thin))
+    return out
+
+
+def revision_caveat_table(forecasts_md: str, question_ids: tuple[str, ...]) -> str:
+    """The computed v1→v2 revision DIRECTION per question — the directional-confound evidence."""
+    lines = [
+        "| Question | v1→v2 revision | per-family shift (thin → sourced, Δ) |",
+        "|---|---|---|",
+    ]
+    for qid in question_ids:
+        dirs = revision_direction(forecasts_md, qid)
+        deltas = [d for *_, d in dirs]
+        direction = (
+            "upward"
+            if all(d > 0 for d in deltas)
+            else "downward"
+            if all(d < 0 for d in deltas)
+            else "mixed"
+        )
+        shifts = "; ".join(
+            f"{fam} {thin:.3f} → {sourced:.3f} ({delta:+.3f})" for fam, thin, sourced, delta in dirs
+        )
+        lines.append(f"| {qid} | {direction} | {shifts} |")
+    return "\n".join(lines)
+
+
 def render_note_tables(forecasts_md: str, grading_md: str, question_id: str) -> str:
     """Both computed tables, for embedding in the analyst note (pure; every figure derived)."""
     medians = sealed_medians(forecasts_md, question_id)

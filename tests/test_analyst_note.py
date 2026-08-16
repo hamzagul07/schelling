@@ -12,6 +12,8 @@ from schelling.report.analyst_note import (
     outcome_table,
     plausible_bands,
     render_note_tables,
+    revision_caveat_table,
+    revision_direction,
     sealed_medians,
     sourcing_table,
 )
@@ -76,3 +78,18 @@ def test_note_changes_no_grading_rule_or_sealed_value() -> None:
     """The note is clearly marked non-authoritative and adds no 'Actual outcome' line (ungraded)."""
     assert "changes NO grading rule and no sealed value" in _GRADING
     assert "Actual outcome" not in _GRADING  # the question is not resolved/graded
+
+
+def test_revision_direction_up_on_opec_down_on_usiran() -> None:
+    """The confound's premise, computed from the ledger: the v2 revision moved OPEC-SEP up and
+    USIRAN-STAGE2 down (D58.1)."""
+    opec = revision_direction(_FORECASTS, "Q-2026-OPEC-SEP")
+    usiran = revision_direction(_FORECASTS, QID)
+    assert opec and all(delta > 0 for *_, delta in opec)  # every family revised upward
+    assert usiran and all(delta < 0 for *_, delta in usiran)  # every family revised downward
+
+
+def test_committed_caveat_matches_the_computation() -> None:
+    """Drift guard: the committed directional-caveat table equals a fresh computation (D58.1)."""
+    computed = revision_caveat_table(_FORECASTS, ("Q-2026-OPEC-SEP", QID))
+    assert computed in _GRADING, "the committed caveat table differs from a fresh computation"
