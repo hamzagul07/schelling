@@ -3169,3 +3169,23 @@ generated. The situation text (committed in the question package) and the comman
 awaits API credit. This is a runtime/billing blocker, not a code state; nothing sealed changed and the
 grading rubric is already committed. Gate green: ruff, format, mypy --strict, pytest, paper-evidence
 --check, site build --check.
+
+### D58.0 — Pre-resolution analyst note for Q-2026-USIRAN-STAGE2 (a reading, on record, ex ante)
+A dated (2026-08-16) analyst note appended to `GRADING-Q-2026-USIRAN-STAGE2.md`, **changing no grading
+rule and no sealed value** — added before the 2026-08-31 resolution so the reading exists ex ante and
+cannot be reverse-fit after the outcome. Two tables, both **computed** from the sealed ledger medians
+and the committed band midpoints (`schelling.report.analyst_note`), never hand-typed:
+**(a)** for each of the four plausible bands — collapse (11–30), largely-US (31–44), balanced (45–60),
+Iranian-leaning (61–69) — the graded value under the midpoint-default rule, each of the five sealed
+records' error (challenge/compromise × v1/v2, plus llm-judgment v2), and the closest family. The
+closest family **flips**: the challenge model is closest *only* if the talks collapse; the compromise
+model is closest in every other plausible band (its v2 record in the US-terms band, its v1 record in
+the balanced and Iranian-leaning bands). **(b)** whether the v2-beats-v1 (sourced-beats-thin) finding
+from the graded `Q-2026-OPEC-SEP` cycle **replicates**: it does so **only at the low end** —
+REPLICATES if the talks collapse, SPLITs in the US-terms band (compromise v2 wins, challenge v1 wins),
+and FAILS in the balanced and Iranian-leaning bands, where the higher-sitting thin v1 records are
+closer. The sourcing revision pulled both models toward the US pole (D10.4), which helps when the
+outcome is low and hurts when it is high. The note is excluded from `inputs_hash` (like the rest of the
+rubric); a drift-guard test (`tests/test_analyst_note.py`) pins the committed tables to a fresh
+computation, so the note can never diverge from the records it reads. Nothing solved, sealed, or
+graded. Gate green: ruff, format, mypy --strict, pytest, paper-evidence --check, site build --check.
