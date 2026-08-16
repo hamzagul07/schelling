@@ -3108,3 +3108,64 @@ provenance whitelist), the chart is byte-identical and computed, the page stays 
 offline-clean, and the no-hand-typed-figures test passes with the restyle. Also published a private
 Artifact preview so the redesign could be reviewed before shipping. Gate green: ruff, format, mypy
 --strict, pytest, paper-evidence --check, site build --check.
+
+### D57.1 — Two-decimal grading mode, and the Q-2026-OPEC-OCT rubric that needs it
+Session 57 opens a second OPEC question. Its continuum applies **D28.0** (never site the status quo
+at the midpoint): anchored to the plausible range — 0 = a 150 kb/d cut, 100 = a 600 kb/d increase —
+so the status-quo **rollover sits at 20**, near a pole, where a mid-scale forecast is informative.
+`grade = 20 + (adjustment_kbd / 750) × 100`, clamped [0, 100]. At a slope of 0.133 per kbd, whole-
+integer grading would flatten ~7.5 kbd into each step, so the rubric grades to **two decimals**. New
+rounding rule `nearest_hundredth_half_up` in `backtest.mapping` (`round_half_up(value, dp)`,
+`apply_linear_map` dispatches on the declared rule via `_ROUNDING_DP`); `LinearMap.rounding` now
+documents both rules. The integer path is byte-unchanged (the SEP map still gives 188 → 66). New
+unit tests plus a drift-guard `test_opec_oct_outcome_map_matches_prose` pin the OCT executable map to
+its prose at the two-decimal boundary, exactly as D49.2 did for September. `GRADING-Q-2026-OPEC-OCT.md`
+committed (resolution 2026-09-10, grading 2026-09-11); the question package is
+`docs/questions/question-opec-oct.md`. Nothing sealed changed.
+
+### D57.2 — Reference class built denominator-first; honestly INCOMPLETE
+The OPEC archive fetcher is bot-blocked (opec.org serves HTML, no open feed), so the sessions-at-risk
+denominator was built by **manual sourced enumeration** under a strict, pre-registered protocol
+(`docs/questions/opec-reference-class.md`). Part A — the definition — was written and **committed
+before any outcome was sourced**: the unit is one production month's collective AVA adjustment; the
+denominator is fixed **by construction** at N = 41 months (May 2023 → Sep 2026, counted off the
+calendar, not discovered); and the tranche (1.65 / 2.2 mb/d), eight-to-seven membership, and
+no-announcement cases are each ruled on in advance (holds = rollover, not gaps). Part B sourced each
+month from opec.org `pr-detail` statements (reachable one-by-one via a different fetcher) and mirrors
+(CNBC, World Oil, Euronews, GlobalSecurity/SPA, Aegis), actively hunting pauses — and found the
+**Q1-2026 seasonality pause** (Jan–Mar 2026 at rollover). Coverage came to **M/N = 27/41 (66%)**; the
+14 delayed-unwind holds of Feb 2024 → Mar 2025 are only block-inferable, so per **D30.2** the class is
+**INCOMPLETE and no base rate is claimed** — the distribution is reported over the 27 sourced months
+and labelled incomplete. The class is **NOT RATIFIED**; it feeds nothing until a human ratifies the
+definition, the outcomes, and either the INCOMPLETE verdict or the 14 inferred holds. This is the
+discipline working: the pre-registered scope was broader than the clean monthly-decision cadence, and
+the completeness check flagged it rather than gerrymandering a "complete" class.
+
+### D57.3 — Actor coordinates sourced via DBnomics; the v2 acceptance test, applied
+`docs/questions/opec-oct-coordinates.md` records, per actor, what fraction of its coordinate *basis*
+is sourced vs inferred — the D37.2 "no dressing up" ledger, re-run for OCT. Fiscal breakevens
+(grounding salience) are sourced from IMF MCDREO `PZPIOILBE_G_USD` for **six of the seven** (Saudi
+90.94, Iraq 92.43, Kuwait 81.84, Kazakhstan 115.93, Algeria 118.95, Oman 57.31 US$/bbl, 2025) —
+**Russia is outside the Middle East & Central Asia REO, so its breakeven is the one inferred gap.**
+Production weights (grounding capability) are sourced for all seven from the OPEC required-production
+table. Inventories are a market-level variable, not a per-actor coordinate. Positions (ideal points)
+are inferred for all seven — no participant publishes its preferred figure — exactly the SEP v2 shape:
+capabilities grounded, salience mostly grounded, positions inferred. DBnomics supplies the citation,
+never the coordinate (the firewall holds).
+
+### D57.4 — OPEC monthly-decision series scaffolding
+`docs/questions/README.md` documents the series and a per-month checklist; `_template-opec-monthly.md`
+is a fill-in skeleton so a new month is a **date-and-anchor edit, not a rewrite**. The reference-class
+definition and the coordinate-sourcing method are factored to the *series* level (reused unchanged);
+only the dated identifiers, the cadence markers, and the refreshed figures change month to month. The
+continuum anchors are reused while the regime is stable, re-anchored (re-applying D28.0) only if the
+plausible range genuinely shifts.
+
+### D57.5 — Formalize stopped for review; blocked on API credits, nothing solved or sealed
+Session 57 was scoped to STOP at a reviewed formalization — no solve, no seal (`schelling formalize`
+never auto-solves). The command was run — `formalize analyses/opec-oct/situation.txt --search
+--max-searches 6` — but the Anthropic API returned **400: credit balance too low**, so no draft was
+generated. The situation text (committed in the question package) and the command are ready; the draft
+awaits API credit. This is a runtime/billing blocker, not a code state; nothing sealed changed and the
+grading rubric is already committed. Gate green: ruff, format, mypy --strict, pytest, paper-evidence
+--check, site build --check.

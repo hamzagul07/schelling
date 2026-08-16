@@ -62,6 +62,43 @@ def test_opec_outcome_map_matches_prose(raw: float) -> None:
     assert value == _prose_grade(float(raw))
 
 
+def _oct_rubric() -> ResolutionRubric:
+    looked = lookup_rubric("Q-2026-OPEC-OCT", _REPO_ROOT)
+    assert looked is not None, "OPEC-OCT grading file must be findable"
+    return looked[0]
+
+
+def _oct_prose_grade(raw: float) -> float:
+    """The committed OPEC-OCT prose formula: grade = 20 + adjustment/750*100, clamped [0,100],
+    two decimals with ties up (the declared rounding)."""
+    return round_half_up(max(0.0, min(100.0, 20 + raw / 750 * 100)), 2)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [-2200, -1660, -300, -150, -75, -1, 0, 1, 137, 138, 188, 206, 411, 547, 548, 600, 601, 900],
+)
+def test_opec_oct_outcome_map_matches_prose(raw: float) -> None:
+    """The OCT executable outcome_map reproduces its committed prose formula exactly (D57.1).
+
+    Two-decimal arithmetic mapping, rollover at 20 (D28.0). A future edit to one that does not match
+    the other fails here; the prose governs on disagreement.
+    """
+    rubric = _oct_rubric()
+    assert rubric.outcome_map is not None
+    value, _ = map_outcome(rubric, float(raw))
+    assert value == _oct_prose_grade(float(raw))
+
+
+def test_opec_oct_anchors_and_two_decimal_boundary() -> None:
+    """The OCT anchors land exactly and the grade keeps two decimals (D57.1)."""
+    rubric = _oct_rubric()
+    assert map_outcome(rubric, -150.0)[0] == 0.0  # a 150 kb/d cut -> low pole
+    assert map_outcome(rubric, 0.0)[0] == 20.0  # rollover off the midpoint (D28.0)
+    assert map_outcome(rubric, 600.0)[0] == 100.0  # +600 kb/d -> high pole
+    assert map_outcome(rubric, 188.0)[0] == 45.07  # +188 keeps two decimals, not 45
+
+
 def test_opec_map_rounding_half_up_at_the_point_five_boundary() -> None:
     """The declared rounding is nearest-integer, ties UP — pinned at a real ``.5`` boundary (D49.2).
 
@@ -80,6 +117,33 @@ def test_round_half_up_ties_go_up() -> None:
     assert round_half_up(49.5) == 50.0
     assert round_half_up(0.5) == 1.0
     assert round_half_up(50.4999) == 50.0
+
+
+def test_round_half_up_two_decimals_ties_go_up() -> None:
+    """Two-decimal precision (D57.1): ties at the hundredth go up, not banker's rounding."""
+    assert round_half_up(65.665, 2) == 65.67
+    assert round_half_up(20.005, 2) == 20.01
+    assert round_half_up(45.0667, 2) == 45.07
+    assert round_half_up(45.0644, 2) == 45.06
+
+
+def test_nearest_hundredth_half_up_map() -> None:
+    """A two-decimal arithmetic map keeps a tight continuum's grade off the integer grid (D57.1).
+
+    slope 100/750, intercept 20 (the OPEC-OCT continuum: 0 = a 150 kb/d cut, 100 = a 600 kb/d rise,
+    a rollover at 20). Each anchor lands exactly; an intermediate figure keeps two decimals.
+    """
+    m = LinearMap(
+        unit="thousand b/d",
+        slope=100.0 / 750.0,
+        intercept=20.0,
+        rounding="nearest_hundredth_half_up",
+    )
+    assert apply_linear_map(m, -150.0) == 0.0  # cut of 150 kb/d -> pole
+    assert apply_linear_map(m, 0.0) == 20.0  # rollover sits at 20, not the midpoint (D28.0)
+    assert apply_linear_map(m, 600.0) == 100.0  # +600 kb/d -> pole
+    assert apply_linear_map(m, 188.0) == 45.07  # an intermediate figure keeps two decimals
+    assert apply_linear_map(m, -400.0) == 0.0 and apply_linear_map(m, 900.0) == 100.0  # clamped
 
 
 def test_linear_map_clamps() -> None:
