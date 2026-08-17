@@ -94,7 +94,7 @@ def test_load_front_matter_reads_the_committed_repo_config() -> None:
     fm = load_front_matter(REPO / "paper" / "preprint" / "front-matter.toml")
     assert fm.author == "Hamza Gul Hassan"
     assert fm.orcid == "0009-0004-5391-4030"
-    assert fm.dateline.endswith("v7") and fm.runhead.endswith("v7")
+    assert fm.dateline.endswith("v7.1") and fm.runhead.endswith("v7.1")
     assert "Bueno de Mesquita model" in fm.keywords
 
 

@@ -3365,3 +3365,22 @@ classifier is run this session**. The **political** target (predict polarized vs
 is explicitly **not** registered — mooted by A.5 (no resolution to predict) and higher contamination
 risk. Registered as a *descriptive validation* of the structural distinction, not a route to beating
 the mean.
+
+### D64.0 — Paper v7.1: three consistency fixes + one appendix-render fix before upload
+A pre-upload pass aligning three stale spots left by the v6/v7 rewrites, plus a table-parsing bug.
+No science number and no sealed record changed. **(1)** §1's *fourth contribution* replaced the
+oracle-scores-worse framing with the **residual probe** — a flexible learner fitted to the residual
+the weighted mean leaves behind recovers no signal (CV R^2 spanning zero) — matching §5 and the
+abstract, scoping the ceiling to **mean-error loss**, and dropping the now-unused `[E-ORACLE-GAP]`
+citation (the §1 roadmap line "the oracle and the ceiling" is aligned to "the residual probe and the
+ceiling" for the same reason; `E-ORACLE-GAP`/`E-ORACLE-MAE` remain in EVIDENCE.md, simply uncited).
+**(2)** §9's capability wording now matches §3: *the DEU datasets record no capability as a coded
+variable — the framework's third input has always been supplied exogenously.* **(3)** §5's opening
+"Seven failures admit two readings" became "**That seven challengers could not separate from the
+mean** admits two readings," consistent with §4's "failed to separate from." **(4)** Root-caused the
+empty/shifted Source-Provenance cells on the **E-REVIEW-HITS** appendix row: the metric string
+carried literal table pipes (`|err|`), which `paper.assemble.parse_evidence` split on, shifting
+value/source/prov; fixed the metric in `paper/evidence._review_items` to `abs error` (no pipes),
+regenerated EVIDENCE.md, and the appendix row now renders correctly. Rebuilt as **v7.1**
+(front-matter dateline / runhead / version note; DRAFT.md, manuscript.md, manuscript.pdf). Gate
+green: ruff, format, mypy --strict, pytest, paper-evidence --check, site build --check.
