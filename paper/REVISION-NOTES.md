@@ -39,4 +39,28 @@ whose revision points one way cannot separate the two explanations.
 > `Q-2026-USIRAN-STAGE2`, where the revision moved forecasts downward, is pre-registered to supply
 > that contrast.
 
+---
+
+## D60.1 — §3 (Fair fight): two factual corrections about the DEU benchmark
+
+**Source:** `paper/draft/03-fair-fight.md` (assembled into `paper/DRAFT.md`).
+
+**Problem.** §3 says "DEU records no capability data." That is correct but two clarifications should be
+added, surfaced by the Session-60 reviewer investigation (docs/review/reviewer-package.md):
+
+1. **The framework's third input is exogenous.** The exchange-model literature describes the DEU
+   framework as "positions, saliences, and capabilities," which can read as though the dataset codes
+   capability. It does not: every wave records only position and salience per actor; the capability
+   input is supplied **exogenously** (Council voting weights), not as a coded column. §3 should say so
+   explicitly, so the reader does not infer a coded capability variable.
+2. **The 351 issues already span all three waves.** The repo dataset is the combined **DEU I + II +
+   III** (141 proposals / 364 issues, 1999–2019; 351 scored), not a single wave. §3 (or §9) should
+   state this, because it establishes that **n cannot be increased by adding earlier waves** — they
+   are already in — so the predictability-ceiling limit is a property of the benchmark, not a
+   sample-size problem. The paired-MAE minimum detectable effect at n = 351 (~3.04 scale units) is
+   worth stating alongside, and belongs in the abstract.
+
+**Status:** proposed 2026-08-17; not applied. Sealed text unchanged. Apply at the next revision, then
+reassemble `DRAFT.md` and rebuild the preprint.
+
 **Status:** proposed 2026-08-16; not applied. Apply at the next revision, then reassemble and rebuild.

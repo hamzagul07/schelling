@@ -3215,3 +3215,40 @@ wording, the problem, and the replacement. `paper/REVISION-NOTES.md` is not read
 so it moves no science number and the evidence gate is unaffected. Apply at the next revision (edit the
 section, reassemble `DRAFT.md`, rebuild the preprint). Gate green: ruff, format, mypy --strict, pytest,
 paper-evidence --check, site build --check.
+
+### D60.0 — Reviewer data package for the DEU benchmark (post-hoc, exploratory; nothing sealed)
+A referee asked for the per-issue data and several robustness checks behind §3–§5. Everything here is
+**post-hoc and exploratory** — not pre-registered, no sealed forecast, grading rule, or paper text
+changed. Deliverables under `docs/review/`: **`deu-paired-differences.csv`** (one row per scored issue
+— forecasts, absolute errors, paired difference, winner) and **`reviewer-package.md`** (a plain,
+non-defensive covering note plus the analysis). Reproducible via `schelling.backtest.review`
+(`load_scored_issues` → `paired_rows`/`summary`), pinned by a drift-guard test (`tests/test_review.py`)
+so the packaged numbers cannot diverge from the data. **Findings.** (1) *Per-issue (his priority):* on
+mean AE the compromise wins by 3.84 (95% CI [+1.66, +6.01], above the benchmark's MDE); but on **median
+AE the gap is not significant** (CI includes 0), the challenge **wins the tight-hit rates** (≤5: .29
+vs .17; ≤10: .41 vs .31), **CRPS ties** (18.4 vs 18.1), and the sign test is borderline (157 vs 194,
+p=0.055) — so the MAE headline is **loss-function-specific** (supports the critique). (2) *Grid A —
+reconstruction readings:* of the four §2 ambiguities only two are cleanly enumerable (security
+superscript, proposal ordering; k=2); across all four combinations **no reading beats the mean** (best
+26.83). (3) *Grid B — evaluation config:* across 32 configs (k=8 knobs) the challenge **never** beats
+the mean, and the paper's own config is its best case. (4) *Residual probe (reframing the oracle):*
+fitting the same learner to `y − wmean` gives **CV R² = −0.029 [−0.090, +0.021]** — no signal beyond
+the mean; the residual design shrinks toward the baseline, conservative in the right direction. (5)
+*Ablation ladder:* the plain mean of positions carries the accuracy; salience/capability weighting add
+nothing detectable; the dynamics subtract 3.84. (6) *Proxy sweep* (`schelling power`: Shapley-Shubik,
+Banzhaf, + population, voting weights): MAE spread < MDE; challenge loses under every proxy. (7) *The
+missing 2×2 cell* (mean-on-converged = 23.90): the dynamics are ~inert (CI [−0.19, +2.02]); the
+operator dominates. (8) *DEU correction:* the 351 issues are already DEU I+II+III combined (364 issues,
+1999–2019), no wave codes capability, so **n cannot grow** and the ceiling is a benchmark property;
+**MDE ≈ 3.04**. The solver was **not** modified — the proposal-ordering alternative was a script-only
+monkeypatch (a `SolverConfig` field would have changed the serialized config in sealed records). Item
+5 (formalizer-over-DEU) was **investigated, not built**: the CSV carries no issue text, and DEU
+outcomes are published (contamination risk), so a pre-committed recall-probe / model-cutoff /
+perturbation contamination test is proposed before any run. Gate green: ruff, format, mypy --strict,
+pytest, paper-evidence --check, site build --check.
+
+### D60.1 — §3 factual corrections proposed (sealed text unchanged)
+`paper/REVISION-NOTES.md` gains a D60.1 item: §3 should note that the framework's third input
+(capability) is **exogenous voting weights, not a coded column**, and that the 351 issues **span all
+three DEU waves** (so n cannot be increased and the ceiling is a benchmark property; state the ~3.04
+MDE). Proposal only; the committed/sealed paper text is not changed this session.
