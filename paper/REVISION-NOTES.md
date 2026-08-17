@@ -90,3 +90,96 @@ the current §4.1 wording as settled.
 
 **Status:** proposed 2026-08-17; the minimal v7 reframe is applied, the full rewrite is not. Revisit
 with the regime decomposition.
+
+---
+
+## D62 — Regime decomposition: a negative result (POST-HOC; nothing sealed changed)
+
+All numbers below regenerate deterministically from `docs/review/regime-decomposition.py`
+(committed, Q = 0.700, seed 62). POST-HOC and TEST-touching — hypothesis generation, not evidence.
+The decomposition asked whether the pole/middle split the reviewer found is *politics* (a signal the
+mechanism captures) or *structure* (a coding artifact). Answer: **structure plus a scoring-rule
+artifact; there is no recoverable regime signal that beats the mean.**
+
+**What the cut found.**
+- **Classification (ex ante, from the issue spec):** of 351 issues, **binary = 90 (26%)**, **graded =
+  261 (74%)** — binary = 2 named alternatives in the Policy Scales, graded ≥ 3 (53 post-2016 issues
+  lack a scales entry and fall back to "any interior elicited position"). Pole outcomes are 66%
+  binary vs a 26% base rate, so "pole" is heavily confounded with binary issue structure.
+- **2×2 (operator × position vintage):** mean-init **22.99** (best of the four), mean-conv 23.90,
+  med-init 28.42, med-conv (= challenge) **26.83**. The challenge's +3.84 penalty decomposes into
+  **operator +2.93** (median vs mean on the same converged positions) and **dynamics +0.90, ns**
+  (CI [−0.21, +1.99]). The dynamics add no information anywhere; the operator is the culprit.
+- **Proper scores (each model's own ensemble):** on graded poles the challenge's CRPS is *worse*
+  (25.5 vs 22.0) and its **resolution is tied** (0.084 vs 0.086 on P(≥85)); the .30 hit rate is a
+  **commitment artifact** (the challenge calls a pole 48% of the time, right 44%, base rate 31%) — the
+  same pattern on binary poles.
+- **Robustness:** the +3.84 gap holds under a dossier-clustered bootstrap (CI [+1.65, +6.08], 137
+  clusters); trimming each model's top-5/10% blowups drops the gap to **+2.54 / +1.42 — below the MDE
+  3.04**, so the challenge's loss is substantially a tail phenomenon and the defensible claim is
+  "does not beat the mean," not "is worse."
+- **Attacks (post-hoc, in-sample):** convex combination, shrink-to-mean, shrink-to-50 all bottom out
+  at the mean's 22.99 (best convex weight is 0.95 on the mean); linear recalibration is worse (23.38);
+  the OLS slope of outcome on the weighted mean is **0.776, CI [0.627, 0.925]** (< 1, so the mean is
+  mildly too extreme under squared loss, but no transform helps MAE).
+- **Payoff curves:** routing each issue to its regime's best model, **even at perfect classification**,
+  caps at 21.75 (pole/middle) or 22.73 (binary/graded) MAE — break-even needs 80% / 94% accuracy and
+  an MDE-sized gain is **unreachable at any accuracy**. The two-model oracle bound (16.66) is reachable
+  only by *per-issue* selection, which the residual probe (R² ≈ 0) already showed is not learnable.
+
+### D62 item 4 — §4 correction: the regime model *blended where selection was required*
+
+**Source:** `paper/draft/04-successor-search.md`, §4 (the regime-model paragraph).
+
+**Current wording (do not change until the §4.1/regime rewrite):** "…the fitted model collapsed —
+assigning roughly five-sixths of its weight to the compromise component… We read this as evidence
+that the structural features available in these data carry no exploitable regime signal *within* the
+domain…"
+
+**Problem:** "no exploitable regime signal" is too strong. A weak signal exists — the fitted regime
+classifier separates the structural regimes at **AUC ≈ 0.665**, above chance. The R1 model failed not
+because the signal is absent but because it **blended** (soft-weighted its three components) where
+**selection** (hard routing) was required, and with full freedom it put ~5/6 weight on the mean.
+
+**Proposed replacement:** "The more informative result is *how* the regime model failed: it **blended
+where selection was required** — granted freedom to weight its three components it put roughly
+five-sixths of its weight on the compromise and treated the rest as noise. This shows that *soft
+blending* of regime components does not help; it does not show that no regime signal exists. A weak
+one does — the fitted regime classifier separates the structural regimes at AUC ≈ 0.665. But the
+signal is unexploitable for accuracy: routing each issue to its regime's best model, even at *perfect*
+classification, cannot beat the weighted mean by the benchmark's minimum detectable effect (pole/middle
+routing caps at 21.8 MAE against the mean's 23.0; an MDE-sized gain is unreachable at any accuracy).
+The regime hypothesis thus survives only in the cross-domain form Section 7 tests; within this domain
+the signal is real but too weak for any routing to convert into a detectable gain."
+
+### D62 item 7 — retire operator-smoothness as a frame; keep it as a caveated named result
+
+**Source:** `paper/draft/04-successor-search.md`, §4.1.
+
+**Keep (named result, now on 351 issues):** the 2×2 establishes that the **median operator is +2.93
+MAE worse than the mean operator on identical converged positions**, and that the dynamics are inert
+(+0.90, ns) — so "the operator, not the dynamics, drives the loss" graduates from the n = 2 live-game
+probe to the full benchmark.
+
+**Retire (causal frame):** the **"smoothness / median-lock" mechanism** — median snaps, mean smooths
+— as the *explanation*. It rests on the n = 2 sensitivity probe and is **confounded with centrality**:
+the mean is a central-tendency estimator and 69% of DEU outcomes are central (middle), so "mean beats
+median" may reflect central clustering of outcomes rather than a lock/smoothness mechanism. §4.1
+should state the operator result and the centrality confound, and drop median-lock as the causal
+story (the D63.0 note above already flags §4.1 for this rewrite and records the reviewer's confound).
+
+### D62 item D — the ceiling claim, sharpest available form
+
+For the next revision, the ceiling should be stated as follows (mean-error loss, this domain and input
+set): **the capability×salience weighted mean of the raw inputs is the best point forecast obtainable
+from these inputs, across every structural cell.** Grounds: (1) the mean dominates the challenge by
+every proper score in every cell (CRPS, Brier, resolution); (2) the challenge's pole advantage is a
+commitment artifact uniform across structure (~4-unit point edge on poles, both below their cells'
+MDE, no resolution gain); (3) the median operator discards ~2.93 MAE that a mean over the same settled
+positions recovers, but that recovery still does not beat the raw compromise, and the dynamics are
+inert; (4) no regime routing beats the mean by the MDE at any classifier accuracy. The per-issue
+oracle bound (16.66) is not a counterexample — it is reachable only by issue-level selection, which
+the residual probe (R² ≈ 0) showed is not learnable from structure.
+
+**Status:** proposed 2026-08-17; not applied. The paper text is unchanged this session. Apply items 4,
+7, D at the §4/§4.1 rewrite, then reassemble `DRAFT.md` and rebuild the preprint.

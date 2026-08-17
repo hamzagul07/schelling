@@ -3322,3 +3322,46 @@ the two figures the new §5 subsection cites reuse existing E-tags (`E-METHOD-ch
 as **v7** (front-matter dateline / runhead / version note bumped); DRAFT.md, manuscript.md, and
 manuscript.pdf regenerated. Gate green: ruff, format, mypy --strict, pytest, paper-evidence --check,
 site build --check.
+
+### D62.0 — Regime decomposition: a negative result (POST-HOC; no paper text changed)
+A referee read the mean's error as concentrating on "pole" issues (outcome 0/100) and asked whether
+that is a distinct regime the challenge mechanism captures. Session 62 ran the decomposition across
+three human-judgment gates (A: is the pole axis politics or structure; A.5: proper scores; the 2×2)
+and then items 1-5, all **POST-HOC and TEST-touching — hypothesis generation, not evidence**. Nothing
+sealed, no E-tag, and no paper text changed. Everything regenerates deterministically from a new
+committed script, `docs/review/regime-decomposition.py` (Q=0.700, seed 62); the findings and the
+proposed §4/§4.1 wording go into `paper/REVISION-NOTES.md` (D62 entry, items 4/7/D).
+
+**The result is a clean negative.** (1) *Classification* (ex ante, from the Policy Scales alternative
+count): 90 binary / 261 graded of 351; pole outcomes are 66% binary vs a 26% base rate, so "pole" is
+largely **binary issue structure**. (2) *2x2* (operator x vintage): mean-init 22.99 is the best of the
+four corners; the challenge's +3.84 penalty splits into **operator +2.93** (median vs mean) and
+**dynamics +0.90, ns** — so §4.1's "operator, not dynamics" holds on 351 issues, but as an *operator*
+claim, not "the dynamics add information" (they are inert). (3) *Proper scores*: on graded poles the
+challenge has **no resolution advantage** (tied Brier resolution, worse CRPS) — the .30 hit rate is a
+**commitment artifact** (calls a pole 48% of the time, right 44%, base 31%), identical on binary poles.
+(4) *Robustness*: the gap holds under a dossier-clustered bootstrap but falls **below MDE** under a
+per-model tail trim (+2.54 / +1.42), so the honest claim is "does not beat the mean," not "is worse."
+(5) *Attacks*: no post-hoc in-sample transform of the mean (convex, shrink-to-mean, shrink-to-50,
+linear recalibration) beats 22.99; the OLS slope of outcome on the mean is 0.776 [0.627, 0.925].
+(6) *Payoff curves*: routing each issue to its regime's best model, **even at perfect classification**,
+caps at 21.75 (pole/middle) or 22.73 (binary/graded) vs the mean's 22.99 — an MDE-sized gain is
+unreachable at any accuracy; the per-issue oracle bound (16.66) needs issue-level selection the
+residual probe (R^2≈0) already showed is unlearnable. REVISION-NOTES records item 4 (§4's "no
+exploitable regime signal" is too strong given AUC≈0.665 — the R1 model *blended where selection was
+required*), item 7 (retire operator-smoothness as a frame; keep the operator result, note the
+centrality confound), and item D (the ceiling's sharpest form). The **political** classifier target is
+dropped as mooted by the A.5 no-resolution finding. Gate green: ruff, format, mypy --strict, pytest,
+paper-evidence --check, site build --check.
+
+### D62.1 — Pre-registration: structural (binary vs graded) issue classifier, committed before code
+`docs/preregistration-structural-classifier.md` pre-commits the **structural** classifier target — can
+a language model read binary vs graded from issue text at >=75% balanced accuracy — with the recall-
+probe / model-cutoff / perturbation contamination controls, and the pre-computed payoff (even perfect
+structural classification cannot beat the mean by the MDE: break-even alpha 0.94, MDE-beating alpha
+1.64, unreachable). It is committed **before any classifier code exists**, so the append-only history
+certifies the protocol precedes the run, exactly as `deu3_split.json` certified the R1 split; **no
+classifier is run this session**. The **political** target (predict polarized vs consensual outcomes)
+is explicitly **not** registered — mooted by A.5 (no resolution to predict) and higher contamination
+risk. Registered as a *descriptive validation* of the structural distinction, not a route to beating
+the mean.
