@@ -805,7 +805,7 @@ def _review_items(csv_path: Path, record: BacktestRecord) -> list[EvidenceItem]:
         EvidenceItem(
             "E-REVIEW-HITS",
             sec3,
-            "Hit rate |err|<=5/10/20, challenge vs compromise",
+            "Hit rate, abs error <=5/10/20, challenge vs compromise",
             f"<=5: {h[5][0]:.2f} vs {h[5][1]:.2f}; <=10: {h[10][0]:.2f} vs {h[10][1]:.2f}; "
             f"<=20: {h[20][0]:.2f} vs {h[20][1]:.2f}",
             src,

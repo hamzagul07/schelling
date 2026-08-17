@@ -42,7 +42,7 @@
 | E-REVIEW-MAE-CI | 3. Fair fight (post-hoc) | Challenge-minus-compromise mean-AE paired diff + 95% bootstrap CI | +3.84, 95% CI [+1.66, +6.01] | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc, responsive to review; the pre-registered gate was mean absolute error |
 | E-REVIEW-MEDIAN-AE | 3. Fair fight (post-hoc) | Median AE, challenge vs compromise | 20.00 vs 17.54 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc, responsive to review; the pre-registered gate was mean absolute error |
 | E-REVIEW-MEDIAN-CI | 3. Fair fight (post-hoc) | Median-AE paired diff + 95% bootstrap CI (spans zero) | +2.46, 95% CI [-2.34, +4.17] | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc; interval includes 0 |
-| E-REVIEW-HITS | 3. Fair fight (post-hoc) | Hit rate |err|<=5/10/20, challenge vs compromise | <=5: 0.29 vs 0.17; <=10: 0.41 vs 0.31; <=20: 0.55 vs 0.54 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc; challenge wins the tight-hit criteria |
+| E-REVIEW-HITS | 3. Fair fight (post-hoc) | Hit rate, abs error <=5/10/20, challenge vs compromise | <=5: 0.29 vs 0.17; <=10: 0.41 vs 0.31; <=20: 0.55 vs 0.54 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc; challenge wins the tight-hit criteria |
 | E-REVIEW-CRPS | 3. Fair fight (post-hoc) | Weighted-empirical CRPS, challenge vs compromise | 18.38 vs 18.14 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc; point CRPS on DEU equals absolute error |
 | E-REVIEW-WINS | 3. Fair fight (post-hoc) | Per-issue wins + sign test | 157 vs 194; sign test p=0.055 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc, responsive to review; the pre-registered gate was mean absolute error |
 | E-REVIEW-MDE | 5. Ceiling (post-hoc) | Minimum detectable paired-MAE effect at n=351 (80% power, a=.05) | 3.04 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | property of the benchmark; n cannot grow (351 span DEU I+II+III) |
@@ -70,7 +70,7 @@
 | E-CHINA-ROWS | 7. Case library | China Tables 2+3 rows verified (blind dual entry) | 60/60 (26 + 34) | `data/coercive-cases/ktab-china-2014.json` | `ca65c05` | two independent blind transcriptions agree; every Exercised-Power checksum reproduces |
 | E-CHINA-VERIFIED | 7. Case library | China transcription.verified | True | `data/coercive-cases/ktab-china-2014.json` | `ca65c05` | flipped true only on human ratification (D13.0) |
 | E-DOMAIN-VERDICT | 7. Case library | Domain verdicts | cooperative: compromise mean wins; coercive: PENDING | `BACKTEST.md` | `c71f138` | coercive classics paywalled (D11.1); domestic cases out-of-domain, never counted |
-| E-TESTS | Repro | Test count (pytest --collect-only) | 670 | `tests/` | `e9d6c23` | regenerated live; green gate is the acceptance bar |
+| E-TESTS | Repro | Test count (pytest --collect-only) | 670 | `tests/` | `ecc7f43` | regenerated live; green gate is the acceptance bar |
 
 ## Open questions — numbers no artifact could source
 - (none — every cited number resolved to an artifact)
