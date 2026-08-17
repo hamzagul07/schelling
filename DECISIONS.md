@@ -3252,3 +3252,37 @@ pytest, paper-evidence --check, site build --check.
 (capability) is **exogenous voting weights, not a coded column**, and that the 351 issues **span all
 three DEU waves** (so n cannot be increased and the ceiling is a benchmark property; state the ~3.04
 MDE). Proposal only; the committed/sealed paper text is not changed this session.
+
+### D61.0 — Paper v6: the reviewer response incorporated into the manuscript
+The D59/D60 post-hoc analysis is now written into the paper (nothing sealed changed; the DEU-derived
+numbers are cited, not hand-typed). New reviewer-response E-tags — `E-REVIEW-*` for the median AE,
+hit rates, CRPS, the win split with a sign test, the mean-AE bootstrap CI, the benchmark's minimum
+detectable effect, and the residual-probe R^2 — are computed by `paper/evidence._review_items` from
+`schelling.backtest.review` (a new `residual_r2` added there), **registered inside the
+`data/deu` gate** so `paper-evidence --check` still tolerates the gitignored CSV on CI. **§3** now
+reports the full loss-function picture and states plainly that the pre-registered gate was mean
+absolute error and failed on it, then labels the other criteria post-hoc — and adds a bias–variance
+subsection: the challenge model trades bias for variance (bad under absolute-error loss, favourable
+under hit-rate), which replaces "it loses" as the characterisation. **§3** also carries the two DEU
+corrections (capability is an exogenous input, not a coded column; the 351 issues already span DEU
+I+II+III). **§5** replaces the oracle framing with the residual probe (CV R^2 spanning zero) and the
+MDE, scoping the ceiling explicitly to mean-error losses. The **abstract** adds the MDE, Grids A/B
+(no reconstruction reading and no evaluation configuration beats the mean; the paper's own config is
+the challenge's best case), and the hit-rate caveat. **§6** adds an availability-bias account of the
+legend's persistence, grounded in the hit-rate/tail bimodality (Tversky & Kahneman 1973). **§8** cuts
+the OPEC within-question paragraph (per REVISION-NOTES D58.2). Tone pass: "performed theater" and "we
+built the courtroom" removed from §10, and the domain scope-guard restatement dropped from §5 (kept
+once, in §9). New citations added and woven in: Salganik et al. (2020) for the ceiling method, Green
+& Armstrong (2015) for simple-vs-complex, Schneider et al. (2010) for the DEU model-comparison
+literature, Tversky & Kahneman (1973) for availability. Rebuilt as **v6** (front-matter dateline /
+runhead / version note bumped); manuscript.md + manuscript.pdf regenerated. Gate green: ruff, format,
+mypy --strict, pytest, paper-evidence --check, site build --check.
+
+### D61.1 — Provenance footnotes moved to an appendix table
+Per the review, the ~37 inline `[^ev-…]` provenance footnotes are gone: `paper/assemble._resolve_tags`
+now renders a cited figure's value inline (in parentheses, or elided when the prose already states
+it) with **no footnote marker**, and `assemble()` appends a single **"Appendix: provenance of cited
+figures"** table — `| E-tag | Value | Source | Provenance |` — over the `used` set, so every cited
+number still traces to its artifact and stamp, in one place instead of scattered through the text.
+The marker/suppression unit tests and the assemble drift-guard were updated to the new form; the
+preprint drift-guard (`assemble_manuscript(DRAFT) == manuscript.md`) stays green after regeneration.

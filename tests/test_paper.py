@@ -167,10 +167,11 @@ def test_parse_evidence_reads_the_table() -> None:
     assert ev["E-FOO"] == {"value": "12.3", "source": "a.csv", "prov": "abc123"}
 
 
-def test_resolve_tag_inline_value_and_provenance_footnote() -> None:
+def test_resolve_tag_inline_value_no_marker() -> None:
+    # D61: the inline citation renders the value only; provenance moves to the appendix table.
     ev = {"E-FOO": {"value": "12.3", "source": "a.csv", "prov": "abc"}}
     out, used, todos = _resolve_tags("the value is [E-FOO].", ev)
-    assert "(12.3)[^ev-E-FOO]" in out and "E-FOO" in used and todos == []
+    assert "(12.3)" in out and "[^ev-" not in out and "E-FOO" in used and todos == []
 
 
 def test_resolve_two_tags_in_one_bracket_keeps_connective() -> None:
@@ -179,7 +180,7 @@ def test_resolve_two_tags_in_one_bracket_keeps_connective() -> None:
         "E-B": {"value": "2", "source": "s", "prov": "p"},
     }
     out, used, _ = _resolve_tags("[E-A vs E-B]", ev)
-    assert "(1 vs 2)[^ev-E-A][^ev-E-B]" in out and set(used) == {"E-A", "E-B"}
+    assert "(1 vs 2)" in out and "[^ev-" not in out and set(used) == {"E-A", "E-B"}
 
 
 def test_resolve_family_prefix_joins_members() -> None:
@@ -188,7 +189,7 @@ def test_resolve_family_prefix_joins_members() -> None:
         "E-LEDGER-y": {"value": "8", "source": "F", "prov": "p"},
     }
     out, used, _ = _resolve_tags("[E-LEDGER]", ev)
-    assert "(9, 8)[^ev-E-LEDGER]" in out and "E-LEDGER" in used
+    assert "(9, 8)" in out and "E-LEDGER" in used
 
 
 def test_resolve_unknown_tag_is_visible_todo_never_silent() -> None:
@@ -197,33 +198,32 @@ def test_resolve_unknown_tag_is_visible_todo_never_silent() -> None:
 
 
 def test_resolve_suppresses_echo_when_value_already_in_prose() -> None:
-    # D16.2: a tag confirming a number already written in the sentence resolves footnote-only.
+    # D16.2: a tag confirming a number already written in the sentence elides the parenthetical; the
+    # provenance still lands in the appendix table (D61).
     ev = {"E-N": {"value": "351", "source": "s", "prov": "p"}}
     out, used, _ = _resolve_tags("comprises 351 scoreable issues [E-N].", ev)
-    assert "issues[^ev-E-N]" in out and "(351)" not in out and "E-N" in used
+    assert "scoreable issues." in out and "(351)" not in out and "E-N" in used
 
 
 def test_resolve_keeps_echo_when_value_absent_from_prose() -> None:
     ev = {"E-M": {"value": "9.530", "source": "s", "prov": "p"}}
     out, _used, _ = _resolve_tags("reproduces the reference case [E-M].", ev)
-    assert "(9.530)[^ev-E-M]" in out  # no prose number -> value echoed
+    assert "(9.530)" in out and "[^ev-" not in out  # no prose number -> value echoed, no marker
 
 
-def test_resolve_non_numeric_value_is_footnote_only() -> None:
-    # Session 52: a verdict/boolean/description (FAILED, True, PENDING) resolves footnote-only —
-    # never an inline "(FAILED)"/"(True)" parenthetical.
+def test_resolve_non_numeric_value_is_elided_inline() -> None:
+    # A verdict/boolean/description (FAILED, True, PENDING) elides the inline parenthetical — no
+    # inline "(FAILED)"/"(True)"; its provenance is in the appendix table (D61).
     ev = {"E-V": {"value": "FAILED", "source": "s", "prov": "p"}}
     out, used, _ = _resolve_tags("the gate verdict [E-V].", ev)
-    assert "verdict[^ev-E-V]" in out and "(FAILED)" not in out and "E-V" in used
+    assert "the gate verdict." in out and "(FAILED)" not in out and "E-V" in used
 
 
-def test_resolve_keeps_marker_at_every_citation() -> None:
-    # Session 54, item 2: a tag cited twice keeps its marker at BOTH sites; the PDF build merges the
-    # rendered footnotes so the repeat REUSES its number (Session 52 had dropped the repeat marker).
+def test_resolve_shows_value_at_every_citation_no_marker() -> None:
+    # D61: a numeric tag cited twice shows its value at both sites, with no footnote marker.
     ev = {"E-N": {"value": "42", "source": "s", "prov": "p"}}
     out, _u, _ = _resolve_tags("First [E-N]. Later again [E-N].", ev)
-    assert out.count("[^ev-E-N]") == 2  # marker kept at both citation sites
-    assert out.count("(42)") == 2  # the value shows at both
+    assert out.count("(42)") == 2 and "[^ev-" not in out
 
 
 def test_value_stated_in_matches_exact_and_numeric_components() -> None:
@@ -236,16 +236,16 @@ def test_value_stated_in_matches_exact_and_numeric_components() -> None:
     assert not _value_stated_in("22.09 vs 21.26", "worse by 0.83 scale units")  # absolutes absent
 
 
-def test_resolve_multitag_footnote_only_when_prose_states_all_values() -> None:
-    # Session 54, item 8: a multi-tag citation whose values the prose already spells out resolves
-    # footnote-only (both markers kept), never a redundant "(23.84 vs 22.99, -0.84)" parenthetical.
+def test_resolve_multitag_elided_when_prose_states_all_values() -> None:
+    # A multi-tag citation whose values the prose already spells out elides the parenthetical (no
+    # redundant "(23.84 vs 22.99, -0.84)"); both tags still enter the appendix via `used` (D61).
     ev = {
         "E-MAE": {"value": "23.84 vs 22.99", "source": "s", "prov": "p"},
         "E-GAP": {"value": "-0.84", "source": "s", "prov": "p"},
     }
-    out, _u, _ = _resolve_tags("error of 23.84 against 22.99, a gap of 0.84 [E-MAE, E-GAP].", ev)
-    assert "(23.84 vs 22.99" not in out
-    assert out.count("[^ev-E-MAE]") == 1 and out.count("[^ev-E-GAP]") == 1
+    out, used, _ = _resolve_tags("error of 23.84 against 22.99, a gap of 0.84 [E-MAE, E-GAP].", ev)
+    assert "(23.84 vs 22.99" not in out and "[^ev-" not in out
+    assert set(used) == {"E-MAE", "E-GAP"}
 
 
 def test_assemble_repo_deterministic_complete_and_consistent() -> None:
@@ -260,12 +260,14 @@ def test_assemble_repo_deterministic_complete_and_consistent() -> None:
     assert "Meehl, P.E. (1954)" in a  # verified bibliography appended
     # Declarations sit after the conclusion and before the References (Session 52 formatting pass)
     assert "## Declarations" in a and a.index("## Declarations") < a.index("## References")
-    # D16.2 + Session 54: E-DEU-N confirms the prose "351" so its value is never echoed inline; its
-    # marker is kept at every citation site (§1 and §3), so the bracket appears twice as a marker
-    # plus once as the single definition line.
-    assert "(351)[^ev-E-DEU-N]" not in a  # the number echo is suppressed
-    assert "[^ev-E-DEU-N]:" in a  # provenance footnote still defined (once)
-    assert a.count("[^ev-E-DEU-N]") == 3  # two citation markers (§1, §3) + one definition line
+    # D61: provenance moved from footnotes to an appendix table. No footnote markers remain; every
+    # cited figure appears as one appendix row keyed by its E-tag. E-DEU-N confirms the prose "351"
+    # so its value is never echoed inline, but its provenance is in the appendix table.
+    assert "[^ev-" not in a  # no provenance footnote markers anywhere
+    assert "## Appendix: provenance of cited figures" in a
+    assert "| E-DEU-N | 351 |" in a  # the appendix row carries the value
+    assert "(351)[^ev-E-DEU-N]" not in a and "(351)" not in a  # inline number echo suppressed
+    assert "| E-REVIEW-MDE | 3.04 |" in a  # the post-hoc reviewer numbers are in the appendix too
 
 
 def test_paper_assemble_cli_reports_no_unresolved(tmp_path: Path) -> None:

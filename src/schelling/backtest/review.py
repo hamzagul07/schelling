@@ -164,6 +164,57 @@ def summary(
     }
 
 
+def residual_r2(
+    issues: list[DEUIssue], *, seed: int = 59, boot: int = 3000
+) -> tuple[float, float, float]:
+    """Cross-validated R^2 of the flexible learner fit to the residual ``y - wmean`` (D60/D61).
+
+    The oracle reframed: because the weighted mean is already a feature, fitting ``y`` lets ridge
+    shrinkage bias its coefficient away from 1 (flattering the learner), whereas fitting the
+    residual shrinks toward zero — which *is* the baseline — so the residual design is conservative
+    correct direction. R^2 <= 0 means no signal beyond the mean. Returns (r2, ci_lo, ci_hi); the
+    in-sample hyperparameter selection is the offsetting optimism. Deterministic given the seed.
+    """
+    from schelling.backtest.oracle import oracle_features
+
+    x = np.array([oracle_features(i) for i in issues])
+    y = np.array([i.outcome for i in issues])
+    wm = np.array([weighted_mean_forecast(i.game) for i in issues])
+    resid = y - wm
+    n = len(issues)
+    fold = np.random.default_rng(20260721).permutation(n) % 5
+
+    def _std(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        m, s = a.mean(0), np.where(a.std(0) < 1e-9, 1.0, a.std(0))
+        return (a - m) / s, (b - m) / s
+
+    best_pred = None
+    best_mae = np.inf
+    for lam in (0.3, 1.0, 3.0, 10.0):
+        pred = np.zeros(n)
+        for fk in range(5):
+            te = fold == fk
+            tr = ~te
+            a, b = _std(x[tr], x[te])
+            a1 = np.column_stack([np.ones(int(tr.sum())), a])
+            b1 = np.column_stack([np.ones(int(te.sum())), b])
+            reg = lam * np.eye(a1.shape[1])
+            reg[0, 0] = 0.0
+            beta = np.linalg.solve(a1.T @ a1 + reg, a1.T @ resid[tr])
+            pred[te] = b1 @ beta
+        mae = float(np.abs(pred - resid).mean())
+        if mae < best_mae:
+            best_mae, best_pred = mae, pred
+    assert best_pred is not None
+
+    def _r2(r: np.ndarray, p: np.ndarray) -> float:
+        return float(1.0 - ((r - p) ** 2).sum() / ((r - r.mean()) ** 2).sum())
+
+    rng = np.random.default_rng(seed)
+    b = np.array([_r2(resid[i], best_pred[i]) for i in rng.integers(0, n, size=(boot, n))])
+    return _r2(resid, best_pred), float(np.percentile(b, 2.5)), float(np.percentile(b, 97.5))
+
+
 def write_package_csv(out_dir: Path, csv_path: Path = DEFAULT_CSV) -> Path:
     """Write ``deu-paired-differences.csv`` under ``out_dir``; return the path."""
     issues, q = load_scored_issues(csv_path)
