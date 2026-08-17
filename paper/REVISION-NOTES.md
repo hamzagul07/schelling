@@ -64,3 +64,29 @@ added, surfaced by the Session-60 reviewer investigation (docs/review/reviewer-p
 reassemble `DRAFT.md` and rebuild the preprint.
 
 **Status:** proposed 2026-08-16; not applied. Apply at the next revision, then reassemble and rebuild.
+
+---
+
+## D63.0 — §4.1 (The operator, not the dynamics): slated for rewrite under the regime decomposition
+
+**Source:** `paper/draft/04-successor-search.md`, §4.1 (assembled into `paper/DRAFT.md` and the
+preprint manuscript).
+
+**Context.** v7 (D63) applied only a *minimal* fix to §4.1: the operator explanation is now framed
+as a hypothesis these results are consistent with rather than one they demonstrate, and the section
+states that the direct mechanism evidence is the two-game median-lock probe (n = 2), not the
+351-issue MAE comparison. That is a holding action, not the section's final form.
+
+**Problem the minimal fix does not resolve.** The external reviewer has separately identified a
+**centrality confound**: the "median operator locks, mean operator smooths" account cannot, on the
+present evidence, be cleanly separated from the fact that the mean is simply a measure of central
+tendency well matched to a benchmark whose outcomes cluster centrally. The operator-vs-dynamics claim
+therefore rests on n = 2 live games and remains confounded with issue centrality.
+
+**Plan.** §4.1 is slated for a **full rewrite under the regime-decomposition work** (Session 62 gate
+and its follow-on): the rewrite should either supply a centrality-controlled test of the median-lock
+mechanism or downgrade the operator claim to an explicitly caveated, named result. Do **not** treat
+the current §4.1 wording as settled.
+
+**Status:** proposed 2026-08-17; the minimal v7 reframe is applied, the full rewrite is not. Revisit
+with the regime decomposition.

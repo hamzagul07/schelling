@@ -3286,3 +3286,39 @@ figures"** table — `| E-tag | Value | Source | Provenance |` — over the `use
 number still traces to its artifact and stamp, in one place instead of scattered through the text.
 The marker/suppression unit tests and the assemble drift-guard were updated to the new form; the
 preprint drift-guard (`assemble_manuscript(DRAFT) == manuscript.md`) stays green after regeneration.
+
+### D63.0 — Paper v7: hygiene revision closing the review-independent Codex findings
+A narrow, deliberately non-substantive pass on the four sections a Codex adversarial review of v6
+flagged, taking only the findings **independent of the pending regime decomposition** (Session 62)
+plus minimal scoping on the two that are not. Nothing sealed changed and **no science number moved**;
+the two figures the new §5 subsection cites reuse existing E-tags (`E-METHOD-challenge_rp` = 26.83,
+`E-METHOD-baseline_wmean` = 22.99), so EVIDENCE.md is unchanged and no new machinery was added.
+
+- **§5 (Finding 2).** A short subsection, **labelled post-hoc exploratory at first mention**, now
+  reports the two robustness grids behind the abstract's claim: **Grid A** — the four defensible
+  reconstruction readings (security superscript × proposal ordering; the other two §2 ambiguities are
+  not cleanly enumerable), none of which lowers the challenge model below its 26.83 at the paper's
+  configuration, so no reading beats the mean; and **Grid B** — a factorial sweep of **32 evaluation
+  configurations**, the challenge ahead in **none**, its lowest error at the paper's own config. The
+  full grids live in the committed, drift-guarded `docs/review/reviewer-package.md`. The abstract's
+  grid sentence is now supported in the body.
+- **§4 (Finding 4).** The four Phase C methods are labelled **post-hoc exploratory at first mention**;
+  "pre-registered gate" is reserved for the two R1 candidates only; the "identical gate" framing is
+  removed. (The split-reuse caveat paragraph already present is now consistent with this framing.)
+- **§4 (Finding 5, tone).** "seven attacks" → "seven challengers … failed to separate"; "killing every
+  proposal" → "rejecting every proposal on the held-out data"; "caveat-shaped escape" → "the caveat
+  itself, not a way around it".
+- **§10 (Finding 1, minimal).** Two ceiling statements scoped to mean-error loss, one qualifier each
+  ("**under mean-error loss** there is nothing beyond it to find"; "**under that same loss**, the
+  equations above it added nothing measurable"). §10 is otherwise unchanged.
+- **§4.1 (Finding 3, minimal).** The operator explanation is reframed as a hypothesis the results are
+  *consistent with rather than establish*, noting the direct mechanism evidence is the two-game
+  median-lock probe (n = 2), not the 351-issue MAE comparison. `paper/REVISION-NOTES.md` gains **D63.0**
+  recording that the external reviewer separately identified a **centrality confound** and that §4.1 is
+  slated for a full rewrite under the regime decomposition — the v7 change is a holding action, not the
+  section's final form.
+
+§4/§5/§6/§10 were **not** substantively rewritten — that waits for the regime decomposition. Rebuilt
+as **v7** (front-matter dateline / runhead / version note bumped); DRAFT.md, manuscript.md, and
+manuscript.pdf regenerated. Gate green: ruff, format, mypy --strict, pytest, paper-evidence --check,
+site build --check.
