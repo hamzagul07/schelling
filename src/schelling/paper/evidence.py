@@ -751,6 +751,106 @@ def _test_count_item(repo_root: Path) -> tuple[EvidenceItem | None, list[str]]:
 
 
 # --------------------------------------------------------------------------- assembly
+def _review_items(csv_path: Path, record: BacktestRecord) -> list[EvidenceItem]:
+    """Post-hoc reviewer-response numbers (Session 60/61, D60/D61) — EXPLORATORY, not preregistered.
+
+    The loss-function picture (median AE, hit rates, CRPS, the mean-AE bootstrap CI, the win split),
+    the benchmark's minimum detectable effect, and the residual probe that reframes the oracle. The
+    pre-registered gate remains mean absolute error; these are responsive to review.
+    """
+    from typing import cast
+
+    from schelling.backtest.review import load_scored_issues, residual_r2, summary
+
+    issues, q = load_scored_issues(csv_path)
+    s = summary(issues, q)
+    r2, r2lo, r2hi = residual_r2(issues)
+    prov = f"sha256:{record.dataset_sha256[:12]}"
+    src = "data/deu/Dataset_DEU_III.csv"
+    sec3, sec5 = "3. Fair fight (post-hoc)", "5. Ceiling (post-hoc)"
+    mb, ml, mh = cast("tuple[float, float, float]", s["mean_ae_diff_ci"])
+    db, dl, dh = cast("tuple[float, float, float]", s["median_ae_diff_ci"])
+    h = cast("dict[int, tuple[float, float]]", s["hit_rates"])
+    cr = cast("dict[str, float]", s["crps_weighted_empirical"])
+    w = cast("dict[str, int]", s["wins"])
+    exp = "post-hoc, responsive to review; the pre-registered gate was mean absolute error"
+    return [
+        EvidenceItem(
+            "E-REVIEW-MAE-CI",
+            sec3,
+            "Challenge-minus-compromise mean-AE paired diff + 95% bootstrap CI",
+            f"{mb:+.2f}, 95% CI [{ml:+.2f}, {mh:+.2f}]",
+            src,
+            prov,
+            exp,
+        ),
+        EvidenceItem(
+            "E-REVIEW-MEDIAN-AE",
+            sec3,
+            "Median AE, challenge vs compromise",
+            f"{s['challenge_median_ae']:.2f} vs {s['compromise_median_ae']:.2f}",
+            src,
+            prov,
+            exp,
+        ),
+        EvidenceItem(
+            "E-REVIEW-MEDIAN-CI",
+            sec3,
+            "Median-AE paired diff + 95% bootstrap CI (spans zero)",
+            f"{db:+.2f}, 95% CI [{dl:+.2f}, {dh:+.2f}]",
+            src,
+            prov,
+            "post-hoc; interval includes 0",
+        ),
+        EvidenceItem(
+            "E-REVIEW-HITS",
+            sec3,
+            "Hit rate |err|<=5/10/20, challenge vs compromise",
+            f"<=5: {h[5][0]:.2f} vs {h[5][1]:.2f}; <=10: {h[10][0]:.2f} vs {h[10][1]:.2f}; "
+            f"<=20: {h[20][0]:.2f} vs {h[20][1]:.2f}",
+            src,
+            prov,
+            "post-hoc; challenge wins the tight-hit criteria",
+        ),
+        EvidenceItem(
+            "E-REVIEW-CRPS",
+            sec3,
+            "Weighted-empirical CRPS, challenge vs compromise",
+            f"{cr['challenge']:.2f} vs {cr['compromise']:.2f}",
+            src,
+            prov,
+            "post-hoc; point CRPS on DEU equals absolute error",
+        ),
+        EvidenceItem(
+            "E-REVIEW-WINS",
+            sec3,
+            "Per-issue wins + sign test",
+            f"{w['challenge']} vs {w['compromise']}; sign test p={s['sign_test_p']:.3f}",
+            src,
+            prov,
+            exp,
+        ),
+        EvidenceItem(
+            "E-REVIEW-MDE",
+            sec5,
+            "Minimum detectable paired-MAE effect at n=351 (80% power, a=.05)",
+            f"{s['mde_paired_mae']:.2f}",
+            src,
+            prov,
+            "property of the benchmark; n cannot grow (351 span DEU I+II+III)",
+        ),
+        EvidenceItem(
+            "E-REVIEW-RESIDUAL-R2",
+            sec5,
+            "CV R^2 of the flexible learner fit to the residual y-wmean",
+            f"{r2:.3f}, 95% CI [{r2lo:.3f}, {r2hi:.3f}]",
+            src,
+            prov,
+            "post-hoc; R^2<=0 means no signal beyond the weighted mean",
+        ),
+    ]
+
+
 def build_evidence(repo_root: Path) -> EvidenceBundle:
     """Gather every cited number from the repo's artifacts. Runs the DEU backtest if present."""
     from schelling.backtest.deu import load_deu_issues
@@ -785,11 +885,14 @@ def build_evidence(repo_root: Path) -> EvidenceBundle:
         qre_items, qre_missing = _qre_lock_items(repo_root)
         bundle.items += qre_items
         bundle.open_questions += qre_missing
+        bundle.items += _review_items(csv_path, record)
     else:
         bundle.open_questions += [
             "DEU MAE/RMSE tables, split-sample, oracle gap, worst issues, round-1 (E-DEU-MAE-r1 / "
             "E-BASE-WMEAN-r1): data/deu absent — download DEU III (doi:10.34810/data53) to redo.",
             "Successor leaderboard + bootstrap CIs + R1 split sizes: data/deu absent (see above).",
+            "Reviewer-response numbers (E-REVIEW-*: median AE, hits, CRPS, MDE, R^2): data/deu "
+            "absent (see above).",
         ]
 
     ledger_items, ledger_open = _ledger_items(repo_root)

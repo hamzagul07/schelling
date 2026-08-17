@@ -17,6 +17,7 @@ from schelling.backtest.deu import DEFAULT_CSV
 from schelling.backtest.review import (
     load_scored_issues,
     paired_rows,
+    residual_r2,
     summary,
     to_csv,
 )
@@ -84,6 +85,14 @@ def test_win_counts_and_sign_test(scored: tuple[list[DEUIssue], float]) -> None:
     assert wins["challenge"] + wins["compromise"] + wins["ties"] == 351
     assert wins["challenge"] == 157 and wins["compromise"] == 194
     assert s["sign_test_p"] == pytest.approx(0.055, abs=0.01)
+
+
+def test_residual_probe_recovers_no_signal(scored: tuple[list[DEUIssue], float]) -> None:
+    """The oracle reframed (D61): CV R^2 on the residual y-wmean is ~0, CI spans 0."""
+    issues, _q = scored
+    r2, lo, hi = residual_r2(issues)
+    assert r2 == pytest.approx(-0.029, abs=0.01)
+    assert lo < 0 < hi  # indistinguishable from zero -> no signal beyond the weighted mean
 
 
 def test_nothing_sealed_changed_solver_default_untouched() -> None:

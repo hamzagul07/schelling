@@ -39,6 +39,14 @@
 | E-QRE-CI80-usiran | 4. Successor | Median-lock: CI80 width, challenge → QRE (US-Iran stage two) | 44.65 → 25.02 | `analyses/usiran/usiran-v2.json` | `sha256:8868b82c14e5` | seed 42, 10000 draws; QRE tightens rather than widens (D41.6) |
 | E-QRE-ZEROSWING-iaea | 4. Successor | Median-lock: zero-swing sensitivity rows, challenge → QRE (IAEA September) | 13/20 → 13/20 | `analyses/iaea/iaea.json` | `sha256:afa36056cc44` | seed 42; QRE leaves the pinned-median count near-unchanged (D41.6) |
 | E-QRE-CI80-iaea | 4. Successor | Median-lock: CI80 width, challenge → QRE (IAEA September) | 32.71 → 22.28 | `analyses/iaea/iaea.json` | `sha256:afa36056cc44` | seed 42, 10000 draws; QRE tightens rather than widens (D41.6) |
+| E-REVIEW-MAE-CI | 3. Fair fight (post-hoc) | Challenge-minus-compromise mean-AE paired diff + 95% bootstrap CI | +3.84, 95% CI [+1.66, +6.01] | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc, responsive to review; the pre-registered gate was mean absolute error |
+| E-REVIEW-MEDIAN-AE | 3. Fair fight (post-hoc) | Median AE, challenge vs compromise | 20.00 vs 17.54 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc, responsive to review; the pre-registered gate was mean absolute error |
+| E-REVIEW-MEDIAN-CI | 3. Fair fight (post-hoc) | Median-AE paired diff + 95% bootstrap CI (spans zero) | +2.46, 95% CI [-2.34, +4.17] | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc; interval includes 0 |
+| E-REVIEW-HITS | 3. Fair fight (post-hoc) | Hit rate |err|<=5/10/20, challenge vs compromise | <=5: 0.29 vs 0.17; <=10: 0.41 vs 0.31; <=20: 0.55 vs 0.54 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc; challenge wins the tight-hit criteria |
+| E-REVIEW-CRPS | 3. Fair fight (post-hoc) | Weighted-empirical CRPS, challenge vs compromise | 18.38 vs 18.14 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc; point CRPS on DEU equals absolute error |
+| E-REVIEW-WINS | 3. Fair fight (post-hoc) | Per-issue wins + sign test | 157 vs 194; sign test p=0.055 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc, responsive to review; the pre-registered gate was mean absolute error |
+| E-REVIEW-MDE | 5. Ceiling (post-hoc) | Minimum detectable paired-MAE effect at n=351 (80% power, a=.05) | 3.04 | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | property of the benchmark; n cannot grow (351 span DEU I+II+III) |
+| E-REVIEW-RESIDUAL-R2 | 5. Ceiling (post-hoc) | CV R^2 of the flexible learner fit to the residual y-wmean | -0.029, 95% CI [-0.093, 0.019] | `data/deu/Dataset_DEU_III.csv` | `sha256:0d75f0d2f3a9` | post-hoc; R^2<=0 means no signal beyond the weighted mean |
 | E-LEDGER-challenge-v1 | 8. Ledger | Sealed challenge v1 median | 34.576 | `FORECASTS.md` | `cc6124d` | frozen 2026-07-21; sha256 aece91bdcfd8… (gitignored — commit-reveal) |
 | E-LEDGER-compromise-v1 | 8. Ledger | Sealed compromise v1 median | 41.636 | `FORECASTS.md` | `cc6124d` | frozen 2026-07-21; sha256 c87d91ae7f05… (gitignored — commit-reveal) |
 | E-LEDGER-challenge-v2 | 8. Ledger | Sealed challenge v2 median | 29.407 | `FORECASTS.md` | `cc6124d` | frozen 2026-07-21; sha256 3bc97cd4a4ba… (gitignored — commit-reveal) |
@@ -62,7 +70,7 @@
 | E-CHINA-ROWS | 7. Case library | China Tables 2+3 rows verified (blind dual entry) | 60/60 (26 + 34) | `data/coercive-cases/ktab-china-2014.json` | `ca65c05` | two independent blind transcriptions agree; every Exercised-Power checksum reproduces |
 | E-CHINA-VERIFIED | 7. Case library | China transcription.verified | True | `data/coercive-cases/ktab-china-2014.json` | `ca65c05` | flipped true only on human ratification (D13.0) |
 | E-DOMAIN-VERDICT | 7. Case library | Domain verdicts | cooperative: compromise mean wins; coercive: PENDING | `BACKTEST.md` | `c71f138` | coercive classics paywalled (D11.1); domestic cases out-of-domain, never counted |
-| E-TESTS | Repro | Test count (pytest --collect-only) | 669 | `tests/` | `e7df188` | regenerated live; green gate is the acceptance bar |
+| E-TESTS | Repro | Test count (pytest --collect-only) | 670 | `tests/` | `ce97576` | regenerated live; green gate is the acceptance bar |
 
 ## Open questions — numbers no artifact could source
 - (none — every cited number resolved to an artifact)
